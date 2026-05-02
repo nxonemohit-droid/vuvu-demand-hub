@@ -329,6 +329,14 @@ Deno.serve(async (req) => {
         .select("id", { count: "exact", head: true })
         .eq("status", "queued");
 
+      // Fire-and-forget: structure newly-captured signals into leads as soon as the wave finishes.
+      // Don't await — keep drain response fast so the dashboard can launch the next wave.
+      fetch(`${SUPABASE_URL}/functions/v1/structure-leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
+        body: JSON.stringify({ limit: 80 }),
+      }).catch(() => {});
+
       return new Response(JSON.stringify({
         ok: true, mode: "drain", processed: jobs.length, remaining: remaining ?? 0,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
