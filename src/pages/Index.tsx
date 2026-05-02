@@ -39,6 +39,7 @@ const Index = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [enriching, setEnriching] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [waveStatus, setWaveStatus] = useState<string>("");
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [allLeads, setAllLeads] = useState<Pick<LeadRow,"country"|"source"|"priority"|"created_at">[]>([]);
@@ -66,12 +67,53 @@ const Index = () => {
 
   const runDiscovery = async () => {
     setDiscovering(true);
-    toast.info("Discovery started — fetching from APIFY (1–2 min)…");
-    const { data, error } = await supabase.functions.invoke("apify-discover", { body: {} });
-    setDiscovering(false);
-    if (error) return toast.error(error.message);
-    toast.success(`Discovery complete · ran ${data?.ran ?? 0} jobs`);
-    loadAll();
+    setWaveStatus("Queueing jobs…");
+    try {
+      // Step 1: queue
+      const { data: planData, error: planErr } = await supabase.functions.invoke("apify-discover", {
+        body: { mode: "plan" },
+      });
+      if (planErr) throw planErr;
+      const queued = planData?.queued ?? 0;
+      toast.success(`Queued ${queued} discovery jobs`);
+      loadAll();
+
+      // Step 2: drain in waves of 4
+      let waveNum = 0;
+      let totalDone = 0;
+      const totalQueued = queued;
+      while (true) {
+        waveNum++;
+        setWaveStatus(`Wave ${waveNum} · running 4 actors…`);
+        const { data: drainData, error: drainErr } = await supabase.functions.invoke("apify-discover", {
+          body: { mode: "drain" },
+        });
+        if (drainErr) throw drainErr;
+        const processed = drainData?.processed ?? 0;
+        const remaining = drainData?.remaining ?? 0;
+        totalDone += processed;
+        setWaveStatus(`Wave ${waveNum} done · ${totalDone}/${totalQueued} processed · ${remaining} remaining`);
+        loadAll();
+        if (processed === 0 || remaining === 0) break;
+      }
+
+      // Step 3: structure with AI
+      setWaveStatus("AI structuring leads…");
+      await supabase.functions.invoke("structure-leads", { body: { limit: 100 } }).catch(() => {});
+
+      // Step 4: enrich emails
+      setWaveStatus("Enriching emails (Hunter)…");
+      await supabase.functions.invoke("hunter-enrich", { body: { limit: 20 } }).catch(() => {});
+
+      toast.success(`Discovery complete · ${totalDone} jobs processed`);
+      setWaveStatus("");
+      loadAll();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Discovery failed");
+      setWaveStatus("");
+    } finally {
+      setDiscovering(false);
+    }
   };
   const runHunter = async () => {
     setEnriching(true);
@@ -142,6 +184,12 @@ const Index = () => {
       </div>
 
       <div className="p-8 space-y-6">
+        {waveStatus && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 border rounded-lg px-3 py-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            <span>{waveStatus}</span>
+          </div>
+        )}
         {/* KPIs */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
