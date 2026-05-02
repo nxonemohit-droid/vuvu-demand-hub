@@ -80,6 +80,12 @@ const PRIORITY_KEYWORDS = [
   "nurse","caregiver","construction worker","welder","electrician",
   "driver","factory worker","warehouse","mason","plumber","carpenter",
   "hotel staff","cleaner","chef",
+  // Recruiter / staffing-agency intent keywords — surface partner agencies, not just direct employers.
+  "blue collar recruiter","staffing agency blue collar","manpower recruiter",
+  "construction recruiter","warehouse recruiter","hospitality recruiter",
+  "facility management recruiter","security agency recruiter","housekeeping agency",
+  "agriculture recruiter","logistics recruiter","manpower supply company",
+  "workforce solutions","contract staffing","overseas recruitment",
 ];
 
 // Role -> multilingual synonyms (used in query expansion)
@@ -99,6 +105,86 @@ const ROLE_SYNONYMS: Record<string, string[]> = {
   chef: ["chef","cook","kuvar","kucharz","Koch","μάγειρας"],
   waiter: ["waiter","waitress","konobar","kelner","Kellner","σερβιτόρος"],
   "hotel staff": ["hotel staff","reception","hotel receptionist","recepcionista","Hotelmitarbeiter"],
+  // Recruiter / staffing-agency intent — uses Indeed Boolean search syntax.
+  "blue collar recruiter": [
+    "\"blue collar recruiter\"",
+    "\"blue-collar recruiter\"",
+    "(recruiter AND \"blue collar\")",
+    "\"frontline recruiter\"",
+    "\"bulk hiring recruiter\"",
+  ],
+  "staffing agency blue collar": [
+    "\"staffing agency\" AND \"blue collar\"",
+    "\"staffing solutions\" AND \"blue collar\"",
+    "\"recruitment agency\" AND \"blue collar\"",
+    "\"placement consultant\" AND \"blue collar\"",
+  ],
+  "manpower recruiter": [
+    "\"manpower recruiter\"",
+    "\"manpower supply\"",
+    "(manpower OR workforce) AND recruiter",
+    "\"field recruiter\"",
+  ],
+  "construction recruiter": [
+    "\"construction recruiter\"",
+    "(construction OR civil) AND recruiter",
+    "\"technical recruiter\" AND construction",
+  ],
+  "warehouse recruiter": [
+    "\"warehouse recruiter\"",
+    "(warehouse OR logistics) AND recruiter",
+    "\"logistics recruiter\"",
+  ],
+  "hospitality recruiter": [
+    "\"hospitality recruiter\"",
+    "(hotel OR HORECA) AND recruiter",
+    "\"hospitality staffing\"",
+  ],
+  "facility management recruiter": [
+    "\"facility management\" AND recruiter",
+    "\"FM recruiter\"",
+    "\"facilities recruiter\"",
+  ],
+  "security agency recruiter": [
+    "\"security agency\" AND recruiter",
+    "\"security guard\" AND recruiter",
+    "\"security staffing\"",
+  ],
+  "housekeeping agency": [
+    "\"housekeeping agency\"",
+    "(housekeeping OR cleaning) AND agency AND hiring",
+    "\"cleaning staffing\"",
+  ],
+  "agriculture recruiter": [
+    "\"agriculture recruiter\"",
+    "(farm OR agriculture) AND recruiter",
+    "\"seasonal worker\" AND agency",
+  ],
+  "logistics recruiter": [
+    "\"logistics recruiter\"",
+    "(driver OR fleet) AND recruiter",
+    "\"transport staffing\"",
+  ],
+  "manpower supply company": [
+    "\"manpower supply\"",
+    "\"labour supply\"",
+    "\"workforce supply\"",
+  ],
+  "workforce solutions": [
+    "\"workforce solutions\"",
+    "\"staffing solutions\"",
+    "\"workforce management\"",
+  ],
+  "contract staffing": [
+    "\"contract staffing\"",
+    "\"temporary staffing\"",
+    "\"contingent workforce\"",
+  ],
+  "overseas recruitment": [
+    "\"overseas recruitment\"",
+    "\"international recruitment\" AND \"blue collar\"",
+    "\"foreign workers\" AND agency",
+  ],
 };
 const KEYWORDS = Object.keys(ROLE_SYNONYMS);
 
