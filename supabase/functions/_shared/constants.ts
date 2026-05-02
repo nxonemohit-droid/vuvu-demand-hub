@@ -101,7 +101,8 @@ export const CAREER_PATH_HINTS = [
   "vacatures", "werkenbij",                         // nl
 ];
 
-export function looksLikeCareerUrl(url: string): boolean {
+export function looksLikeCareerUrl(url: unknown): boolean {
+  if (typeof url !== "string" || !url) return false;
   const u = url.toLowerCase();
   return CAREER_PATH_HINTS.some((h) => u.includes(h));
 }

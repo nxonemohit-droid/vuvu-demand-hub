@@ -72,9 +72,16 @@ async function persistScrapedPage(
   return !error;
 }
 
+function normaliseLinks(raw: unknown): string[] {
+  // Firecrawl /map can return string[] OR { url: string }[].
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((x) => (typeof x === "string" ? x : (x && typeof x === "object" && "url" in (x as any) ? (x as any).url : null)))
+    .filter((x): x is string => typeof x === "string" && x.length > 0);
+}
+
 function pickCareerLinks(links: string[], rootDomain: string | null): string[] {
   const filtered = links.filter((l) => {
-    if (!l) return false;
     const d = extractDomain(l);
     if (rootDomain && d && !d.endsWith(rootDomain)) return false;
     return looksLikeCareerUrl(l);
@@ -154,7 +161,8 @@ Deno.serve(async (req) => {
         limit: 1000,
         includeSubdomains: false,
       });
-      const links: string[] = (mapRes as any).links ?? (mapRes as any).data?.links ?? [];
+      const linksRaw = (mapRes as any).links ?? (mapRes as any).data?.links ?? (mapRes as any).data ?? [];
+      const links = normaliseLinks(linksRaw);
       const careerLinks = pickCareerLinks(links, rootDomain);
       pageCount = careerLinks.length;
       await logRunEvent(supa, sjob.id, "firecrawl.map", `${links.length} urls, ${careerLinks.length} career`, { sample: careerLinks.slice(0, 5) });
