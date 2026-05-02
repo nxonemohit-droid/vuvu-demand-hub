@@ -71,7 +71,14 @@ function fingerprint(s: string) {
   return `${h}`;
 }
 
-async function runActor(actorId: string, input: unknown, timeoutMs = 90_000) {
+// Indeed actor only supports a fixed list of countries
+const INDEED_ALLOWED = new Set([
+  "AQ","AR","AU","AT","BH","BE","BR","CA","CL","CN","CO","CR","CZ","DK","EC","EG","FI","FR","DE","GR",
+  "HK","HU","IN","ID","IE","IL","IT","JP","KW","LU","MY","MX","NL","NZ","NG","NO","OM","PK","PA","PE",
+  "PH","PL","PT","QA","RO","SA","SG","ZA","KR","ES","SE","CH","TW","TH","TR","AE","UA","GB","US","UY","VE","VN",
+]);
+
+async function runActor(actorId: string, input: unknown, timeoutMs = 60_000) {
   const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${Math.floor(timeoutMs/1000)}`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs + 5000);
@@ -189,6 +196,78 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     const body = await req.json().catch(() => ({}));
+    const mode: "plan" | "drain" = body.mode === "drain" ? "drain" : "plan";
+
+    // ---------- DRAIN MODE: process up to 4 queued jobs synchronously ----------
+    if (mode === "drain") {
+      const WAVE_SIZE = 4;
+      const WAVE_BUDGET_MS = 120_000;
+      const startedAt = Date.now();
+      const actors: Record<string, string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
+
+      const { data: queuedJobs, error: pickErr } = await supabase
+        .from("scrape_jobs")
+        .select("id, source, country, keyword, actor_id")
+        .eq("status", "queued")
+        .order("started_at", { ascending: true })
+        .limit(WAVE_SIZE);
+      if (pickErr) throw pickErr;
+
+      const jobs = queuedJobs ?? [];
+      if (jobs.length > 0) {
+        await supabase.from("scrape_jobs").update({ status: "running" }).in("id", jobs.map((j) => j.id));
+      }
+
+      await Promise.all(jobs.map(async (job) => {
+        if (Date.now() - startedAt > WAVE_BUDGET_MS) {
+          await supabase.from("scrape_jobs").update({ status: "queued" }).eq("id", job.id);
+          return;
+        }
+        const actorId = job.actor_id || actors[job.source];
+        try {
+          const input = buildInput(job.source, job.country ?? "", job.keyword ?? "");
+          const items: any[] = await runActor(actorId, input, 60_000);
+          let inserted = 0;
+          const synonyms = (ROLE_SYNONYMS[job.keyword ?? ""] ?? [job.keyword ?? ""]).map((s) => s.toLowerCase());
+          for (const it of items.slice(0, 60)) {
+            const text = JSON.stringify(it).slice(0, 8000);
+            const lower = text.toLowerCase();
+            const hasRole = synonyms.some((s) => s && lower.includes(s));
+            const hasIntent = INTENT_TERMS.some((t) => lower.includes(t.toLowerCase()));
+            if (!hasRole || !hasIntent) continue;
+            const fp = fingerprint(`${job.source}|${job.country}|${job.keyword}|${(it.url ?? it.link ?? it.id ?? text.slice(0,200))}`);
+            const { error: insErr } = await supabase.from("raw_signals").insert({
+              job_id: job.id,
+              source: job.source,
+              source_url: it.url ?? it.link ?? null,
+              source_id: it.id ?? null,
+              raw_text: text,
+              payload: it,
+              fingerprint: fp,
+            });
+            if (!insErr) inserted++;
+          }
+          await supabase.from("scrape_jobs").update({
+            status: "succeeded", items_found: items.length, items_structured: inserted, finished_at: new Date().toISOString(),
+          }).eq("id", job.id);
+        } catch (e) {
+          await supabase.from("scrape_jobs").update({
+            status: "failed", error: String(e).slice(0, 500), finished_at: new Date().toISOString(),
+          }).eq("id", job.id);
+        }
+      }));
+
+      const { count: remaining } = await supabase
+        .from("scrape_jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "queued");
+
+      return new Response(JSON.stringify({
+        ok: true, mode: "drain", processed: jobs.length, remaining: remaining ?? 0,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ---------- PLAN MODE: build the plan and queue jobs ----------
     const sources: string[] = body.sources ?? Object.keys(DEFAULT_ACTORS);
     const countries: string[] = body.countries ?? COUNTRIES;
     const keywords: string[] = body.keywords ?? KEYWORDS;
@@ -204,6 +283,11 @@ Deno.serve(async (req) => {
         const s = sources[j];
         const c = countries[(i + j) % countries.length];
         const k = keywords[(i * 2 + j) % keywords.length];
+        // Skip Indeed for unsupported countries
+        if (s === "indeed") {
+          const iso = COUNTRY_META[c]?.iso2;
+          if (!iso || !INDEED_ALLOWED.has(iso)) continue;
+        }
         if (!plan.find((p) => p.source === s && p.country === c && p.keyword === k)) {
           plan.push({ source: s, country: c, keyword: k });
           if (plan.length >= maxJobs) break outer;
