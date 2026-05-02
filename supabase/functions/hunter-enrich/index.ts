@@ -13,8 +13,9 @@ const APIFY_TOKEN = Deno.env.get("APIFY_API_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Default Hunter actor on Apify. Override via request body { actor_id }.
-const DEFAULT_HUNTER_ACTOR = "vdrmota~hunter-io-email-finder";
+// Apify "Contact Info Scraper" — officially maintained, scrapes emails/phones from a domain.
+// Override via request body { actor_id }.
+const DEFAULT_HUNTER_ACTOR = "vdrmota~contact-info-scraper";
 
 function extractDomains(url?: string | null, employer?: string | null, country?: string | null): string[] {
   const out = new Set<string>();
@@ -62,27 +63,41 @@ async function runActor(actorId: string, input: unknown, timeoutMs = 90_000) {
 }
 
 function pickBestEmail(items: any[]): { email?: string; name?: string; phone?: string } {
-  // Hunter actor returns array with { emails: [{ value, first_name, last_name, position, type, confidence }] }
-  // Different actors flatten differently — handle both shapes.
+  // Handles three shapes:
+  //   1. Hunter-style: { emails: [{ value, first_name, ... }] }
+  //   2. contact-info-scraper: { emails: ["a@b.com", ...], phones: [...] }
+  //   3. Flat: { email: "...", phone: "..." }
   const emails: any[] = [];
+  const phones: string[] = [];
   for (const it of items) {
-    if (Array.isArray(it?.emails)) emails.push(...it.emails);
-    else if (it?.value && typeof it.value === "string" && it.value.includes("@")) emails.push(it);
-    else if (it?.email && typeof it.email === "string") emails.push({ value: it.email, ...it });
+    if (Array.isArray(it?.emails)) {
+      for (const e of it.emails) {
+        if (typeof e === "string") emails.push({ value: e });
+        else if (e?.value || e?.email) emails.push(e);
+      }
+    }
+    if (Array.isArray(it?.phones)) phones.push(...it.phones.filter((p: any) => typeof p === "string"));
+    if (it?.value && typeof it.value === "string" && it.value.includes("@")) emails.push(it);
+    if (it?.email && typeof it.email === "string") emails.push({ value: it.email, ...it });
+    if (it?.phone && typeof it.phone === "string") phones.push(it.phone);
   }
   if (!emails.length) return {};
   // Prefer HR/recruiting/hiring contacts, then highest confidence
   const score = (e: any) => {
     const role = `${e.position ?? ""} ${e.department ?? ""} ${e.first_name ?? ""}`.toLowerCase();
+    const addr = String(e.value ?? e.email ?? "").toLowerCase();
     let s = e.confidence ?? 0;
     if (/(hr|recruit|talent|hiring|people)/.test(role)) s += 50;
+    if (/(hr|recruit|jobs|careers|hiring|talent|people|kariera|praca)/.test(addr)) s += 30;
+    if (/(info|contact|hello)@/.test(addr)) s += 5;
+    if (/(noreply|no-reply|donotreply|privacy|legal|abuse)/.test(addr)) s -= 50;
     if (e.type === "personal") s += 10;
     return s;
   };
   emails.sort((a, b) => score(b) - score(a));
   const best = emails[0];
   const name = [best.first_name, best.last_name].filter(Boolean).join(" ").trim() || undefined;
-  return { email: best.value ?? best.email, name, phone: best.phone ?? best.phone_number };
+  return { email: best.value ?? best.email, name, phone: best.phone ?? best.phone_number ?? phones[0] };
 }
 
 Deno.serve(async (req) => {
@@ -123,7 +138,16 @@ Deno.serve(async (req) => {
       for (const domain of domains) {
         triedDomain = domain;
         try {
-          const items = await runActor(actorId, { domain, maxResults: 10 });
+          // contact-info-scraper expects startUrls; build a homepage + /contact crawl
+          const items = await runActor(actorId, {
+            startUrls: [
+              { url: `https://${domain}` },
+              { url: `https://${domain}/contact` },
+              { url: `https://${domain}/careers` },
+            ],
+            maxDepth: 2,
+            maxRequestsPerStartUrl: 8,
+          });
           const arr = Array.isArray(items) ? items : [];
           totalItems += arr.length;
           const candidate = pickBestEmail(arr);

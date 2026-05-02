@@ -1,0 +1,2 @@
+UPDATE public.scrape_jobs SET status = 'queued', error = NULL WHERE status = 'running' AND started_at < now() - interval '5 minutes';
+DELETE FROM public.scrape_jobs WHERE status = 'failed' AND keyword LIKE 'hunter:%';
