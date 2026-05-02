@@ -92,30 +92,90 @@ async function runActor(actorId: string, input: unknown, timeoutMs = 90_000) {
   }
 }
 
+function expandQueries(keyword: string, country: string): string[] {
+  const meta = COUNTRY_META[country];
+  const syns = ROLE_SYNONYMS[keyword] ?? [keyword];
+  const intents = ["hiring","urgent","visa sponsorship","walk in","apply now"];
+  const out = new Set<string>();
+  for (const s of syns.slice(0, 4)) {
+    for (const it of intents) out.add(`${s} ${it} ${country}`);
+    out.add(`${s} jobs ${country}`);
+    if (meta?.langs.includes("de")) out.add(`${s} Stelle ${country}`);
+    if (meta?.langs.includes("pl")) out.add(`${s} praca ${country}`);
+    if (meta?.langs.includes("sr")) out.add(`${s} posao ${country}`);
+  }
+  return Array.from(out).slice(0, 6);
+}
+
 function buildInput(source: string, country: string, keyword: string) {
+  const meta = COUNTRY_META[country] ?? { iso2: country.slice(0,2).toUpperCase(), langs: ["en"], boards: [] };
+  const queries = expandQueries(keyword, country);
+  const synonyms = ROLE_SYNONYMS[keyword] ?? [keyword];
+
   switch (source) {
     case "indeed":
       return {
-        country: country.toLowerCase().slice(0,2) === "ge" ? "DE" : country.slice(0,2).toUpperCase(),
-        position: keyword,
-        maxItems: 20,
+        country: meta.iso2,
+        position: synonyms.slice(0, 3).join(" OR "),
+        maxItems: 40,
+        parseCompanyDetails: true,
+        saveOnlyUniqueItems: true,
       };
-    case "facebook":
+    case "linkedin":
       return {
-        startUrls: [
-          { url: `https://www.facebook.com/search/posts?q=${encodeURIComponent(`${keyword} jobs ${country} hiring`)}` },
-        ],
-        maxPosts: 15,
+        location: country,
+        keyword: synonyms.slice(0, 2).join(" OR "),
+        rows: 30,
+        publishedAt: "r604800", // last 7 days
       };
-    case "classifieds":
-    case "career_page":
+    case "facebook": {
+      const urls = queries.flatMap((q) => [
+        { url: `https://www.facebook.com/search/posts/?q=${encodeURIComponent(q)}` },
+        { url: `https://www.facebook.com/search/groups/?q=${encodeURIComponent(`${keyword} ${country} hiring`)}` },
+      ]);
+      return { startUrls: urls.slice(0, 8), maxPosts: 25, maxPostsPerSource: 25 };
+    }
+    case "google": {
+      const boardFilter = meta.boards.length
+        ? "(" + meta.boards.map((b) => `site:${b}`).join(" OR ") + ")"
+        : "";
+      const urls = queries.map((q) => ({
+        url: `https://www.google.com/search?q=${encodeURIComponent(`${q} ${boardFilter}`)}&hl=en&gl=${meta.iso2.toLowerCase()}`,
+      }));
       return {
-        startUrls: [
-          { url: `https://www.google.com/search?q=${encodeURIComponent(`${keyword} jobs ${country} site:olx.${country.slice(0,2).toLowerCase()} OR inurl:careers`)}` },
-        ],
-        pageFunction: "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,4000))}}",
-        maxPagesPerCrawl: 5,
+        queries: queries.join("\n"),
+        countryCode: meta.iso2.toLowerCase(),
+        languageCode: meta.langs[0] ?? "en",
+        maxPagesPerQuery: 2,
+        resultsPerPage: 20,
+        startUrls: urls,
       };
+    }
+    case "classifieds": {
+      const urls = meta.boards.flatMap((b) =>
+        queries.slice(0, 2).map((q) => ({
+          url: `https://www.google.com/search?q=${encodeURIComponent(`${q} site:${b}`)}`,
+        })),
+      );
+      return {
+        startUrls: urls.slice(0, 10),
+        pageFunction:
+          "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,6000))}}",
+        maxPagesPerCrawl: 12,
+        maxRequestRetries: 2,
+      };
+    }
+    case "career_page": {
+      const urls = queries.slice(0, 3).map((q) => ({
+        url: `https://www.google.com/search?q=${encodeURIComponent(`${q} (inurl:careers OR inurl:jobs OR inurl:vacancies)`)}`,
+      }));
+      return {
+        startUrls: urls,
+        pageFunction:
+          "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,6000))}}",
+        maxPagesPerCrawl: 10,
+      };
+    }
     default:
       return {};
   }
