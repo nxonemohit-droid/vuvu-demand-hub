@@ -337,11 +337,12 @@ Deno.serve(async (req) => {
     // ---------- BULK MODE: queue a high-yield sweep across Balkans + EU ----------
     if (mode === "bulk") {
       const actorsB: Record<string,string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
-      // Skip facebook (low keep-rate) and linkedin (often blocked) for bulk runs.
-      const bulkSources = body.sources ?? ["indeed","career_page","classifieds","google"];
+      // Indeed is the only source consistently delivering structured hiring data.
+      // Google-backed sources (career_page/classifieds/google) get blocked → drop from bulk.
+      const bulkSources = body.sources ?? ["indeed"];
       const bulkCountries: string[] = body.countries ?? PRIORITY_COUNTRIES;
       const bulkKeywords: string[] = body.keywords ?? PRIORITY_KEYWORDS;
-      const maxBulk = Math.min(body.maxJobs ?? 60, 80);
+      const maxBulk = Math.min(body.maxJobs ?? 80, 120);
 
       // Round-robin so we don't queue 20 Indeed jobs in a row before any web-scraper.
       const bulkPlan: Array<{source:string;country:string;keyword:string}> = [];
