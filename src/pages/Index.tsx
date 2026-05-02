@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -308,7 +309,14 @@ const Index = () => {
                 <h2 className="font-semibold">Recent discovery runs</h2>
                 <p className="text-xs text-muted-foreground">APIFY actor activity</p>
               </div>
-              <Radar className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" asChild className="h-8">
+                  <Link to="/actor-health">
+                    <Activity className="h-3.5 w-3.5 mr-1.5" /> Actor health
+                  </Link>
+                </Button>
+                <Radar className="h-4 w-4 text-muted-foreground" />
+              </div>
             </div>
             {runs.length === 0 ? (
               <EmptyState
