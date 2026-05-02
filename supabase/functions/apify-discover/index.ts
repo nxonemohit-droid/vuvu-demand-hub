@@ -223,8 +223,14 @@ Deno.serve(async (req) => {
         const input = buildInput(job.source, job.country, job.keyword);
         const items: any[] = await runActor(actorId, input);
         let inserted = 0;
-        for (const it of items.slice(0, 25)) {
+        const synonyms = (ROLE_SYNONYMS[job.keyword] ?? [job.keyword]).map((s) => s.toLowerCase());
+        for (const it of items.slice(0, 60)) {
           const text = JSON.stringify(it).slice(0, 8000);
+          const lower = text.toLowerCase();
+          // Intent prefilter: must contain at least one role synonym AND one hiring-intent term
+          const hasRole = synonyms.some((s) => lower.includes(s));
+          const hasIntent = INTENT_TERMS.some((t) => lower.includes(t.toLowerCase()));
+          if (!hasRole || !hasIntent) continue;
           const fp = fingerprint(`${job.source}|${job.country}|${job.keyword}|${(it.url ?? it.link ?? it.id ?? text.slice(0,200))}`);
           const { error: insErr } = await supabase.from("raw_signals").insert({
             job_id: jobRow.id,
@@ -238,7 +244,7 @@ Deno.serve(async (req) => {
           if (!insErr) inserted++;
         }
         await supabase.from("scrape_jobs").update({
-          status: "succeeded", items_found: items.length, finished_at: new Date().toISOString(),
+          status: "succeeded", items_found: items.length, items_structured: inserted, finished_at: new Date().toISOString(),
         }).eq("id", jobRow.id);
         results.push({ ...job, items_found: items.length, inserted });
       } catch (e) {
@@ -253,7 +259,7 @@ Deno.serve(async (req) => {
     fetch(`${SUPABASE_URL}/functions/v1/structure-leads`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
-      body: JSON.stringify({ limit: 50 }),
+      body: JSON.stringify({ limit: 100 }),
     }).catch(() => {});
 
     return new Response(JSON.stringify({ ok: true, ran: plan.length, results }), {
