@@ -168,8 +168,9 @@ function buildInput(source: string, country: string, keyword: string) {
     case "indeed":
       return {
         country: meta.iso2,
-        position: synonyms.slice(0, 3).join(" OR "),
-        maxItems: 20, // smaller crawl → fits inside 90s timeout
+        // Add hiring-intent terms so Indeed returns blue-collar vacancies, not exec roles.
+        position: `(${synonyms.slice(0, 3).join(" OR ")}) (hiring OR urgent OR "visa sponsorship" OR "work permit")`,
+        maxItems: 25, // smaller crawl → fits inside 90s timeout
         parseCompanyDetails: true,
         saveOnlyUniqueItems: true,
       };
