@@ -13,18 +13,55 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Default actor map. Admins can override per-call via request body.
-// These are widely-used public APIFY actors. Replace freely from admin UI later.
 const DEFAULT_ACTORS: Record<string, string> = {
   indeed: "misceres~indeed-scraper",
   facebook: "apify~facebook-posts-scraper",
   classifieds: "apify~web-scraper",
   career_page: "apify~web-scraper",
+  google: "apify~google-search-scraper",
+  linkedin: "bebity~linkedin-jobs-scraper",
 };
 
-const COUNTRIES = ["Serbia", "Romania", "Poland", "Germany", "Malta"];
-const KEYWORDS = [
-  "mason","plumber","electrician","caregiver","nurse",
-  "factory worker","driver","construction worker",
+// Country -> { iso2, language hints, local job board hosts }
+const COUNTRY_META: Record<string, { iso2: string; langs: string[]; boards: string[] }> = {
+  Serbia:   { iso2: "RS", langs: ["en","sr"],     boards: ["poslovi.infostud.com","helloworld.rs","olx.ba","halooglasi.com"] },
+  Romania:  { iso2: "RO", langs: ["en","ro"],     boards: ["ejobs.ro","bestjobs.eu","olx.ro","hipo.ro"] },
+  Poland:   { iso2: "PL", langs: ["en","pl"],     boards: ["pracuj.pl","olx.pl","gowork.pl","praca.pl"] },
+  Germany:  { iso2: "DE", langs: ["en","de"],     boards: ["stepstone.de","xing.com","arbeitsagentur.de","kimeta.de"] },
+  Malta:    { iso2: "MT", langs: ["en"],          boards: ["jobsplus.gov.mt","keepmeposted.com.mt","maltapark.com"] },
+  Greece:   { iso2: "GR", langs: ["en","el"],     boards: ["kariera.gr","skywalker.gr","xe.gr"] },
+  Croatia:  { iso2: "HR", langs: ["en","hr"],     boards: ["mojposao.net","posao.hr","njuskalo.hr"] },
+  Hungary:  { iso2: "HU", langs: ["en","hu"],     boards: ["profession.hu","jobline.hu"] },
+  Czechia:  { iso2: "CZ", langs: ["en","cs"],     boards: ["jobs.cz","prace.cz"] },
+  Slovakia: { iso2: "SK", langs: ["en","sk"],     boards: ["profesia.sk","kariera.sk"] },
+};
+const COUNTRIES = Object.keys(COUNTRY_META);
+
+// Role -> multilingual synonyms (used in query expansion)
+const ROLE_SYNONYMS: Record<string, string[]> = {
+  mason: ["mason","bricklayer","zidar","murarz","Maurer","ziditelj","kőműves"],
+  plumber: ["plumber","vodoinstalater","hydraulik","Klempner","instalator","υδραυλικός"],
+  electrician: ["electrician","električar","elektryk","Elektriker","electrician","ηλεκτρολόγος"],
+  caregiver: ["caregiver","care worker","negovateljica","opiekun","Pflegekraft","badante"],
+  nurse: ["nurse","medicinska sestra","pielęgniarka","Krankenpfleger","νοσηλευτής"],
+  "factory worker": ["factory worker","production operator","radnik u fabrici","pracownik produkcji","Produktionsmitarbeiter"],
+  driver: ["driver","truck driver","vozač","kierowca","Fahrer","LKW Fahrer"],
+  "construction worker": ["construction worker","građevinski radnik","pracownik budowlany","Bauarbeiter","εργάτης οικοδομών"],
+  welder: ["welder","varilac","spawacz","Schweißer","συγκολλητής"],
+  carpenter: ["carpenter","stolar","cieśla","Zimmermann","ξυλουργός"],
+  warehouse: ["warehouse worker","picker packer","magacioner","magazynier","Lagerarbeiter"],
+  cleaner: ["cleaner","housekeeping","čistačica","sprzątaczka","Reinigungskraft"],
+  chef: ["chef","cook","kuvar","kucharz","Koch","μάγειρας"],
+  waiter: ["waiter","waitress","konobar","kelner","Kellner","σερβιτόρος"],
+  "hotel staff": ["hotel staff","reception","hotel receptionist","recepcionista","Hotelmitarbeiter"],
+};
+const KEYWORDS = Object.keys(ROLE_SYNONYMS);
+
+const INTENT_TERMS = [
+  "hiring","urgent hiring","walk in","mass hiring","bulk hiring","visa sponsorship",
+  "work permit","accommodation provided","apply now","immediate joining",
+  "zapošljavamo","tražimo","zatrudnimy","poszukujemy","Wir stellen ein","suchen",
+  "ζητείται","ζητούνται","cerchiamo",
 ];
 
 function fingerprint(s: string) {
@@ -55,30 +92,90 @@ async function runActor(actorId: string, input: unknown, timeoutMs = 90_000) {
   }
 }
 
+function expandQueries(keyword: string, country: string): string[] {
+  const meta = COUNTRY_META[country];
+  const syns = ROLE_SYNONYMS[keyword] ?? [keyword];
+  const intents = ["hiring","urgent","visa sponsorship","walk in","apply now"];
+  const out = new Set<string>();
+  for (const s of syns.slice(0, 4)) {
+    for (const it of intents) out.add(`${s} ${it} ${country}`);
+    out.add(`${s} jobs ${country}`);
+    if (meta?.langs.includes("de")) out.add(`${s} Stelle ${country}`);
+    if (meta?.langs.includes("pl")) out.add(`${s} praca ${country}`);
+    if (meta?.langs.includes("sr")) out.add(`${s} posao ${country}`);
+  }
+  return Array.from(out).slice(0, 6);
+}
+
 function buildInput(source: string, country: string, keyword: string) {
+  const meta = COUNTRY_META[country] ?? { iso2: country.slice(0,2).toUpperCase(), langs: ["en"], boards: [] };
+  const queries = expandQueries(keyword, country);
+  const synonyms = ROLE_SYNONYMS[keyword] ?? [keyword];
+
   switch (source) {
     case "indeed":
       return {
-        country: country.toLowerCase().slice(0,2) === "ge" ? "DE" : country.slice(0,2).toUpperCase(),
-        position: keyword,
-        maxItems: 20,
+        country: meta.iso2,
+        position: synonyms.slice(0, 3).join(" OR "),
+        maxItems: 40,
+        parseCompanyDetails: true,
+        saveOnlyUniqueItems: true,
       };
-    case "facebook":
+    case "linkedin":
       return {
-        startUrls: [
-          { url: `https://www.facebook.com/search/posts?q=${encodeURIComponent(`${keyword} jobs ${country} hiring`)}` },
-        ],
-        maxPosts: 15,
+        location: country,
+        keyword: synonyms.slice(0, 2).join(" OR "),
+        rows: 30,
+        publishedAt: "r604800", // last 7 days
       };
-    case "classifieds":
-    case "career_page":
+    case "facebook": {
+      const urls = queries.flatMap((q) => [
+        { url: `https://www.facebook.com/search/posts/?q=${encodeURIComponent(q)}` },
+        { url: `https://www.facebook.com/search/groups/?q=${encodeURIComponent(`${keyword} ${country} hiring`)}` },
+      ]);
+      return { startUrls: urls.slice(0, 8), maxPosts: 25, maxPostsPerSource: 25 };
+    }
+    case "google": {
+      const boardFilter = meta.boards.length
+        ? "(" + meta.boards.map((b) => `site:${b}`).join(" OR ") + ")"
+        : "";
+      const urls = queries.map((q) => ({
+        url: `https://www.google.com/search?q=${encodeURIComponent(`${q} ${boardFilter}`)}&hl=en&gl=${meta.iso2.toLowerCase()}`,
+      }));
       return {
-        startUrls: [
-          { url: `https://www.google.com/search?q=${encodeURIComponent(`${keyword} jobs ${country} site:olx.${country.slice(0,2).toLowerCase()} OR inurl:careers`)}` },
-        ],
-        pageFunction: "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,4000))}}",
-        maxPagesPerCrawl: 5,
+        queries: queries.join("\n"),
+        countryCode: meta.iso2.toLowerCase(),
+        languageCode: meta.langs[0] ?? "en",
+        maxPagesPerQuery: 2,
+        resultsPerPage: 20,
+        startUrls: urls,
       };
+    }
+    case "classifieds": {
+      const urls = meta.boards.flatMap((b) =>
+        queries.slice(0, 2).map((q) => ({
+          url: `https://www.google.com/search?q=${encodeURIComponent(`${q} site:${b}`)}`,
+        })),
+      );
+      return {
+        startUrls: urls.slice(0, 10),
+        pageFunction:
+          "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,6000))}}",
+        maxPagesPerCrawl: 12,
+        maxRequestRetries: 2,
+      };
+    }
+    case "career_page": {
+      const urls = queries.slice(0, 3).map((q) => ({
+        url: `https://www.google.com/search?q=${encodeURIComponent(`${q} (inurl:careers OR inurl:jobs OR inurl:vacancies)`)}`,
+      }));
+      return {
+        startUrls: urls,
+        pageFunction:
+          "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,6000))}}",
+        maxPagesPerCrawl: 10,
+      };
+    }
     default:
       return {};
   }
@@ -96,13 +193,18 @@ Deno.serve(async (req) => {
     const countries: string[] = body.countries ?? COUNTRIES;
     const keywords: string[] = body.keywords ?? KEYWORDS;
     const actors: Record<string,string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
-    // Cap fan-out so we don't blow timeouts on first run.
-    const maxJobs = body.maxJobs ?? 6;
+    // Cap fan-out — higher default for robust coverage; admin can override.
+    const maxJobs = body.maxJobs ?? 18;
 
+    // Round-robin (source, country, keyword) so we don't exhaust one source first.
     const plan: Array<{source:string;country:string;keyword:string}> = [];
-    outer: for (const s of sources) {
-      for (const c of countries) {
-        for (const k of keywords) {
+    const maxLen = Math.max(sources.length, countries.length, keywords.length);
+    outer: for (let i = 0; i < maxLen * maxLen; i++) {
+      for (let j = 0; j < sources.length; j++) {
+        const s = sources[j];
+        const c = countries[(i + j) % countries.length];
+        const k = keywords[(i * 2 + j) % keywords.length];
+        if (!plan.find((p) => p.source === s && p.country === c && p.keyword === k)) {
           plan.push({ source: s, country: c, keyword: k });
           if (plan.length >= maxJobs) break outer;
         }
@@ -121,8 +223,14 @@ Deno.serve(async (req) => {
         const input = buildInput(job.source, job.country, job.keyword);
         const items: any[] = await runActor(actorId, input);
         let inserted = 0;
-        for (const it of items.slice(0, 25)) {
+        const synonyms = (ROLE_SYNONYMS[job.keyword] ?? [job.keyword]).map((s) => s.toLowerCase());
+        for (const it of items.slice(0, 60)) {
           const text = JSON.stringify(it).slice(0, 8000);
+          const lower = text.toLowerCase();
+          // Intent prefilter: must contain at least one role synonym AND one hiring-intent term
+          const hasRole = synonyms.some((s) => lower.includes(s));
+          const hasIntent = INTENT_TERMS.some((t) => lower.includes(t.toLowerCase()));
+          if (!hasRole || !hasIntent) continue;
           const fp = fingerprint(`${job.source}|${job.country}|${job.keyword}|${(it.url ?? it.link ?? it.id ?? text.slice(0,200))}`);
           const { error: insErr } = await supabase.from("raw_signals").insert({
             job_id: jobRow.id,
@@ -136,7 +244,7 @@ Deno.serve(async (req) => {
           if (!insErr) inserted++;
         }
         await supabase.from("scrape_jobs").update({
-          status: "succeeded", items_found: items.length, finished_at: new Date().toISOString(),
+          status: "succeeded", items_found: items.length, items_structured: inserted, finished_at: new Date().toISOString(),
         }).eq("id", jobRow.id);
         results.push({ ...job, items_found: items.length, inserted });
       } catch (e) {
@@ -151,7 +259,7 @@ Deno.serve(async (req) => {
     fetch(`${SUPABASE_URL}/functions/v1/structure-leads`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
-      body: JSON.stringify({ limit: 50 }),
+      body: JSON.stringify({ limit: 100 }),
     }).catch(() => {});
 
     return new Response(JSON.stringify({ ok: true, ran: plan.length, results }), {

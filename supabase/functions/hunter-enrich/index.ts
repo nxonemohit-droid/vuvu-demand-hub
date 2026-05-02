@@ -16,21 +16,28 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Default Hunter actor on Apify. Override via request body { actor_id }.
 const DEFAULT_HUNTER_ACTOR = "vdrmota~hunter-io-email-finder";
 
-function extractDomain(url?: string | null, employer?: string | null): string | null {
+function extractDomains(url?: string | null, employer?: string | null, country?: string | null): string[] {
+  const out = new Set<string>();
   if (url) {
     try {
       const u = new URL(url.startsWith("http") ? url : `https://${url}`);
       const host = u.hostname.replace(/^www\./, "");
-      // skip social/job aggregator domains — they aren't the employer's site
-      const skip = ["facebook.com","linkedin.com","indeed.com","google.com","olx.","gumtree.","kijiji."];
-      if (!skip.some((s) => host.includes(s))) return host;
-    } catch { /* fallthrough */ }
+      const skip = ["facebook.com","linkedin.com","indeed.com","google.com","olx.","gumtree.","kijiji.","glassdoor.","monster."];
+      if (!skip.some((s) => host.includes(s))) out.add(host);
+    } catch { /* ignore */ }
   }
   if (employer) {
     const slug = employer.toLowerCase().replace(/[^a-z0-9]+/g, "");
-    if (slug.length >= 3) return `${slug}.com`;
+    if (slug.length >= 3) {
+      const tldByCountry: Record<string,string[]> = {
+        Serbia:["rs"], Romania:["ro"], Poland:["pl"], Germany:["de"], Malta:["mt","com.mt"],
+        Greece:["gr"], Croatia:["hr"], Hungary:["hu"], Czechia:["cz"], Slovakia:["sk"],
+      };
+      const tlds = ["com", ...(country ? tldByCountry[country] ?? [] : []), "eu","net"];
+      for (const t of tlds) out.add(`${slug}.${t}`);
+    }
   }
-  return null;
+  return Array.from(out).slice(0, 4);
 }
 
 async function runActor(actorId: string, input: unknown, timeoutMs = 90_000) {
@@ -92,13 +99,13 @@ Deno.serve(async (req) => {
 
     let q = supabase
       .from("demand_leads")
-      .select("id, employer_name, source_url, contact_email")
+      .select("id, employer_name, source_url, contact_email, country")
       .is("contact_email", null)
       .not("employer_name", "is", null)
       .order("urgency_score", { ascending: false })
       .limit(limit);
     if (leadIds?.length) q = supabase.from("demand_leads")
-      .select("id, employer_name, source_url, contact_email")
+      .select("id, employer_name, source_url, contact_email, country")
       .in("id", leadIds);
 
     const { data: leads, error } = await q;
@@ -106,36 +113,44 @@ Deno.serve(async (req) => {
 
     const results: any[] = [];
     for (const lead of leads ?? []) {
-      const domain = extractDomain(lead.source_url, lead.employer_name);
-      if (!domain) { results.push({ id: lead.id, skipped: "no_domain" }); continue; }
+      const domains = extractDomains(lead.source_url, lead.employer_name, (lead as any).country);
+      if (!domains.length) { results.push({ id: lead.id, skipped: "no_domain" }); continue; }
+
+      let best: { email?: string; name?: string; phone?: string } = {};
+      let triedDomain = "";
+      let totalItems = 0;
+      let lastError = "";
+      for (const domain of domains) {
+        triedDomain = domain;
+        try {
+          const items = await runActor(actorId, { domain, maxResults: 10 });
+          const arr = Array.isArray(items) ? items : [];
+          totalItems += arr.length;
+          const candidate = pickBestEmail(arr);
+          if (candidate.email) { best = candidate; break; }
+        } catch (e) {
+          lastError = String(e).slice(0, 200);
+        }
+      }
 
       const { data: jobRow } = await supabase.from("scrape_jobs").insert({
-        source: "other", actor_id: actorId, country: null, keyword: `hunter:${domain}`, status: "running",
+        source: "other", actor_id: actorId, country: (lead as any).country ?? null,
+        keyword: `hunter:${triedDomain}`,
+        status: best.email ? "succeeded" : (lastError ? "failed" : "succeeded"),
+        items_found: totalItems,
+        items_structured: best.email ? 1 : 0,
+        error: best.email ? null : lastError || null,
+        finished_at: new Date().toISOString(),
       }).select().single();
 
-      try {
-        const items = await runActor(actorId, { domain, maxResults: 10 });
-        const best = pickBestEmail(Array.isArray(items) ? items : []);
-        if (best.email) {
-          await supabase.from("demand_leads").update({
-            contact_email: best.email,
-            contact_name: best.name ?? undefined,
-            contact_phone: best.phone ?? undefined,
-          }).eq("id", lead.id);
-        }
-        if (jobRow) await supabase.from("scrape_jobs").update({
-          status: "succeeded",
-          items_found: Array.isArray(items) ? items.length : 0,
-          items_structured: best.email ? 1 : 0,
-          finished_at: new Date().toISOString(),
-        }).eq("id", jobRow.id);
-        results.push({ id: lead.id, domain, email: best.email ?? null });
-      } catch (e) {
-        if (jobRow) await supabase.from("scrape_jobs").update({
-          status: "failed", error: String(e).slice(0, 500), finished_at: new Date().toISOString(),
-        }).eq("id", jobRow.id);
-        results.push({ id: lead.id, domain, error: String(e).slice(0, 200) });
+      if (best.email) {
+        await supabase.from("demand_leads").update({
+          contact_email: best.email,
+          contact_name: best.name ?? undefined,
+          contact_phone: best.phone ?? undefined,
+        }).eq("id", lead.id);
       }
+      results.push({ id: lead.id, domains, email: best.email ?? null, error: best.email ? null : lastError || null, job_id: jobRow?.id });
     }
 
     return new Response(JSON.stringify({ ok: true, processed: results.length, results }), {
