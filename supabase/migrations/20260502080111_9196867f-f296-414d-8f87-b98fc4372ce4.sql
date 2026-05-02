@@ -1,0 +1,1 @@
+ALTER VIEW public.company_demand_stats SET (security_invoker = true);
