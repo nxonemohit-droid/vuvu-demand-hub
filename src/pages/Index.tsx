@@ -184,6 +184,12 @@ const Index = () => {
       </div>
 
       <div className="p-8 space-y-6">
+        {waveStatus && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 border rounded-lg px-3 py-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            <span>{waveStatus}</span>
+          </div>
+        )}
         {/* KPIs */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
