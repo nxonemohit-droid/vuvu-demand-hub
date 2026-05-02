@@ -211,58 +211,84 @@ Deno.serve(async (req) => {
       }
     }
 
-    const results: any[] = [];
+    // Pre-create scrape_jobs rows synchronously so the UI sees them immediately,
+    // then run the slow Apify calls in the background to avoid the 150s timeout.
+    const queued: Array<{ job: typeof plan[number]; jobId: string; actorId: string }> = [];
     for (const job of plan) {
       const actorId = actors[job.source];
-      const { data: jobRow, error: jobErr } = await supabase.from("scrape_jobs").insert({
-        source: job.source, actor_id: actorId, country: job.country, keyword: job.keyword, status: "running",
-      }).select().single();
-      if (jobErr || !jobRow) { results.push({ ...job, error: jobErr?.message }); continue; }
-
-      try {
-        const input = buildInput(job.source, job.country, job.keyword);
-        const items: any[] = await runActor(actorId, input);
-        let inserted = 0;
-        const synonyms = (ROLE_SYNONYMS[job.keyword] ?? [job.keyword]).map((s) => s.toLowerCase());
-        for (const it of items.slice(0, 60)) {
-          const text = JSON.stringify(it).slice(0, 8000);
-          const lower = text.toLowerCase();
-          // Intent prefilter: must contain at least one role synonym AND one hiring-intent term
-          const hasRole = synonyms.some((s) => lower.includes(s));
-          const hasIntent = INTENT_TERMS.some((t) => lower.includes(t.toLowerCase()));
-          if (!hasRole || !hasIntent) continue;
-          const fp = fingerprint(`${job.source}|${job.country}|${job.keyword}|${(it.url ?? it.link ?? it.id ?? text.slice(0,200))}`);
-          const { error: insErr } = await supabase.from("raw_signals").insert({
-            job_id: jobRow.id,
-            source: job.source,
-            source_url: it.url ?? it.link ?? null,
-            source_id: it.id ?? null,
-            raw_text: text,
-            payload: it,
-            fingerprint: fp,
-          });
-          if (!insErr) inserted++;
-        }
-        await supabase.from("scrape_jobs").update({
-          status: "succeeded", items_found: items.length, items_structured: inserted, finished_at: new Date().toISOString(),
-        }).eq("id", jobRow.id);
-        results.push({ ...job, items_found: items.length, inserted });
-      } catch (e) {
-        await supabase.from("scrape_jobs").update({
-          status: "failed", error: String(e).slice(0, 500), finished_at: new Date().toISOString(),
-        }).eq("id", jobRow.id);
-        results.push({ ...job, error: String(e).slice(0, 200) });
-      }
+      if (!actorId) continue;
+      const { data: jobRow } = await supabase.from("scrape_jobs").insert({
+        source: job.source, actor_id: actorId, country: job.country, keyword: job.keyword, status: "queued",
+      }).select("id").single();
+      if (jobRow) queued.push({ job, jobId: jobRow.id, actorId });
     }
 
-    // Fire structuring asynchronously
-    fetch(`${SUPABASE_URL}/functions/v1/structure-leads`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
-      body: JSON.stringify({ limit: 100 }),
-    }).catch(() => {});
+    const runAll = async () => {
+      // Process in small parallel batches so total wall time stays manageable
+      const CONCURRENCY = 3;
+      let idx = 0;
+      const worker = async () => {
+        while (idx < queued.length) {
+          const cur = queued[idx++];
+          if (!cur) break;
+          const { job, jobId, actorId } = cur;
+          await supabase.from("scrape_jobs").update({ status: "running" }).eq("id", jobId);
+          try {
+            const input = buildInput(job.source, job.country, job.keyword);
+            const items: any[] = await runActor(actorId, input);
+            let inserted = 0;
+            const synonyms = (ROLE_SYNONYMS[job.keyword] ?? [job.keyword]).map((s) => s.toLowerCase());
+            for (const it of items.slice(0, 60)) {
+              const text = JSON.stringify(it).slice(0, 8000);
+              const lower = text.toLowerCase();
+              const hasRole = synonyms.some((s) => lower.includes(s));
+              const hasIntent = INTENT_TERMS.some((t) => lower.includes(t.toLowerCase()));
+              if (!hasRole || !hasIntent) continue;
+              const fp = fingerprint(`${job.source}|${job.country}|${job.keyword}|${(it.url ?? it.link ?? it.id ?? text.slice(0,200))}`);
+              const { error: insErr } = await supabase.from("raw_signals").insert({
+                job_id: jobId,
+                source: job.source,
+                source_url: it.url ?? it.link ?? null,
+                source_id: it.id ?? null,
+                raw_text: text,
+                payload: it,
+                fingerprint: fp,
+              });
+              if (!insErr) inserted++;
+            }
+            await supabase.from("scrape_jobs").update({
+              status: "succeeded", items_found: items.length, items_structured: inserted, finished_at: new Date().toISOString(),
+            }).eq("id", jobId);
+          } catch (e) {
+            await supabase.from("scrape_jobs").update({
+              status: "failed", error: String(e).slice(0, 500), finished_at: new Date().toISOString(),
+            }).eq("id", jobId);
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
-    return new Response(JSON.stringify({ ok: true, ran: plan.length, results }), {
+      // Fire structuring once all actors finished
+      await fetch(`${SUPABASE_URL}/functions/v1/structure-leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
+        body: JSON.stringify({ limit: 100 }),
+      }).catch(() => {});
+    };
+
+    // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(runAll());
+    } else {
+      runAll().catch(() => {});
+    }
+
+    return new Response(JSON.stringify({
+      ok: true,
+      queued: queued.length,
+      message: "Discovery started in background. Refresh in 1–2 minutes to see results.",
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
