@@ -169,7 +169,7 @@ function buildInput(source: string, country: string, keyword: string) {
       return {
         country: meta.iso2,
         position: synonyms.slice(0, 3).join(" OR "),
-        maxItems: 40,
+        maxItems: 20, // smaller crawl → fits inside 90s timeout
         parseCompanyDetails: true,
         saveOnlyUniqueItems: true,
       };
@@ -210,10 +210,10 @@ function buildInput(source: string, country: string, keyword: string) {
         })),
       );
       return {
-        startUrls: urls.slice(0, 10),
+        startUrls: urls.slice(0, 6),
         pageFunction:
           "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,6000))}}",
-        maxPagesPerCrawl: 12,
+        maxPagesPerCrawl: 6,
         maxRequestRetries: 2,
       };
     }
@@ -225,7 +225,7 @@ function buildInput(source: string, country: string, keyword: string) {
         startUrls: urls,
         pageFunction:
           "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,6000))}}",
-        maxPagesPerCrawl: 10,
+        maxPagesPerCrawl: 6,
       };
     }
     default:
