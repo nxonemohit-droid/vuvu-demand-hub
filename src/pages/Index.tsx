@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Briefcase, Users, Radar, AlertTriangle, Mail, Loader2, PlayCircle,
   RefreshCw, TrendingUp, Globe2, Phone, ExternalLink, Sparkles, Activity, MapPin,
+  Zap,
 } from "lucide-react";
 import { useRoles } from "@/lib/auth";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ const Index = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [enriching, setEnriching] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
   const [waveStatus, setWaveStatus] = useState<string>("");
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [leads, setLeads] = useState<LeadRow[]>([]);
@@ -66,17 +68,22 @@ const Index = () => {
 
   useEffect(() => { loadAll(); }, []);
 
-  const runDiscovery = async () => {
-    setDiscovering(true);
+  const runPipeline = async (mode: "plan" | "bulk") => {
+    const setLoading = mode === "bulk" ? setBulkRunning : setDiscovering;
+    setLoading(true);
     setWaveStatus("Queueing jobs…");
     try {
       // Step 1: queue
       const { data: planData, error: planErr } = await supabase.functions.invoke("apify-discover", {
-        body: { mode: "plan" },
+        body: { mode },
       });
       if (planErr) throw planErr;
       const queued = planData?.queued ?? 0;
-      toast.success(`Queued ${queued} discovery jobs`);
+      toast.success(
+        mode === "bulk"
+          ? `Bulk queued ${queued} jobs across full Balkans + EU`
+          : `Queued ${queued} discovery jobs`,
+      );
       loadAll();
 
       // Step 2: drain in waves of 4
@@ -99,12 +106,12 @@ const Index = () => {
       }
 
       // Step 3: structure with AI
-      setWaveStatus("AI structuring leads…");
-      await supabase.functions.invoke("structure-leads", { body: { limit: 100 } }).catch(() => {});
+      setWaveStatus("Gemini analysing & scoring leads…");
+      await supabase.functions.invoke("structure-leads", { body: { limit: 200 } }).catch(() => {});
 
       // Step 4: enrich emails
-      setWaveStatus("Enriching emails (Hunter)…");
-      await supabase.functions.invoke("hunter-enrich", { body: { limit: 20 } }).catch(() => {});
+      setWaveStatus("Enriching contact emails…");
+      await supabase.functions.invoke("hunter-enrich", { body: { limit: 30 } }).catch(() => {});
 
       toast.success(`Discovery complete · ${totalDone} jobs processed`);
       setWaveStatus("");
@@ -113,9 +120,13 @@ const Index = () => {
       toast.error(e?.message ?? "Discovery failed");
       setWaveStatus("");
     } finally {
-      setDiscovering(false);
+      setLoading(false);
     }
   };
+
+  const runDiscovery = () => runPipeline("plan");
+  const runBulkDiscovery = () => runPipeline("bulk");
+
   const runHunter = async () => {
     setEnriching(true);
     toast.info("Hunter enrichment started…");
@@ -179,6 +190,16 @@ const Index = () => {
             <Button size="sm" onClick={runDiscovery} disabled={discovering} className="shadow-md">
               {discovering ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-2" />}
               Run discovery now
+            </Button>
+            <Button
+              size="sm"
+              onClick={runBulkDiscovery}
+              disabled={bulkRunning || discovering}
+              className="shadow-md bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90"
+              title="Sweep all priority countries × roles via Indeed + classifieds + career pages + Google"
+            >
+              {bulkRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
+              Bulk discovery (Balkans + EU)
             </Button>
           </div>
         </div>
