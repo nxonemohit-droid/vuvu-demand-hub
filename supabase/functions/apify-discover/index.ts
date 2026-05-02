@@ -23,19 +23,64 @@ const DEFAULT_ACTORS: Record<string, string> = {
 };
 
 // Country -> { iso2, language hints, local job board hosts }
+// Full Balkans + EU coverage. Boards we don't know are omitted; google/career_page still work.
 const COUNTRY_META: Record<string, { iso2: string; langs: string[]; boards: string[] }> = {
-  Serbia:   { iso2: "RS", langs: ["en","sr"],     boards: ["poslovi.infostud.com","helloworld.rs","olx.ba","halooglasi.com"] },
-  Romania:  { iso2: "RO", langs: ["en","ro"],     boards: ["ejobs.ro","bestjobs.eu","olx.ro","hipo.ro"] },
-  Poland:   { iso2: "PL", langs: ["en","pl"],     boards: ["pracuj.pl","olx.pl","gowork.pl","praca.pl"] },
-  Germany:  { iso2: "DE", langs: ["en","de"],     boards: ["stepstone.de","xing.com","arbeitsagentur.de","kimeta.de"] },
-  Malta:    { iso2: "MT", langs: ["en"],          boards: ["jobsplus.gov.mt","keepmeposted.com.mt","maltapark.com"] },
-  Greece:   { iso2: "GR", langs: ["en","el"],     boards: ["kariera.gr","skywalker.gr","xe.gr"] },
-  Croatia:  { iso2: "HR", langs: ["en","hr"],     boards: ["mojposao.net","posao.hr","njuskalo.hr"] },
-  Hungary:  { iso2: "HU", langs: ["en","hu"],     boards: ["profession.hu","jobline.hu"] },
-  Czechia:  { iso2: "CZ", langs: ["en","cs"],     boards: ["jobs.cz","prace.cz"] },
-  Slovakia: { iso2: "SK", langs: ["en","sk"],     boards: ["profesia.sk","kariera.sk"] },
+  // Balkans
+  Serbia:                 { iso2: "RS", langs: ["en","sr"], boards: ["poslovi.infostud.com","helloworld.rs","halooglasi.com","oglasi.rs"] },
+  Croatia:                { iso2: "HR", langs: ["en","hr"], boards: ["mojposao.net","posao.hr","njuskalo.hr","moj-posao.net"] },
+  Slovenia:               { iso2: "SI", langs: ["en","sl"], boards: ["mojedelo.com","optius.com","zaposlitev.net"] },
+  "Bosnia and Herzegovina": { iso2: "BA", langs: ["en","bs","hr","sr"], boards: ["posao.ba","kolektiv.ba","olx.ba","posao.hr"] },
+  Montenegro:             { iso2: "ME", langs: ["en","sr"], boards: ["posao.me","poslovi.me","hoso.me"] },
+  "North Macedonia":      { iso2: "MK", langs: ["en","mk"], boards: ["vrabotuvanje.com.mk","mojakariera.com.mk","najdiposao.mk"] },
+  Albania:                { iso2: "AL", langs: ["en","sq"], boards: ["duapune.com","njoftime.com","mjaft.org"] },
+  Kosovo:                 { iso2: "XK", langs: ["en","sq"], boards: ["telegrafi.com/punesim","kosovojob.com"] },
+  Bulgaria:               { iso2: "BG", langs: ["en","bg"], boards: ["jobs.bg","zaplata.bg","rabota.bg"] },
+  Moldova:                { iso2: "MD", langs: ["en","ro","ru"], boards: ["rabota.md","999.md","delogo.md"] },
+  Romania:                { iso2: "RO", langs: ["en","ro"], boards: ["ejobs.ro","bestjobs.eu","olx.ro","hipo.ro"] },
+  // Central & Eastern EU
+  Hungary:                { iso2: "HU", langs: ["en","hu"], boards: ["profession.hu","jobline.hu","allas.hu"] },
+  Poland:                 { iso2: "PL", langs: ["en","pl"], boards: ["pracuj.pl","olx.pl","gowork.pl","praca.pl"] },
+  Czechia:                { iso2: "CZ", langs: ["en","cs"], boards: ["jobs.cz","prace.cz"] },
+  Slovakia:               { iso2: "SK", langs: ["en","sk"], boards: ["profesia.sk","kariera.sk"] },
+  Estonia:                { iso2: "EE", langs: ["en","et"], boards: ["cv.ee","cvkeskus.ee","tootukassa.ee"] },
+  Latvia:                 { iso2: "LV", langs: ["en","lv"], boards: ["cv.lv","cvonline.lv"] },
+  Lithuania:              { iso2: "LT", langs: ["en","lt"], boards: ["cvbankas.lt","cvonline.lt"] },
+  // Western & Northern EU
+  Germany:                { iso2: "DE", langs: ["en","de"], boards: ["stepstone.de","xing.com","arbeitsagentur.de","kimeta.de"] },
+  Austria:                { iso2: "AT", langs: ["en","de"], boards: ["karriere.at","stepstone.at","willhaben.at"] },
+  Switzerland:            { iso2: "CH", langs: ["en","de","fr","it"], boards: ["jobs.ch","jobup.ch","jobscout24.ch"] },
+  Luxembourg:             { iso2: "LU", langs: ["en","fr","de"], boards: ["jobs.lu","monster.lu","jobfinder.lu"] },
+  Netherlands:            { iso2: "NL", langs: ["en","nl"], boards: ["nationalevacaturebank.nl","monsterboard.nl","werk.nl"] },
+  Belgium:                { iso2: "BE", langs: ["en","nl","fr"], boards: ["vdab.be","stepstone.be","jobat.be","references.be"] },
+  France:                 { iso2: "FR", langs: ["en","fr"], boards: ["pole-emploi.fr","apec.fr","hellowork.com","indeed.fr"] },
+  Ireland:                { iso2: "IE", langs: ["en"],      boards: ["irishjobs.ie","jobs.ie","monster.ie"] },
+  Sweden:                 { iso2: "SE", langs: ["en","sv"], boards: ["arbetsformedlingen.se","blocket.se/jobb"] },
+  Denmark:                { iso2: "DK", langs: ["en","da"], boards: ["jobindex.dk","jobnet.dk"] },
+  Finland:                { iso2: "FI", langs: ["en","fi"], boards: ["te-palvelut.fi","duunitori.fi","oikotie.fi"] },
+  Norway:                 { iso2: "NO", langs: ["en","no"], boards: ["finn.no/job","nav.no"] },
+  // Southern EU
+  Italy:                  { iso2: "IT", langs: ["en","it"], boards: ["infojobs.it","monster.it","subito.it/offerte-lavoro"] },
+  Spain:                  { iso2: "ES", langs: ["en","es"], boards: ["infojobs.net","tecnoempleo.com","milanuncios.com/empleo"] },
+  Portugal:               { iso2: "PT", langs: ["en","pt"], boards: ["net-empregos.com","sapo.pt/emprego","ofertas-emprego.com"] },
+  Greece:                 { iso2: "GR", langs: ["en","el"], boards: ["kariera.gr","skywalker.gr","xe.gr"] },
+  Cyprus:                 { iso2: "CY", langs: ["en","el"], boards: ["ergodotisi.com","carierista.com"] },
+  Malta:                  { iso2: "MT", langs: ["en"],      boards: ["jobsplus.gov.mt","keepmeposted.com.mt","maltapark.com"] },
 };
 const COUNTRIES = Object.keys(COUNTRY_META);
+
+// Subset of countries Voynova prioritises for blue-collar placements (used by bulk mode).
+const PRIORITY_COUNTRIES = [
+  "Serbia","Romania","Poland","Germany","Greece","Croatia","Slovenia","Bulgaria",
+  "Czechia","Hungary","Austria","Netherlands","Italy","Spain","Portugal","Malta",
+  "Slovakia","Bosnia and Herzegovina","North Macedonia","Montenegro","Albania",
+];
+
+// Roles Voynova actively places (used by bulk mode).
+const PRIORITY_KEYWORDS = [
+  "nurse","caregiver","construction worker","welder","electrician",
+  "driver","factory worker","warehouse","mason","plumber","carpenter",
+  "hotel staff","cleaner","chef",
+];
 
 // Role -> multilingual synonyms (used in query expansion)
 const ROLE_SYNONYMS: Record<string, string[]> = {
