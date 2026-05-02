@@ -336,6 +336,11 @@ const Index = () => {
                     <Activity className="h-3.5 w-3.5 mr-1.5" /> Actor health
                   </Link>
                 </Button>
+                <Button size="sm" variant="outline" asChild className="h-8">
+                  <Link to="/keyword-audit">
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Keyword audit
+                  </Link>
+                </Button>
                 <Radar className="h-4 w-4 text-muted-foreground" />
               </div>
             </div>
