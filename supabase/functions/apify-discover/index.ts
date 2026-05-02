@@ -193,13 +193,18 @@ Deno.serve(async (req) => {
     const countries: string[] = body.countries ?? COUNTRIES;
     const keywords: string[] = body.keywords ?? KEYWORDS;
     const actors: Record<string,string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
-    // Cap fan-out so we don't blow timeouts on first run.
-    const maxJobs = body.maxJobs ?? 6;
+    // Cap fan-out — higher default for robust coverage; admin can override.
+    const maxJobs = body.maxJobs ?? 18;
 
+    // Round-robin (source, country, keyword) so we don't exhaust one source first.
     const plan: Array<{source:string;country:string;keyword:string}> = [];
-    outer: for (const s of sources) {
-      for (const c of countries) {
-        for (const k of keywords) {
+    const maxLen = Math.max(sources.length, countries.length, keywords.length);
+    outer: for (let i = 0; i < maxLen * maxLen; i++) {
+      for (let j = 0; j < sources.length; j++) {
+        const s = sources[j];
+        const c = countries[(i + j) % countries.length];
+        const k = keywords[(i * 2 + j) % keywords.length];
+        if (!plan.find((p) => p.source === s && p.country === c && p.keyword === k)) {
           plan.push({ source: s, country: c, keyword: k });
           if (plan.length >= maxJobs) break outer;
         }
