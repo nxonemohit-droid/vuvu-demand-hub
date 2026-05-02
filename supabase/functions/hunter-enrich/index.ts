@@ -13,8 +13,9 @@ const APIFY_TOKEN = Deno.env.get("APIFY_API_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Default Hunter actor on Apify. Override via request body { actor_id }.
-const DEFAULT_HUNTER_ACTOR = "vdrmota~hunter-io-email-finder";
+// Apify "Contact Info Scraper" — officially maintained, scrapes emails/phones from a domain.
+// Override via request body { actor_id }.
+const DEFAULT_HUNTER_ACTOR = "vdrmota~contact-info-scraper";
 
 function extractDomains(url?: string | null, employer?: string | null, country?: string | null): string[] {
   const out = new Set<string>();
@@ -123,7 +124,16 @@ Deno.serve(async (req) => {
       for (const domain of domains) {
         triedDomain = domain;
         try {
-          const items = await runActor(actorId, { domain, maxResults: 10 });
+          // contact-info-scraper expects startUrls; build a homepage + /contact crawl
+          const items = await runActor(actorId, {
+            startUrls: [
+              { url: `https://${domain}` },
+              { url: `https://${domain}/contact` },
+              { url: `https://${domain}/careers` },
+            ],
+            maxDepth: 2,
+            maxRequestsPerStartUrl: 8,
+          });
           const arr = Array.isArray(items) ? items : [];
           totalItems += arr.length;
           const candidate = pickBestEmail(arr);
