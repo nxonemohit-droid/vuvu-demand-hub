@@ -65,8 +65,65 @@ Deno.serve(async (req) => {
     const supa = adminClient();
     const body = await req.json().catch(() => ({}));
     const mode: "plan" | "drain" = body.mode === "drain" ? "drain" : "plan";
+    const planType: string = body.planType ?? "keyword"; // keyword | recrawl | discovery
 
     if (mode === "plan") {
+      // ---------- RECRAWL plan: per-company crawls of careers/official sites ----------
+      if (planType === "recrawl") {
+        const maxCompanies: number = Math.min(body.maxCompanies ?? 20, 100);
+        const { data: src } = await supa.from("source_registry")
+          .select("id, source_family, adapter, actor_or_endpoint, default_input, trust_tier, confidence_weight, enabled")
+          .eq("id", "company_site_firecrawl").maybeSingle<SourceRow>();
+        if (!src || !src.enabled) {
+          return jsonResponse({ ok: false, error: "company_site_firecrawl source disabled" });
+        }
+        // Pick companies due for recrawl (last_crawled_at older than recrawl_interval_hours, or never crawled).
+        const { data: due, error: dueErr } = await supa
+          .from("companies")
+          .select("id, name, careers_url, official_url, website_domain, recrawl_interval_hours, last_crawled_at, crawl_priority")
+          .or("careers_url.not.is.null,official_url.not.is.null,website_domain.not.is.null")
+          .order("crawl_priority", { ascending: true })
+          .order("last_crawled_at", { ascending: true, nullsFirst: true })
+          .limit(maxCompanies * 3);
+        if (dueErr) throw dueErr;
+        const now = Date.now();
+        const eligible = (due ?? []).filter((c: any) => {
+          if (!c.last_crawled_at) return true;
+          const ageH = (now - new Date(c.last_crawled_at).getTime()) / 3_600_000;
+          return ageH >= (c.recrawl_interval_hours ?? 168);
+        }).slice(0, maxCompanies);
+
+        let queued = 0;
+        for (const c of eligible) {
+          const url = c.careers_url ?? c.official_url ?? (c.website_domain ? `https://${c.website_domain}` : null);
+          if (!url) continue;
+          const { error } = await supa.from("scrape_jobs").insert({
+            source: legacySourceForRegistryId(src.id),
+            source_id: src.id,
+            actor_id: src.actor_or_endpoint,
+            country: null,
+            keyword: null,
+            status: "queued",
+            parent_company_id: c.id,
+            input: { url, intent: "map" },
+          });
+          if (!error) queued++;
+        }
+        return jsonResponse({ ok: true, mode: "plan", planType: "recrawl", queued, candidates: eligible.length });
+      }
+
+      // ---------- DISCOVERY plan: trigger firecrawl-search to seed new companies ----------
+      if (planType === "discovery") {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/firecrawl-search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json().catch(() => ({}));
+        return jsonResponse({ ok: true, mode: "plan", planType: "discovery", search: j });
+      }
+
+      // ---------- KEYWORD plan (default) ----------
       const countries: string[] = body.countries ?? PRIORITY_COUNTRIES;
       const keywords: string[] = body.keywords ?? PRIORITY_KEYWORDS;
       const maxJobs: number = Math.min(body.maxJobs ?? 60, 200);
