@@ -241,7 +241,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     const body = await req.json().catch(() => ({}));
-    const mode: "plan" | "drain" = body.mode === "drain" ? "drain" : "plan";
+    const mode: "plan" | "drain" | "bulk" =
+      body.mode === "drain" ? "drain" :
+      body.mode === "bulk"  ? "bulk"  : "plan";
 
     // ---------- DRAIN MODE: process up to 4 queued jobs synchronously ----------
     if (mode === "drain") {
@@ -250,15 +252,25 @@ Deno.serve(async (req) => {
       const startedAt = Date.now();
       const actors: Record<string, string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
 
-      const { data: queuedJobs, error: pickErr } = await supabase
+      // Pull a wider candidate pool, then prioritise: Indeed first (best lead source),
+      // then career_page / classifieds, then everything else. FIFO within each tier.
+      const { data: candidates, error: pickErr } = await supabase
         .from("scrape_jobs")
         .select("id, source, country, keyword, actor_id")
         .eq("status", "queued")
         .order("started_at", { ascending: true })
-        .limit(WAVE_SIZE);
+        .limit(WAVE_SIZE * 4);
       if (pickErr) throw pickErr;
 
-      const jobs = queuedJobs ?? [];
+      const tier = (s: string) =>
+        s === "indeed" ? 0 :
+        s === "career_page" ? 1 :
+        s === "classifieds" ? 2 :
+        s === "google" ? 3 : 4;
+      const jobs = (candidates ?? [])
+        .slice()
+        .sort((a, b) => tier(a.source) - tier(b.source))
+        .slice(0, WAVE_SIZE);
       if (jobs.length > 0) {
         await supabase.from("scrape_jobs").update({ status: "running" }).in("id", jobs.map((j) => j.id));
       }
@@ -271,8 +283,12 @@ Deno.serve(async (req) => {
         const actorId = job.actor_id || actors[job.source];
         try {
           const input = buildInput(job.source, job.country ?? "", job.keyword ?? "");
-          // Indeed is fast, others crawl multiple pages — give them more time
-          const perActorTimeout = job.source === "indeed" || job.source === "linkedin" ? 60_000 : 120_000;
+          // Per-source timeout tuning. Indeed is our money-maker — give it 90s.
+          const perActorTimeout =
+            job.source === "indeed" ? 90_000 :
+            job.source === "linkedin" ? 60_000 :
+            job.source === "google" ? 90_000 :
+            120_000;
           const items: any[] = await runActor(actorId, input, perActorTimeout);
           let inserted = 0;
           const synonyms = (ROLE_SYNONYMS[job.keyword ?? ""] ?? [job.keyword ?? ""]).map((s) => s.toLowerCase());
@@ -314,6 +330,54 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({
         ok: true, mode: "drain", processed: jobs.length, remaining: remaining ?? 0,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ---------- BULK MODE: queue a high-yield sweep across Balkans + EU ----------
+    if (mode === "bulk") {
+      const actorsB: Record<string,string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
+      // Skip facebook (low keep-rate) and linkedin (often blocked) for bulk runs.
+      const bulkSources = body.sources ?? ["indeed","career_page","classifieds","google"];
+      const bulkCountries: string[] = body.countries ?? PRIORITY_COUNTRIES;
+      const bulkKeywords: string[] = body.keywords ?? PRIORITY_KEYWORDS;
+      const maxBulk = Math.min(body.maxJobs ?? 60, 80);
+
+      // Round-robin so we don't queue 20 Indeed jobs in a row before any web-scraper.
+      const bulkPlan: Array<{source:string;country:string;keyword:string}> = [];
+      const seen = new Set<string>();
+      outerB: for (let k = 0; k < bulkKeywords.length; k++) {
+        for (let c = 0; c < bulkCountries.length; c++) {
+          for (let s = 0; s < bulkSources.length; s++) {
+            const src = bulkSources[(s + k) % bulkSources.length];
+            const country = bulkCountries[(c + s) % bulkCountries.length];
+            const kw = bulkKeywords[k];
+            if (src === "indeed") {
+              const iso = COUNTRY_META[country]?.iso2;
+              if (!iso || !INDEED_ALLOWED.has(iso)) continue;
+            }
+            const key = `${src}|${country}|${kw}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            bulkPlan.push({ source: src, country, keyword: kw });
+            if (bulkPlan.length >= maxBulk) break outerB;
+          }
+        }
+      }
+
+      let bulkQueued = 0;
+      for (const j of bulkPlan) {
+        const actorId = actorsB[j.source];
+        if (!actorId) continue;
+        const { error } = await supabase.from("scrape_jobs").insert({
+          source: j.source, actor_id: actorId, country: j.country, keyword: j.keyword, status: "queued",
+        });
+        if (!error) bulkQueued++;
+      }
+
+      return new Response(JSON.stringify({
+        ok: true, mode: "bulk", queued: bulkQueued,
+        countries: bulkCountries.length, keywords: bulkKeywords.length, sources: bulkSources.length,
+        message: `Bulk queued ${bulkQueued} jobs across ${bulkCountries.length} countries × ${bulkKeywords.length} roles.`,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
