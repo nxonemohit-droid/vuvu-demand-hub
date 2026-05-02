@@ -78,7 +78,7 @@ const INDEED_ALLOWED = new Set([
   "PH","PL","PT","QA","RO","SA","SG","ZA","KR","ES","SE","CH","TW","TH","TR","AE","UA","GB","US","UY","VE","VN",
 ]);
 
-async function runActor(actorId: string, input: unknown, timeoutMs = 60_000) {
+async function runActor(actorId: string, input: unknown, timeoutMs = 120_000) {
   const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${Math.floor(timeoutMs/1000)}`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs + 5000);
