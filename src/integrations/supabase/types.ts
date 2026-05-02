@@ -356,6 +356,10 @@ export type Database = {
         | "classifieds"
         | "career_page"
         | "other"
+        | "linkedin"
+        | "google_jobs"
+        | "company_site"
+        | "directory"
       job_status: "queued" | "running" | "succeeded" | "failed"
       priority_tag: "high" | "medium" | "low"
     }
@@ -492,6 +496,10 @@ export const Constants = {
         "classifieds",
         "career_page",
         "other",
+        "linkedin",
+        "google_jobs",
+        "company_site",
+        "directory",
       ],
       job_status: ["queued", "running", "succeeded", "failed"],
       priority_tag: ["high", "medium", "low"],
