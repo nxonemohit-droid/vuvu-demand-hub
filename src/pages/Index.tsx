@@ -2,224 +2,429 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
-import { Briefcase, Users, Radar, AlertCircle, Mail, Loader2, PlayCircle, RefreshCw } from "lucide-react";
+import {
+  Briefcase, Users, Radar, AlertTriangle, Mail, Loader2, PlayCircle,
+  RefreshCw, TrendingUp, Globe2, Phone, ExternalLink, Sparkles, Activity, MapPin,
+} from "lucide-react";
 import { useRoles } from "@/lib/auth";
 import { toast } from "sonner";
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
+  BarChart, Bar, Cell,
+} from "recharts";
 
-type Stats = {
-  leads: number;
-  highPriority: number;
-  candidates: number;
-  signals: number;
-};
-
+type Stats = { leads: number; highPriority: number; candidates: number; signals: number };
 type RunRow = {
-  id: string;
-  source: string;
-  country: string | null;
-  keyword: string | null;
-  status: string;
-  items_found: number;
-  items_structured: number;
-  started_at: string;
-  error: string | null;
+  id: string; source: string; country: string | null; keyword: string | null;
+  status: string; items_found: number; items_structured: number; started_at: string; error: string | null;
 };
 type LeadRow = {
-  id: string;
-  employer_name: string | null;
-  role: string;
-  country: string;
-  city: string | null;
-  source: string;
-  priority: string;
-  urgency_score: number;
-  contact_email: string | null;
-  contact_phone: string | null;
-  source_url: string | null;
-  created_at: string;
+  id: string; employer_name: string | null; role: string; country: string; city: string | null;
+  source: string; priority: string; urgency_score: number;
+  contact_email: string | null; contact_phone: string | null; source_url: string | null;
+  demand_size: number | null; visa_sponsorship: boolean; created_at: string;
+};
+
+const PRIORITY_STYLES: Record<string, string> = {
+  high: "bg-destructive/10 text-destructive border-destructive/30",
+  medium: "bg-primary/10 text-primary border-primary/30",
+  low: "bg-muted text-muted-foreground border-border",
 };
 
 const Index = () => {
-  const { roles } = useRoles();
+  const { roles, user } = useRoles();
   const [stats, setStats] = useState<Stats | null>(null);
   const [enriching, setEnriching] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [allLeads, setAllLeads] = useState<Pick<LeadRow,"country"|"source"|"priority"|"created_at">[]>([]);
 
   const loadAll = async () => {
-    const [leadsCount, high, candidates, signals, runsRes, leadsRes] = await Promise.all([
+    const [leadsCount, high, candidates, signals, runsRes, leadsRes, allLeadsRes] = await Promise.all([
       supabase.from("demand_leads").select("id", { count: "exact", head: true }),
       supabase.from("demand_leads").select("id", { count: "exact", head: true }).eq("priority", "high"),
       supabase.from("candidates").select("id", { count: "exact", head: true }),
       supabase.from("raw_signals").select("id", { count: "exact", head: true }),
-      supabase.from("scrape_jobs").select("id,source,country,keyword,status,items_found,items_structured,started_at,error").order("started_at", { ascending: false }).limit(8),
-      supabase.from("demand_leads").select("id,employer_name,role,country,city,source,priority,urgency_score,contact_email,contact_phone,source_url,created_at").order("created_at", { ascending: false }).limit(8),
+      supabase.from("scrape_jobs").select("id,source,country,keyword,status,items_found,items_structured,started_at,error").order("started_at", { ascending: false }).limit(6),
+      supabase.from("demand_leads").select("id,employer_name,role,country,city,source,priority,urgency_score,contact_email,contact_phone,source_url,demand_size,visa_sponsorship,created_at").order("urgency_score", { ascending: false }).limit(6),
+      supabase.from("demand_leads").select("country,source,priority,created_at").order("created_at", { ascending: false }).limit(500),
     ]);
     setStats({
-      leads: leadsCount.count ?? 0,
-      highPriority: high.count ?? 0,
-      candidates: candidates.count ?? 0,
-      signals: signals.count ?? 0,
+      leads: leadsCount.count ?? 0, highPriority: high.count ?? 0,
+      candidates: candidates.count ?? 0, signals: signals.count ?? 0,
     });
     setRuns((runsRes.data ?? []) as RunRow[]);
     setLeads((leadsRes.data ?? []) as LeadRow[]);
+    setAllLeads((allLeadsRes.data ?? []) as any);
   };
 
-  useEffect(() => {
-    loadAll();
-  }, []);
+  useEffect(() => { loadAll(); }, []);
 
   const runDiscovery = async () => {
     setDiscovering(true);
-    toast.info("Discovery started — this can take 1–2 minutes.");
+    toast.info("Discovery started — fetching from APIFY (1–2 min)…");
     const { data, error } = await supabase.functions.invoke("apify-discover", { body: {} });
     setDiscovering(false);
     if (error) return toast.error(error.message);
-    toast.success(`Discovery: ran ${data?.ran ?? 0} jobs`);
+    toast.success(`Discovery complete · ran ${data?.ran ?? 0} jobs`);
     loadAll();
   };
-
   const runHunter = async () => {
     setEnriching(true);
     toast.info("Hunter enrichment started…");
-    const { data, error } = await supabase.functions.invoke("hunter-enrich", {
-      body: { limit: 10 },
-    });
+    const { data, error } = await supabase.functions.invoke("hunter-enrich", { body: { limit: 10 } });
     setEnriching(false);
     if (error) return toast.error(error.message);
     const found = (data?.results ?? []).filter((r: any) => r.email).length;
-    toast.success(`Hunter: ${found} email(s) found across ${data?.processed ?? 0} leads`);
+    toast.success(`Hunter · ${found} email(s) across ${data?.processed ?? 0} leads`);
     loadAll();
   };
 
-  const cards = [
-    { label: "Demand Leads", value: stats?.leads, icon: Briefcase },
-    { label: "High Priority", value: stats?.highPriority, icon: AlertCircle },
-    { label: "Candidates", value: stats?.candidates, icon: Users },
-    { label: "Raw Signals", value: stats?.signals, icon: Radar },
-  ];
+  // Build charts from allLeads
+  const last7Days = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    const key = d.toISOString().slice(0, 10);
+    const label = d.toLocaleDateString(undefined, { weekday: "short" });
+    const count = allLeads.filter((l) => l.created_at?.slice(0, 10) === key).length;
+    return { day: label, leads: count };
+  });
+  const byCountry = Object.entries(
+    allLeads.reduce<Record<string, number>>((acc, l) => {
+      const k = l.country || "Unknown"; acc[k] = (acc[k] ?? 0) + 1; return acc;
+    }, {}),
+  ).map(([country, leads]) => ({ country, leads }))
+   .sort((a, b) => b.leads - a.leads).slice(0, 6);
+  const bySource = Object.entries(
+    allLeads.reduce<Record<string, number>>((acc, l) => {
+      const k = l.source || "other"; acc[k] = (acc[k] ?? 0) + 1; return acc;
+    }, {}),
+  ).map(([source, leads]) => ({ source, leads })).sort((a, b) => b.leads - a.leads);
+
+  const conversion = stats?.signals ? Math.round((stats.leads / stats.signals) * 100) : 0;
+  const highShare = stats?.leads ? Math.round((stats.highPriority / stats.leads) * 100) : 0;
 
   return (
-    <div className="p-8 space-y-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Welcome back. Here is your demand intelligence overview.
-          </p>
-        </div>
-        <div className="flex gap-2 items-center flex-wrap justify-end">
-          <Button size="sm" onClick={runDiscovery} disabled={discovering}>
-            {discovering ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-2" />}
-            Run discovery now
-          </Button>
-          <Button size="sm" variant="outline" onClick={runHunter} disabled={enriching}>
-            {enriching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
-            Enrich emails (Hunter)
-          </Button>
-          <Button size="sm" variant="ghost" onClick={loadAll} title="Refresh">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          {roles.map((r) => (
-            <Badge key={r} variant="outline" className="capitalize">
-              {r}
-            </Badge>
-          ))}
-        </div>
-      </header>
-
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((c) => (
-          <Card key={c.label} className="p-5 rounded-xl">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{c.label}</span>
-              <c.icon className="h-4 w-4 text-primary" />
+    <div className="min-h-full bg-gradient-to-br from-background via-background to-muted/30">
+      {/* HERO */}
+      <div className="border-b bg-background/60 backdrop-blur">
+        <div className="px-8 py-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
+              <Sparkles className="h-3.5 w-3.5 text-accent" />
+              Demand Intelligence
             </div>
-            <div className="text-3xl font-semibold mt-3">
-              {c.value ?? "—"}
+            <h1 className="text-3xl font-bold mt-1">Welcome back{user?.email ? `, ${user.email.split("@")[0]}` : ""}</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Live employer hiring signals across Europe — discovered, structured, and scored by AI.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 justify-end">
+            {roles.map((r) => (
+              <Badge key={r} variant="outline" className="capitalize">{r}</Badge>
+            ))}
+            <Button size="sm" variant="ghost" onClick={loadAll} title="Refresh">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="outline" onClick={runHunter} disabled={enriching}>
+              {enriching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+              Enrich emails
+            </Button>
+            <Button size="sm" onClick={runDiscovery} disabled={discovering} className="shadow-md">
+              {discovering ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-2" />}
+              Run discovery now
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-8 space-y-6">
+        {/* KPIs */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            label="Demand Leads" value={stats?.leads ?? 0} icon={Briefcase} accent="primary"
+            footer={`${stats?.signals ?? 0} raw signals captured`}
+          />
+          <KpiCard
+            label="High Priority" value={stats?.highPriority ?? 0} icon={AlertTriangle} accent="destructive"
+            footer={
+              <div className="flex items-center gap-2">
+                <Progress value={highShare} className="h-1.5 flex-1" />
+                <span className="text-xs text-muted-foreground">{highShare}%</span>
+              </div>
+            }
+          />
+          <KpiCard
+            label="Signal → Lead" value={`${conversion}%`} icon={TrendingUp} accent="accent"
+            footer="AI structuring success rate"
+          />
+          <KpiCard
+            label="Candidates" value={stats?.candidates ?? 0} icon={Users} accent="muted"
+            footer="Ready for reverse-matching"
+          />
+        </section>
+
+        {/* CHARTS */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Card className="p-5 rounded-xl lg:col-span-2">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-semibold">Lead flow · last 7 days</h2>
+                <p className="text-xs text-muted-foreground">New structured demand leads per day</p>
+              </div>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={last7Days} margin={{ left: -20, right: 5, top: 5, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="lf" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.45}/>
+                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                  <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
+                  <Area type="monotone" dataKey="leads" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#lf)" />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </Card>
-        ))}
-      </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="p-6 rounded-xl">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Recent Discovery Runs</h2>
-            <Badge variant="secondary">{runs.length}</Badge>
-          </div>
-          {runs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No runs yet. Click <b>Run discovery now</b> to fetch the first batch from APIFY.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {runs.map((r) => (
-                <li key={r.id} className="text-sm flex items-center justify-between border-b pb-2 last:border-0">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">
-                      {r.source} · {r.country ?? "—"} · {r.keyword ?? "—"}
+          <Card className="p-5 rounded-xl">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-semibold">By source</h2>
+                <p className="text-xs text-muted-foreground">Where leads originate</p>
+              </div>
+              <Globe2 className="h-4 w-4 text-muted-foreground" />
+            </div>
+            {bySource.length === 0 ? (
+              <EmptyMini label="No leads yet" />
+            ) : (
+              <div className="space-y-2.5">
+                {bySource.map((s) => {
+                  const pct = stats?.leads ? Math.round((s.leads / stats.leads) * 100) : 0;
+                  return (
+                    <div key={s.source}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="capitalize">{s.source}</span>
+                        <span className="text-muted-foreground text-xs">{s.leads} · {pct}%</span>
+                      </div>
+                      <Progress value={pct} className="h-1.5 mt-1" />
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(r.started_at).toLocaleString()} · found {r.items_found}, kept {r.items_structured}
-                    </div>
-                    {r.error && <div className="text-xs text-destructive truncate">{r.error}</div>}
-                  </div>
-                  <Badge
-                    variant={r.status === "succeeded" ? "default" : r.status === "failed" ? "destructive" : "secondary"}
-                    className="ml-2 capitalize"
-                  >
-                    {r.status}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </section>
 
-        <Card className="p-6 rounded-xl">
+        {/* COUNTRY + RUNS */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Card className="p-5 rounded-xl">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-semibold">Top countries</h2>
+                <p className="text-xs text-muted-foreground">Demand concentration</p>
+              </div>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="h-52">
+              {byCountry.length === 0 ? <EmptyMini label="No data yet" /> : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={byCountry} layout="vertical" margin={{ left: 0, right: 10, top: 5, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                    <YAxis type="category" dataKey="country" stroke="hsl(var(--muted-foreground))" fontSize={12} width={70} />
+                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} />
+                    <Bar dataKey="leads" radius={[0, 6, 6, 0]}>
+                      {byCountry.map((_, i) => (
+                        <Cell key={i} fill={i === 0 ? "hsl(var(--accent))" : "hsl(var(--primary))"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </Card>
+
+          <Card className="p-5 rounded-xl lg:col-span-2">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-semibold">Recent discovery runs</h2>
+                <p className="text-xs text-muted-foreground">APIFY actor activity</p>
+              </div>
+              <Radar className="h-4 w-4 text-muted-foreground" />
+            </div>
+            {runs.length === 0 ? (
+              <EmptyState
+                icon={PlayCircle}
+                title="No discovery runs yet"
+                hint="Click Run discovery now to fetch from APIFY across all sources."
+              />
+            ) : (
+              <ul className="divide-y">
+                {runs.map((r) => (
+                  <li key={r.id} className="py-2.5 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">
+                        <span className="capitalize">{r.source}</span>
+                        <span className="text-muted-foreground"> · </span>
+                        {r.country ?? "—"}
+                        <span className="text-muted-foreground"> · </span>
+                        {r.keyword ?? "—"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(r.started_at).toLocaleString()} · found {r.items_found} · kept {r.items_structured}
+                      </div>
+                      {r.error && <div className="text-xs text-destructive truncate">{r.error}</div>}
+                    </div>
+                    <StatusBadge status={r.status} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </section>
+
+        {/* TOP LEADS */}
+        <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Latest Demand Leads</h2>
-            <Badge variant="secondary">{leads.length}</Badge>
+            <div>
+              <h2 className="text-lg font-semibold">Top opportunities</h2>
+              <p className="text-xs text-muted-foreground">Highest-urgency employer leads ready for outreach</p>
+            </div>
           </div>
           {leads.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No leads yet. After a discovery run, AI structuring will populate this list.
-            </p>
+            <Card className="p-10 rounded-xl">
+              <EmptyState
+                icon={Briefcase}
+                title="No demand leads yet"
+                hint="After a discovery run, AI will structure raw signals into prioritized leads here."
+              />
+            </Card>
           ) : (
-            <ul className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {leads.map((l) => (
-                <li key={l.id} className="text-sm border-b pb-2 last:border-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-medium truncate">
-                      {l.employer_name ?? "Unknown employer"} — {l.role}
+                <Card key={l.id} className="p-5 rounded-xl hover:shadow-lg transition-shadow group">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate">{l.employer_name ?? "Unknown employer"}</div>
+                      <div className="text-sm text-muted-foreground capitalize truncate">{l.role}</div>
                     </div>
-                    <Badge
-                      variant={l.priority === "high" ? "destructive" : l.priority === "medium" ? "default" : "secondary"}
-                      className="capitalize"
-                    >
-                      {l.priority} · {l.urgency_score}
+                    <Badge variant="outline" className={`capitalize ${PRIORITY_STYLES[l.priority] ?? ""}`}>
+                      {l.priority}
                     </Badge>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {l.country}{l.city ? `, ${l.city}` : ""} · source: {l.source}
+
+                  <div className="mt-3 flex items-center gap-2 text-xs">
+                    <Progress value={l.urgency_score} className="h-1.5 flex-1" />
+                    <span className="text-muted-foreground tabular-nums w-8 text-right">{l.urgency_score}</span>
                   </div>
-                  {(l.contact_email || l.contact_phone) && (
-                    <div className="text-xs mt-1">
-                      {l.contact_email && <span className="mr-3">✉ {l.contact_email}</span>}
-                      {l.contact_phone && <span>☎ {l.contact_phone}</span>}
-                    </div>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <Badge variant="secondary" className="text-xs">
+                      <MapPin className="h-3 w-3 mr-1" />{l.country}{l.city ? ` · ${l.city}` : ""}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs capitalize">{l.source}</Badge>
+                    {l.demand_size ? (
+                      <Badge variant="secondary" className="text-xs">{l.demand_size} hires</Badge>
+                    ) : null}
+                    {l.visa_sponsorship && (
+                      <Badge className="text-xs bg-accent/15 text-accent border border-accent/30">Visa OK</Badge>
+                    )}
+                  </div>
+
+                  {(l.contact_email || l.contact_phone || l.source_url) && (
+                    <>
+                      <Separator className="my-3" />
+                      <div className="space-y-1 text-xs">
+                        {l.contact_email && (
+                          <div className="flex items-center gap-2 truncate">
+                            <Mail className="h-3.5 w-3.5 text-accent shrink-0" />
+                            <a href={`mailto:${l.contact_email}`} className="truncate hover:underline">{l.contact_email}</a>
+                          </div>
+                        )}
+                        {l.contact_phone && (
+                          <div className="flex items-center gap-2 truncate">
+                            <Phone className="h-3.5 w-3.5 text-accent shrink-0" />
+                            <span className="truncate">{l.contact_phone}</span>
+                          </div>
+                        )}
+                        {l.source_url && (
+                          <a
+                            href={l.source_url} target="_blank" rel="noreferrer"
+                            className="flex items-center gap-2 text-muted-foreground hover:text-primary truncate"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{l.source_url}</span>
+                          </a>
+                        )}
+                      </div>
+                    </>
                   )}
-                </li>
+                </Card>
               ))}
-            </ul>
+            </div>
           )}
-        </Card>
-      </section>
+        </section>
+      </div>
     </div>
   );
 };
+
+const KpiCard = ({
+  label, value, icon: Icon, accent, footer,
+}: { label: string; value: React.ReactNode; icon: any; accent: "primary"|"accent"|"destructive"|"muted"; footer: React.ReactNode }) => {
+  const ring: Record<string, string> = {
+    primary: "bg-primary/10 text-primary",
+    accent: "bg-accent/15 text-accent",
+    destructive: "bg-destructive/10 text-destructive",
+    muted: "bg-muted text-muted-foreground",
+  };
+  return (
+    <Card className="p-5 rounded-xl relative overflow-hidden">
+      <div className="flex items-start justify-between">
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <div className={`h-8 w-8 rounded-lg grid place-items-center ${ring[accent]}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <div className="text-3xl font-semibold mt-3 tabular-nums">{value}</div>
+      <div className="mt-3 text-xs text-muted-foreground">{footer}</div>
+    </Card>
+  );
+};
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const map: Record<string, { v: any; label: string }> = {
+    succeeded: { v: "default", label: "Succeeded" },
+    running: { v: "secondary", label: "Running" },
+    queued: { v: "secondary", label: "Queued" },
+    failed: { v: "destructive", label: "Failed" },
+  };
+  const m = map[status] ?? { v: "outline", label: status };
+  return <Badge variant={m.v}>{m.label}</Badge>;
+};
+
+const EmptyMini = ({ label }: { label: string }) => (
+  <div className="h-full grid place-items-center text-xs text-muted-foreground">{label}</div>
+);
+
+const EmptyState = ({ icon: Icon, title, hint }: { icon: any; title: string; hint: string }) => (
+  <div className="text-center py-6">
+    <div className="h-12 w-12 rounded-xl bg-muted grid place-items-center mx-auto">
+      <Icon className="h-5 w-5 text-muted-foreground" />
+    </div>
+    <div className="mt-3 font-medium">{title}</div>
+    <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">{hint}</p>
+  </div>
+);
 
 export default Index;
