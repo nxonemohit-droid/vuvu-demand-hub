@@ -295,86 +295,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Pre-create scrape_jobs rows synchronously so the UI sees them immediately,
-    // then run the slow Apify calls in the background to avoid the 150s timeout.
-    const queued: Array<{ job: typeof plan[number]; jobId: string; actorId: string }> = [];
+    // Insert all planned jobs as 'queued' and return immediately.
+    // The dashboard then calls this same function in mode:"drain" repeatedly,
+    // processing 4 jobs per call (well under the 150s limit per invocation).
+    let queuedCount = 0;
     for (const job of plan) {
       const actorId = actors[job.source];
       if (!actorId) continue;
-      const { data: jobRow } = await supabase.from("scrape_jobs").insert({
-        source: job.source, actor_id: actorId, country: job.country, keyword: job.keyword, status: "queued",
-      }).select("id").single();
-      if (jobRow) queued.push({ job, jobId: jobRow.id, actorId });
-    }
-
-    const runAll = async () => {
-      // Process in small parallel batches so total wall time stays manageable
-      const CONCURRENCY = 3;
-      let idx = 0;
-      const worker = async () => {
-        while (idx < queued.length) {
-          const cur = queued[idx++];
-          if (!cur) break;
-          const { job, jobId, actorId } = cur;
-          await supabase.from("scrape_jobs").update({ status: "running" }).eq("id", jobId);
-          try {
-            const input = buildInput(job.source, job.country, job.keyword);
-            const items: any[] = await runActor(actorId, input);
-            let inserted = 0;
-            const synonyms = (ROLE_SYNONYMS[job.keyword] ?? [job.keyword]).map((s) => s.toLowerCase());
-            for (const it of items.slice(0, 60)) {
-              const text = JSON.stringify(it).slice(0, 8000);
-              const lower = text.toLowerCase();
-              const hasRole = synonyms.some((s) => lower.includes(s));
-              const hasIntent = INTENT_TERMS.some((t) => lower.includes(t.toLowerCase()));
-              if (!hasRole || !hasIntent) continue;
-              const fp = fingerprint(`${job.source}|${job.country}|${job.keyword}|${(it.url ?? it.link ?? it.id ?? text.slice(0,200))}`);
-              const { error: insErr } = await supabase.from("raw_signals").insert({
-                job_id: jobId,
-                source: job.source,
-                source_url: it.url ?? it.link ?? null,
-                source_id: it.id ?? null,
-                raw_text: text,
-                payload: it,
-                fingerprint: fp,
-              });
-              if (!insErr) inserted++;
-            }
-            await supabase.from("scrape_jobs").update({
-              status: "succeeded", items_found: items.length, items_structured: inserted, finished_at: new Date().toISOString(),
-            }).eq("id", jobId);
-          } catch (e) {
-            await supabase.from("scrape_jobs").update({
-              status: "failed", error: String(e).slice(0, 500), finished_at: new Date().toISOString(),
-            }).eq("id", jobId);
-          }
-        }
-      };
-      await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
-
-      // Fire structuring once all actors finished
-      await fetch(`${SUPABASE_URL}/functions/v1/structure-leads`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
-        body: JSON.stringify({ limit: 100 }),
-      }).catch(() => {});
-    };
-
-    // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
-    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
-      // @ts-ignore
-      EdgeRuntime.waitUntil(runAll());
-    } else {
-      runAll().catch(() => {});
+      const { error: insErr } = await supabase.from("scrape_jobs").insert({
+        source: job.source,
+        actor_id: actorId,
+        country: job.country,
+        keyword: job.keyword,
+        status: "queued",
+      });
+      if (!insErr) queuedCount++;
     }
 
     return new Response(JSON.stringify({
-      ok: true,
-      queued: queued.length,
-      message: "Discovery started in background. Refresh in 1–2 minutes to see results.",
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      ok: true, mode: "plan", queued: queuedCount,
+      message: `Queued ${queuedCount} jobs. Drain them with mode:"drain" in waves of 4.`,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), {
       status: 500,
