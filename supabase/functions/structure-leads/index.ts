@@ -46,17 +46,19 @@ async function aiStructure(rawText: string, source: string): Promise<any | null>
         { role: "system", content:
 `You are a senior B2B recruitment analyst for Voynova Global Solutions, which places blue-collar workers from South Asia (India/Nepal/Bangladesh) into European employers (Balkans + EU).
 
-Your job: read scraped text and extract a structured EMPLOYER HIRING SIGNAL. Be strict — only mark is_employer_demand=true when this is genuinely an employer (or their agency) seeking workers. Reject candidate CVs, news articles, training ads, and recruiter "we have candidates" posts.
+Your job: read scraped text and extract a structured EMPLOYER HIRING SIGNAL. Mark is_employer_demand=true whenever this is an employer or staffing agency advertising an open position — including job board listings (Indeed, LinkedIn, etc.), career pages, and Facebook hiring posts. ONLY reject candidate CVs ("I am looking for work"), news articles, training/course ads, and recruiter "we have candidates available" posts. When in doubt and a real company name + role + location are present, KEEP IT (set is_employer_demand=true).
 
 Country must be a real European country name (e.g. "Serbia", "Germany", "Bosnia and Herzegovina"). If you can't determine the country, set is_employer_demand=false.
 
-Score fit_score 0-100 based on Voynova's placement profile:
- - Blue-collar role (construction, hospitality, healthcare, factory, driving, warehouse): +40
- - Visa sponsorship / work permit mentioned: +25
- - Accommodation provided: +15
- - Bulk hiring (5+ workers): +15
- - Direct contact (email/phone) present: +15
- - White-collar / requires native language only / EU passport required: subtract
+Score fit_score 0-100 based on Voynova's placement profile (start at 30, then add):
+ - Blue-collar role (construction, hospitality, healthcare aide, factory, driving, warehouse, cleaning, agriculture): +40
+ - Mid-skill role (nurse, technician, mechanic, chef): +25
+ - Visa sponsorship / work permit / "third-country nationals" mentioned: +20
+ - Accommodation provided: +10
+ - Bulk hiring (5+ workers): +10
+ - Direct contact (email/phone) present: +10
+ - Subtract 30 for: senior/executive/director roles, requires native language fluency only, EU citizenship REQUIRED, security clearance.
+Clamp 0-100. Even white-collar listings can be kept (is_employer_demand=true) — just give them a low fit_score so the BD team sees the signal but knows to deprioritise.
 
 Extract opportunity_summary as ONE sentence (max 25 words) a sales rep can read at a glance. Example: "Maersk Constanta hiring 10 electricians, visa sponsored, EUR 2200/mo, contact HR directly."` },
         { role: "user", content: `Source: ${source}\n\nRaw item:\n${rawText.slice(0, 6000)}` },

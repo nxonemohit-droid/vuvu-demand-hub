@@ -168,8 +168,9 @@ function buildInput(source: string, country: string, keyword: string) {
     case "indeed":
       return {
         country: meta.iso2,
-        position: synonyms.slice(0, 3).join(" OR "),
-        maxItems: 20, // smaller crawl → fits inside 90s timeout
+        // Add hiring-intent terms so Indeed returns blue-collar vacancies, not exec roles.
+        position: `(${synonyms.slice(0, 3).join(" OR ")}) (hiring OR urgent OR "visa sponsorship" OR "work permit")`,
+        maxItems: 25, // smaller crawl → fits inside 90s timeout
         parseCompanyDetails: true,
         saveOnlyUniqueItems: true,
       };
@@ -328,6 +329,14 @@ Deno.serve(async (req) => {
         .select("id", { count: "exact", head: true })
         .eq("status", "queued");
 
+      // Fire-and-forget: structure newly-captured signals into leads as soon as the wave finishes.
+      // Don't await — keep drain response fast so the dashboard can launch the next wave.
+      fetch(`${SUPABASE_URL}/functions/v1/structure-leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
+        body: JSON.stringify({ limit: 80 }),
+      }).catch(() => {});
+
       return new Response(JSON.stringify({
         ok: true, mode: "drain", processed: jobs.length, remaining: remaining ?? 0,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -336,11 +345,12 @@ Deno.serve(async (req) => {
     // ---------- BULK MODE: queue a high-yield sweep across Balkans + EU ----------
     if (mode === "bulk") {
       const actorsB: Record<string,string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
-      // Skip facebook (low keep-rate) and linkedin (often blocked) for bulk runs.
-      const bulkSources = body.sources ?? ["indeed","career_page","classifieds","google"];
+      // Indeed is the only source consistently delivering structured hiring data.
+      // Google-backed sources (career_page/classifieds/google) get blocked → drop from bulk.
+      const bulkSources = body.sources ?? ["indeed"];
       const bulkCountries: string[] = body.countries ?? PRIORITY_COUNTRIES;
       const bulkKeywords: string[] = body.keywords ?? PRIORITY_KEYWORDS;
-      const maxBulk = Math.min(body.maxJobs ?? 60, 80);
+      const maxBulk = Math.min(body.maxJobs ?? 80, 120);
 
       // Round-robin so we don't queue 20 Indeed jobs in a row before any web-scraper.
       const bulkPlan: Array<{source:string;country:string;keyword:string}> = [];
