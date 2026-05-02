@@ -63,16 +63,20 @@ export type Database = {
         Row: {
           careers_url: string | null
           country: string | null
+          crawl_priority: number
           created_at: string
+          discovery_source: string | null
           employer_type: string
           first_seen_at: string
           id: string
           industry: string | null
+          last_crawled_at: string | null
           last_seen_at: string
           linkedin_slug: string | null
           metadata: Json
           name: string
           official_url: string | null
+          recrawl_interval_hours: number
           size_bucket: string | null
           updated_at: string
           website_domain: string | null
@@ -80,16 +84,20 @@ export type Database = {
         Insert: {
           careers_url?: string | null
           country?: string | null
+          crawl_priority?: number
           created_at?: string
+          discovery_source?: string | null
           employer_type?: string
           first_seen_at?: string
           id?: string
           industry?: string | null
+          last_crawled_at?: string | null
           last_seen_at?: string
           linkedin_slug?: string | null
           metadata?: Json
           name: string
           official_url?: string | null
+          recrawl_interval_hours?: number
           size_bucket?: string | null
           updated_at?: string
           website_domain?: string | null
@@ -97,16 +105,20 @@ export type Database = {
         Update: {
           careers_url?: string | null
           country?: string | null
+          crawl_priority?: number
           created_at?: string
+          discovery_source?: string | null
           employer_type?: string
           first_seen_at?: string
           id?: string
           industry?: string | null
+          last_crawled_at?: string | null
           last_seen_at?: string
           linkedin_slug?: string | null
           metadata?: Json
           name?: string
           official_url?: string | null
+          recrawl_interval_hours?: number
           size_bucket?: string | null
           updated_at?: string
           website_domain?: string | null
@@ -345,6 +357,98 @@ export type Database = {
           },
         ]
       }
+      firecrawl_jobs: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          credits_used: number | null
+          error: string | null
+          finished_at: string | null
+          firecrawl_job_id: string | null
+          id: string
+          mode: string
+          page_count: number
+          pages_persisted: number
+          request_payload: Json
+          scrape_job_id: string | null
+          source_id: string | null
+          started_at: string
+          status: string
+          target_url: string | null
+          updated_at: string
+          webhook_payload: Json
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          credits_used?: number | null
+          error?: string | null
+          finished_at?: string | null
+          firecrawl_job_id?: string | null
+          id?: string
+          mode: string
+          page_count?: number
+          pages_persisted?: number
+          request_payload?: Json
+          scrape_job_id?: string | null
+          source_id?: string | null
+          started_at?: string
+          status?: string
+          target_url?: string | null
+          updated_at?: string
+          webhook_payload?: Json
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          credits_used?: number | null
+          error?: string | null
+          finished_at?: string | null
+          firecrawl_job_id?: string | null
+          id?: string
+          mode?: string
+          page_count?: number
+          pages_persisted?: number
+          request_payload?: Json
+          scrape_job_id?: string | null
+          source_id?: string | null
+          started_at?: string
+          status?: string
+          target_url?: string | null
+          updated_at?: string
+          webhook_payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firecrawl_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firecrawl_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_demand_stats"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "firecrawl_jobs_scrape_job_id_fkey"
+            columns: ["scrape_job_id"]
+            isOneToOne: false
+            referencedRelation: "scrape_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firecrawl_jobs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "source_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       normalized_demand: {
         Row: {
           city: string | null
@@ -525,6 +629,7 @@ export type Database = {
           items_structured: number
           keyword: string | null
           metrics: Json
+          parent_company_id: string | null
           source: Database["public"]["Enums"]["demand_source"]
           source_id: string | null
           started_at: string
@@ -542,6 +647,7 @@ export type Database = {
           items_structured?: number
           keyword?: string | null
           metrics?: Json
+          parent_company_id?: string | null
           source: Database["public"]["Enums"]["demand_source"]
           source_id?: string | null
           started_at?: string
@@ -559,12 +665,27 @@ export type Database = {
           items_structured?: number
           keyword?: string | null
           metrics?: Json
+          parent_company_id?: string | null
           source?: Database["public"]["Enums"]["demand_source"]
           source_id?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["job_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "scrape_jobs_parent_company_id_fkey"
+            columns: ["parent_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scrape_jobs_parent_company_id_fkey"
+            columns: ["parent_company_id"]
+            isOneToOne: false
+            referencedRelation: "company_demand_stats"
+            referencedColumns: ["company_id"]
+          },
           {
             foreignKeyName: "scrape_jobs_source_id_fkey"
             columns: ["source_id"]
