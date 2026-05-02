@@ -13,18 +13,55 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Default actor map. Admins can override per-call via request body.
-// These are widely-used public APIFY actors. Replace freely from admin UI later.
 const DEFAULT_ACTORS: Record<string, string> = {
   indeed: "misceres~indeed-scraper",
   facebook: "apify~facebook-posts-scraper",
   classifieds: "apify~web-scraper",
   career_page: "apify~web-scraper",
+  google: "apify~google-search-scraper",
+  linkedin: "bebity~linkedin-jobs-scraper",
 };
 
-const COUNTRIES = ["Serbia", "Romania", "Poland", "Germany", "Malta"];
-const KEYWORDS = [
-  "mason","plumber","electrician","caregiver","nurse",
-  "factory worker","driver","construction worker",
+// Country -> { iso2, language hints, local job board hosts }
+const COUNTRY_META: Record<string, { iso2: string; langs: string[]; boards: string[] }> = {
+  Serbia:   { iso2: "RS", langs: ["en","sr"],     boards: ["poslovi.infostud.com","helloworld.rs","olx.ba","halooglasi.com"] },
+  Romania:  { iso2: "RO", langs: ["en","ro"],     boards: ["ejobs.ro","bestjobs.eu","olx.ro","hipo.ro"] },
+  Poland:   { iso2: "PL", langs: ["en","pl"],     boards: ["pracuj.pl","olx.pl","gowork.pl","praca.pl"] },
+  Germany:  { iso2: "DE", langs: ["en","de"],     boards: ["stepstone.de","xing.com","arbeitsagentur.de","kimeta.de"] },
+  Malta:    { iso2: "MT", langs: ["en"],          boards: ["jobsplus.gov.mt","keepmeposted.com.mt","maltapark.com"] },
+  Greece:   { iso2: "GR", langs: ["en","el"],     boards: ["kariera.gr","skywalker.gr","xe.gr"] },
+  Croatia:  { iso2: "HR", langs: ["en","hr"],     boards: ["mojposao.net","posao.hr","njuskalo.hr"] },
+  Hungary:  { iso2: "HU", langs: ["en","hu"],     boards: ["profession.hu","jobline.hu"] },
+  Czechia:  { iso2: "CZ", langs: ["en","cs"],     boards: ["jobs.cz","prace.cz"] },
+  Slovakia: { iso2: "SK", langs: ["en","sk"],     boards: ["profesia.sk","kariera.sk"] },
+};
+const COUNTRIES = Object.keys(COUNTRY_META);
+
+// Role -> multilingual synonyms (used in query expansion)
+const ROLE_SYNONYMS: Record<string, string[]> = {
+  mason: ["mason","bricklayer","zidar","murarz","Maurer","ziditelj","kőműves"],
+  plumber: ["plumber","vodoinstalater","hydraulik","Klempner","instalator","υδραυλικός"],
+  electrician: ["electrician","električar","elektryk","Elektriker","electrician","ηλεκτρολόγος"],
+  caregiver: ["caregiver","care worker","negovateljica","opiekun","Pflegekraft","badante"],
+  nurse: ["nurse","medicinska sestra","pielęgniarka","Krankenpfleger","νοσηλευτής"],
+  "factory worker": ["factory worker","production operator","radnik u fabrici","pracownik produkcji","Produktionsmitarbeiter"],
+  driver: ["driver","truck driver","vozač","kierowca","Fahrer","LKW Fahrer"],
+  "construction worker": ["construction worker","građevinski radnik","pracownik budowlany","Bauarbeiter","εργάτης οικοδομών"],
+  welder: ["welder","varilac","spawacz","Schweißer","συγκολλητής"],
+  carpenter: ["carpenter","stolar","cieśla","Zimmermann","ξυλουργός"],
+  warehouse: ["warehouse worker","picker packer","magacioner","magazynier","Lagerarbeiter"],
+  cleaner: ["cleaner","housekeeping","čistačica","sprzątaczka","Reinigungskraft"],
+  chef: ["chef","cook","kuvar","kucharz","Koch","μάγειρας"],
+  waiter: ["waiter","waitress","konobar","kelner","Kellner","σερβιτόρος"],
+  "hotel staff": ["hotel staff","reception","hotel receptionist","recepcionista","Hotelmitarbeiter"],
+};
+const KEYWORDS = Object.keys(ROLE_SYNONYMS);
+
+const INTENT_TERMS = [
+  "hiring","urgent hiring","walk in","mass hiring","bulk hiring","visa sponsorship",
+  "work permit","accommodation provided","apply now","immediate joining",
+  "zapošljavamo","tražimo","zatrudnimy","poszukujemy","Wir stellen ein","suchen",
+  "ζητείται","ζητούνται","cerchiamo",
 ];
 
 function fingerprint(s: string) {
