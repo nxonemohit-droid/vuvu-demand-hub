@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
     // ---------- DRAIN MODE: process up to 4 queued jobs synchronously ----------
     if (mode === "drain") {
       const WAVE_SIZE = 4;
-      const WAVE_BUDGET_MS = 120_000;
+      const WAVE_BUDGET_MS = 140_000;
       const startedAt = Date.now();
       const actors: Record<string, string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
 
@@ -226,14 +226,19 @@ Deno.serve(async (req) => {
         const actorId = job.actor_id || actors[job.source];
         try {
           const input = buildInput(job.source, job.country ?? "", job.keyword ?? "");
-          const items: any[] = await runActor(actorId, input, 60_000);
+          // Indeed is fast, others crawl multiple pages — give them more time
+          const perActorTimeout = job.source === "indeed" || job.source === "linkedin" ? 60_000 : 120_000;
+          const items: any[] = await runActor(actorId, input, perActorTimeout);
           let inserted = 0;
           const synonyms = (ROLE_SYNONYMS[job.keyword ?? ""] ?? [job.keyword ?? ""]).map((s) => s.toLowerCase());
           for (const it of items.slice(0, 60)) {
             const text = JSON.stringify(it).slice(0, 8000);
             const lower = text.toLowerCase();
             const hasRole = synonyms.some((s) => s && lower.includes(s));
-            const hasIntent = INTENT_TERMS.some((t) => lower.includes(t.toLowerCase()));
+            // Trust Indeed/LinkedIn job listings — they're already hiring posts.
+            // Only require explicit hiring intent for noisy sources (facebook/classifieds/google).
+            const trustedSource = job.source === "indeed" || job.source === "linkedin" || job.source === "career_page";
+            const hasIntent = trustedSource ? true : INTENT_TERMS.some((t) => lower.includes(t.toLowerCase()));
             if (!hasRole || !hasIntent) continue;
             const fp = fingerprint(`${job.source}|${job.country}|${job.keyword}|${(it.url ?? it.link ?? it.id ?? text.slice(0,200))}`);
             const { error: insErr } = await supabase.from("raw_signals").insert({
