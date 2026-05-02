@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Briefcase, Users, Radar, AlertCircle } from "lucide-react";
+import { Briefcase, Users, Radar, AlertCircle, Mail, Loader2 } from "lucide-react";
 import { useRoles } from "@/lib/auth";
+import { toast } from "sonner";
 
 type Stats = {
   leads: number;
@@ -15,6 +17,18 @@ type Stats = {
 const Index = () => {
   const { roles } = useRoles();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [enriching, setEnriching] = useState(false);
+
+  const runHunter = async () => {
+    setEnriching(true);
+    const { data, error } = await supabase.functions.invoke("hunter-enrich", {
+      body: { limit: 10 },
+    });
+    setEnriching(false);
+    if (error) return toast.error(error.message);
+    const found = (data?.results ?? []).filter((r: any) => r.email).length;
+    toast.success(`Hunter: ${found} email(s) found across ${data?.processed ?? 0} leads`);
+  };
 
   useEffect(() => {
     (async () => {
@@ -49,7 +63,11 @@ const Index = () => {
             Welcome back. Here is your demand intelligence overview.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <Button size="sm" variant="outline" onClick={runHunter} disabled={enriching}>
+            {enriching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+            Enrich emails (Hunter)
+          </Button>
           {roles.map((r) => (
             <Badge key={r} variant="outline" className="capitalize">
               {r}
