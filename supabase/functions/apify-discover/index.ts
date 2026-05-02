@@ -252,14 +252,21 @@ function buildInput(source: string, country: string, keyword: string) {
 
   switch (source) {
     case "indeed":
+      {
+        const syns = synonyms.slice(0, 3);
+        // If synonyms already use Boolean operators (recruiter keywords), pass them as-is.
+        const hasBoolean = syns.some((s) => /AND|OR|NOT|"/.test(s));
+        const position = hasBoolean
+          ? syns.join(" OR ")
+          : `(${syns.join(" OR ")}) (hiring OR urgent OR "visa sponsorship" OR "work permit")`;
       return {
         country: meta.iso2,
-        // Add hiring-intent terms so Indeed returns blue-collar vacancies, not exec roles.
-        position: `(${synonyms.slice(0, 3).join(" OR ")}) (hiring OR urgent OR "visa sponsorship" OR "work permit")`,
+          position,
         maxItems: 25, // smaller crawl → fits inside 90s timeout
         parseCompanyDetails: true,
         saveOnlyUniqueItems: true,
       };
+      }
     case "linkedin":
       return {
         location: country,
