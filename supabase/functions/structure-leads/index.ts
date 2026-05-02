@@ -121,6 +121,15 @@ Deno.serve(async (req) => {
       await supabase.from("raw_signals").update({ structured: true }).eq("id", s.id);
     }
 
+    // Fire Hunter enrichment for newly-created leads missing email
+    if (created > 0) {
+      fetch(`${SUPABASE_URL}/functions/v1/hunter-enrich`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
+        body: JSON.stringify({ limit: Math.min(created, 10) }),
+      }).catch(() => {});
+    }
+
     return new Response(JSON.stringify({ ok: true, processed: signals?.length ?? 0, created, skipped }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
