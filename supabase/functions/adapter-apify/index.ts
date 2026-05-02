@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     const input = buildApifyInput(source, job);
     if (!input) {
       await supa.from("scrape_jobs").update({
-        status: "skipped", error: "country not supported by source", finished_at: new Date().toISOString(),
+        status: "failed", error: "skipped: country not supported by source", finished_at: new Date().toISOString(),
       }).eq("id", job.id);
       await logRunEvent(supa, job.id, "actor.skip", "country not supported", {}, "warn");
       return jsonResponse({ ok: true, skipped: true });
