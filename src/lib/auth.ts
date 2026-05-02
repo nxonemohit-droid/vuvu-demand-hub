@@ -19,3 +19,41 @@ export function useSession() {
 
   return { session, user, loading };
 }
+
+export type AppRole = "admin" | "bd" | "viewer";
+
+export function useRoles() {
+  const { user, loading: sessionLoading } = useSession();
+  const [roles, setRoles] = useState<AppRole[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (!user) {
+      setRoles([]);
+      setLoading(false);
+      return;
+    }
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        setRoles((data ?? []).map((r) => r.role as AppRole));
+        setLoading(false);
+      });
+  }, [user, sessionLoading]);
+
+  return {
+    user,
+    roles,
+    loading: sessionLoading || loading,
+    isAdmin: roles.includes("admin"),
+    isBD: roles.includes("bd"),
+    isViewer: roles.includes("viewer"),
+  };
+}
+
+export async function signOut() {
+  await supabase.auth.signOut();
+}
