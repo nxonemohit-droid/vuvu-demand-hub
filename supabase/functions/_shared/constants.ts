@@ -99,7 +99,7 @@ export const CAREER_PATH_HINTS = [
   "kariera", "ergasia",                             // gr
   "kariera", "prace",                               // cz/sk
   "vacatures", "werkenbij",                         // nl
-};
+];
 
 export function looksLikeCareerUrl(url: string): boolean {
   const u = url.toLowerCase();
