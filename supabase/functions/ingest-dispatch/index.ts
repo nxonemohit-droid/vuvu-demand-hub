@@ -21,6 +21,7 @@ import {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? SERVICE_ROLE;
 
 const ADAPTER_FUNCTION: Record<string, string> = {
   apify: "adapter-apify",
@@ -48,7 +49,11 @@ function shouldSkip(source: SourceRow, country: string): boolean {
 async function invokeAdapter(adapterFn: string, scrapeJobId: string) {
   return fetch(`${SUPABASE_URL}/functions/v1/${adapterFn}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
+    headers: {
+      "Content-Type": "application/json",
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE}`,
+    },
     body: JSON.stringify({ scrape_job_id: scrapeJobId }),
   });
 }
