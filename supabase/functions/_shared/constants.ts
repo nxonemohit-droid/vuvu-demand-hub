@@ -85,3 +85,48 @@ export function legacySourceForRegistryId(sourceId: string): string {
   if (sourceId.startsWith("directory")) return "directory";
   return "google";
 }
+
+// Career-section URL hints used by Firecrawl /map filtering.
+export const CAREER_PATH_HINTS = [
+  "career", "careers", "job", "jobs", "vacanc", "vacancy", "vacancies",
+  "open-positions", "opportunities", "join-us", "work-with-us", "hiring",
+  "stellen", "stellenangebote", "karriere",         // de
+  "oferty", "praca", "rekrutacja",                  // pl
+  "lavora", "lavoro", "carriera",                   // it
+  "empleo", "trabaja", "carreras",                  // es
+  "emploi", "carriere", "rejoignez",                // fr
+  "posao", "poslovi", "karijera",                   // sr/hr/bs
+  "kariera", "ergasia",                             // gr
+  "kariera", "prace",                               // cz/sk
+  "vacatures", "werkenbij",                         // nl
+};
+
+export function looksLikeCareerUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return CAREER_PATH_HINTS.some((h) => u.includes(h));
+}
+
+// JSON schema Firecrawl uses for direct structured extraction (no LLM cost on us).
+export const FIRECRAWL_JOB_SCHEMA = {
+  type: "object",
+  properties: {
+    is_job_posting: { type: "boolean", description: "True only if this page advertises an open position" },
+    role_title: { type: "string" },
+    company_name: { type: "string" },
+    country: { type: "string", description: "Full English country name" },
+    city: { type: "string" },
+    employment_type: { type: "string" },
+    salary_min: { type: "number" },
+    salary_max: { type: "number" },
+    salary_currency: { type: "string" },
+    visa_sponsorship: { type: "boolean" },
+    accommodation_provided: { type: "boolean" },
+    headcount: { type: "number", description: "Number of workers needed if mentioned" },
+    contact_email: { type: "string" },
+    contact_phone: { type: "string" },
+    posted_at: { type: "string", description: "ISO date if shown" },
+    is_blue_collar: { type: "boolean" },
+    summary: { type: "string", description: "2-3 sentence summary" },
+  },
+  required: ["is_job_posting"],
+} as const;
