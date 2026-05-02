@@ -12,7 +12,11 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 const URGENCY_KEYWORDS = ["urgent","urgent hiring","bulk hiring","visa sponsorship","immediate","immediately","asap","walk in","walk-in","mass hiring"];
-const EU_PRIORITY = ["Serbia","Romania","Poland","Germany","Malta","Greece"];
+const EU_PRIORITY = [
+  "Serbia","Romania","Poland","Germany","Malta","Greece","Croatia","Slovenia",
+  "Bulgaria","Czechia","Hungary","Austria","Netherlands","Italy","Spain","Portugal",
+  "Slovakia","Bosnia and Herzegovina","North Macedonia","Montenegro","Albania",
+];
 
 function score(lead: any, rawText: string): { urgency: number; priority: "high"|"medium"|"low"; matched: string[] } {
   const t = (rawText || "").toLowerCase();
@@ -24,6 +28,8 @@ function score(lead: any, rawText: string): { urgency: number; priority: "high"|
   if (lead.contact_email || lead.contact_phone) s += 20;
   if (lead.visa_sponsorship) s += 10;
   if (EU_PRIORITY.includes(lead.country)) s += 10;
+  // Boost based on AI-derived fit signal (0-100), if present
+  if (typeof lead.fit_score === "number") s += Math.round(lead.fit_score * 0.2);
   s = Math.max(0, Math.min(100, s));
   const priority = s >= 65 ? "high" : s >= 35 ? "medium" : "low";
   return { urgency: s, priority, matched };
@@ -37,14 +43,29 @@ async function aiStructure(rawText: string, source: string): Promise<any | null>
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        { role: "system", content: "You extract employer hiring demand from scraped text. Return ONLY via the tool. Set unknown fields to null. Country must be one of: Serbia, Romania, Poland, Germany, Malta, Greece, or other." },
+        { role: "system", content:
+`You are a senior B2B recruitment analyst for Voynova Global Solutions, which places blue-collar workers from South Asia (India/Nepal/Bangladesh) into European employers (Balkans + EU).
+
+Your job: read scraped text and extract a structured EMPLOYER HIRING SIGNAL. Be strict — only mark is_employer_demand=true when this is genuinely an employer (or their agency) seeking workers. Reject candidate CVs, news articles, training ads, and recruiter "we have candidates" posts.
+
+Country must be a real European country name (e.g. "Serbia", "Germany", "Bosnia and Herzegovina"). If you can't determine the country, set is_employer_demand=false.
+
+Score fit_score 0-100 based on Voynova's placement profile:
+ - Blue-collar role (construction, hospitality, healthcare, factory, driving, warehouse): +40
+ - Visa sponsorship / work permit mentioned: +25
+ - Accommodation provided: +15
+ - Bulk hiring (5+ workers): +15
+ - Direct contact (email/phone) present: +15
+ - White-collar / requires native language only / EU passport required: subtract
+
+Extract opportunity_summary as ONE sentence (max 25 words) a sales rep can read at a glance. Example: "Maersk Constanta hiring 10 electricians, visa sponsored, EUR 2200/mo, contact HR directly."` },
         { role: "user", content: `Source: ${source}\n\nRaw item:\n${rawText.slice(0, 6000)}` },
       ],
       tools: [{
         type: "function",
         function: {
           name: "extract_demand",
-          description: "Extract structured employer demand",
+          description: "Extract structured employer demand with fit scoring and opportunity summary",
           parameters: {
             type: "object",
             properties: {
@@ -60,9 +81,12 @@ async function aiStructure(rawText: string, source: string): Promise<any | null>
               contact_email: { type: ["string","null"] },
               contact_phone: { type: ["string","null"] },
               visa_sponsorship: { type: "boolean" },
+              accommodation_provided: { type: "boolean" },
+              fit_score: { type: "integer", description: "0-100 fit for Voynova's blue-collar placement profile" },
+              opportunity_summary: { type: ["string","null"], description: "ONE-sentence sales summary, max 25 words" },
               is_employer_demand: { type: "boolean", description: "true only if this is a real employer hiring need" },
             },
-            required: ["role","country","visa_sponsorship","is_employer_demand"],
+            required: ["role","country","visa_sponsorship","fit_score","is_employer_demand"],
             additionalProperties: false,
           },
         },
@@ -97,6 +121,13 @@ Deno.serve(async (req) => {
         continue;
       }
       const sc = score(extracted, s.raw_text || "");
+      // Build notes from AI insights for the BD team
+      const noteParts: string[] = [];
+      if (extracted.opportunity_summary) noteParts.push(extracted.opportunity_summary);
+      if (extracted.accommodation_provided) noteParts.push("Accommodation provided.");
+      if (typeof extracted.fit_score === "number") noteParts.push(`Voynova fit: ${extracted.fit_score}/100.`);
+      const aiNotes = noteParts.join(" ");
+
       const { error: insErr } = await supabase.from("demand_leads").insert({
         raw_signal_id: s.id,
         source: s.source,
@@ -116,6 +147,7 @@ Deno.serve(async (req) => {
         urgency_score: sc.urgency,
         priority: sc.priority,
         matched_keywords: sc.matched,
+        notes: aiNotes || null,
       });
       if (!insErr) created++;
       await supabase.from("raw_signals").update({ structured: true }).eq("id", s.id);

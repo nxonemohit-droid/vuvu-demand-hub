@@ -23,19 +23,64 @@ const DEFAULT_ACTORS: Record<string, string> = {
 };
 
 // Country -> { iso2, language hints, local job board hosts }
+// Full Balkans + EU coverage. Boards we don't know are omitted; google/career_page still work.
 const COUNTRY_META: Record<string, { iso2: string; langs: string[]; boards: string[] }> = {
-  Serbia:   { iso2: "RS", langs: ["en","sr"],     boards: ["poslovi.infostud.com","helloworld.rs","olx.ba","halooglasi.com"] },
-  Romania:  { iso2: "RO", langs: ["en","ro"],     boards: ["ejobs.ro","bestjobs.eu","olx.ro","hipo.ro"] },
-  Poland:   { iso2: "PL", langs: ["en","pl"],     boards: ["pracuj.pl","olx.pl","gowork.pl","praca.pl"] },
-  Germany:  { iso2: "DE", langs: ["en","de"],     boards: ["stepstone.de","xing.com","arbeitsagentur.de","kimeta.de"] },
-  Malta:    { iso2: "MT", langs: ["en"],          boards: ["jobsplus.gov.mt","keepmeposted.com.mt","maltapark.com"] },
-  Greece:   { iso2: "GR", langs: ["en","el"],     boards: ["kariera.gr","skywalker.gr","xe.gr"] },
-  Croatia:  { iso2: "HR", langs: ["en","hr"],     boards: ["mojposao.net","posao.hr","njuskalo.hr"] },
-  Hungary:  { iso2: "HU", langs: ["en","hu"],     boards: ["profession.hu","jobline.hu"] },
-  Czechia:  { iso2: "CZ", langs: ["en","cs"],     boards: ["jobs.cz","prace.cz"] },
-  Slovakia: { iso2: "SK", langs: ["en","sk"],     boards: ["profesia.sk","kariera.sk"] },
+  // Balkans
+  Serbia:                 { iso2: "RS", langs: ["en","sr"], boards: ["poslovi.infostud.com","helloworld.rs","halooglasi.com","oglasi.rs"] },
+  Croatia:                { iso2: "HR", langs: ["en","hr"], boards: ["mojposao.net","posao.hr","njuskalo.hr","moj-posao.net"] },
+  Slovenia:               { iso2: "SI", langs: ["en","sl"], boards: ["mojedelo.com","optius.com","zaposlitev.net"] },
+  "Bosnia and Herzegovina": { iso2: "BA", langs: ["en","bs","hr","sr"], boards: ["posao.ba","kolektiv.ba","olx.ba","posao.hr"] },
+  Montenegro:             { iso2: "ME", langs: ["en","sr"], boards: ["posao.me","poslovi.me","hoso.me"] },
+  "North Macedonia":      { iso2: "MK", langs: ["en","mk"], boards: ["vrabotuvanje.com.mk","mojakariera.com.mk","najdiposao.mk"] },
+  Albania:                { iso2: "AL", langs: ["en","sq"], boards: ["duapune.com","njoftime.com","mjaft.org"] },
+  Kosovo:                 { iso2: "XK", langs: ["en","sq"], boards: ["telegrafi.com/punesim","kosovojob.com"] },
+  Bulgaria:               { iso2: "BG", langs: ["en","bg"], boards: ["jobs.bg","zaplata.bg","rabota.bg"] },
+  Moldova:                { iso2: "MD", langs: ["en","ro","ru"], boards: ["rabota.md","999.md","delogo.md"] },
+  Romania:                { iso2: "RO", langs: ["en","ro"], boards: ["ejobs.ro","bestjobs.eu","olx.ro","hipo.ro"] },
+  // Central & Eastern EU
+  Hungary:                { iso2: "HU", langs: ["en","hu"], boards: ["profession.hu","jobline.hu","allas.hu"] },
+  Poland:                 { iso2: "PL", langs: ["en","pl"], boards: ["pracuj.pl","olx.pl","gowork.pl","praca.pl"] },
+  Czechia:                { iso2: "CZ", langs: ["en","cs"], boards: ["jobs.cz","prace.cz"] },
+  Slovakia:               { iso2: "SK", langs: ["en","sk"], boards: ["profesia.sk","kariera.sk"] },
+  Estonia:                { iso2: "EE", langs: ["en","et"], boards: ["cv.ee","cvkeskus.ee","tootukassa.ee"] },
+  Latvia:                 { iso2: "LV", langs: ["en","lv"], boards: ["cv.lv","cvonline.lv"] },
+  Lithuania:              { iso2: "LT", langs: ["en","lt"], boards: ["cvbankas.lt","cvonline.lt"] },
+  // Western & Northern EU
+  Germany:                { iso2: "DE", langs: ["en","de"], boards: ["stepstone.de","xing.com","arbeitsagentur.de","kimeta.de"] },
+  Austria:                { iso2: "AT", langs: ["en","de"], boards: ["karriere.at","stepstone.at","willhaben.at"] },
+  Switzerland:            { iso2: "CH", langs: ["en","de","fr","it"], boards: ["jobs.ch","jobup.ch","jobscout24.ch"] },
+  Luxembourg:             { iso2: "LU", langs: ["en","fr","de"], boards: ["jobs.lu","monster.lu","jobfinder.lu"] },
+  Netherlands:            { iso2: "NL", langs: ["en","nl"], boards: ["nationalevacaturebank.nl","monsterboard.nl","werk.nl"] },
+  Belgium:                { iso2: "BE", langs: ["en","nl","fr"], boards: ["vdab.be","stepstone.be","jobat.be","references.be"] },
+  France:                 { iso2: "FR", langs: ["en","fr"], boards: ["pole-emploi.fr","apec.fr","hellowork.com","indeed.fr"] },
+  Ireland:                { iso2: "IE", langs: ["en"],      boards: ["irishjobs.ie","jobs.ie","monster.ie"] },
+  Sweden:                 { iso2: "SE", langs: ["en","sv"], boards: ["arbetsformedlingen.se","blocket.se/jobb"] },
+  Denmark:                { iso2: "DK", langs: ["en","da"], boards: ["jobindex.dk","jobnet.dk"] },
+  Finland:                { iso2: "FI", langs: ["en","fi"], boards: ["te-palvelut.fi","duunitori.fi","oikotie.fi"] },
+  Norway:                 { iso2: "NO", langs: ["en","no"], boards: ["finn.no/job","nav.no"] },
+  // Southern EU
+  Italy:                  { iso2: "IT", langs: ["en","it"], boards: ["infojobs.it","monster.it","subito.it/offerte-lavoro"] },
+  Spain:                  { iso2: "ES", langs: ["en","es"], boards: ["infojobs.net","tecnoempleo.com","milanuncios.com/empleo"] },
+  Portugal:               { iso2: "PT", langs: ["en","pt"], boards: ["net-empregos.com","sapo.pt/emprego","ofertas-emprego.com"] },
+  Greece:                 { iso2: "GR", langs: ["en","el"], boards: ["kariera.gr","skywalker.gr","xe.gr"] },
+  Cyprus:                 { iso2: "CY", langs: ["en","el"], boards: ["ergodotisi.com","carierista.com"] },
+  Malta:                  { iso2: "MT", langs: ["en"],      boards: ["jobsplus.gov.mt","keepmeposted.com.mt","maltapark.com"] },
 };
 const COUNTRIES = Object.keys(COUNTRY_META);
+
+// Subset of countries Voynova prioritises for blue-collar placements (used by bulk mode).
+const PRIORITY_COUNTRIES = [
+  "Serbia","Romania","Poland","Germany","Greece","Croatia","Slovenia","Bulgaria",
+  "Czechia","Hungary","Austria","Netherlands","Italy","Spain","Portugal","Malta",
+  "Slovakia","Bosnia and Herzegovina","North Macedonia","Montenegro","Albania",
+];
+
+// Roles Voynova actively places (used by bulk mode).
+const PRIORITY_KEYWORDS = [
+  "nurse","caregiver","construction worker","welder","electrician",
+  "driver","factory worker","warehouse","mason","plumber","carpenter",
+  "hotel staff","cleaner","chef",
+];
 
 // Role -> multilingual synonyms (used in query expansion)
 const ROLE_SYNONYMS: Record<string, string[]> = {
@@ -124,7 +169,7 @@ function buildInput(source: string, country: string, keyword: string) {
       return {
         country: meta.iso2,
         position: synonyms.slice(0, 3).join(" OR "),
-        maxItems: 40,
+        maxItems: 20, // smaller crawl → fits inside 90s timeout
         parseCompanyDetails: true,
         saveOnlyUniqueItems: true,
       };
@@ -165,10 +210,10 @@ function buildInput(source: string, country: string, keyword: string) {
         })),
       );
       return {
-        startUrls: urls.slice(0, 10),
+        startUrls: urls.slice(0, 6),
         pageFunction:
           "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,6000))}}",
-        maxPagesPerCrawl: 12,
+        maxPagesPerCrawl: 6,
         maxRequestRetries: 2,
       };
     }
@@ -180,7 +225,7 @@ function buildInput(source: string, country: string, keyword: string) {
         startUrls: urls,
         pageFunction:
           "async function pageFunction(ctx){return{title:ctx.request.url,text:await ctx.page.evaluate(()=>document.body.innerText.slice(0,6000))}}",
-        maxPagesPerCrawl: 10,
+        maxPagesPerCrawl: 6,
       };
     }
     default:
@@ -196,7 +241,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     const body = await req.json().catch(() => ({}));
-    const mode: "plan" | "drain" = body.mode === "drain" ? "drain" : "plan";
+    const mode: "plan" | "drain" | "bulk" =
+      body.mode === "drain" ? "drain" :
+      body.mode === "bulk"  ? "bulk"  : "plan";
 
     // ---------- DRAIN MODE: process up to 4 queued jobs synchronously ----------
     if (mode === "drain") {
@@ -205,15 +252,25 @@ Deno.serve(async (req) => {
       const startedAt = Date.now();
       const actors: Record<string, string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
 
-      const { data: queuedJobs, error: pickErr } = await supabase
+      // Pull a wider candidate pool, then prioritise: Indeed first (best lead source),
+      // then career_page / classifieds, then everything else. FIFO within each tier.
+      const { data: candidates, error: pickErr } = await supabase
         .from("scrape_jobs")
         .select("id, source, country, keyword, actor_id")
         .eq("status", "queued")
         .order("started_at", { ascending: true })
-        .limit(WAVE_SIZE);
+        .limit(WAVE_SIZE * 4);
       if (pickErr) throw pickErr;
 
-      const jobs = queuedJobs ?? [];
+      const tier = (s: string) =>
+        s === "indeed" ? 0 :
+        s === "career_page" ? 1 :
+        s === "classifieds" ? 2 :
+        s === "google" ? 3 : 4;
+      const jobs = (candidates ?? [])
+        .slice()
+        .sort((a, b) => tier(a.source) - tier(b.source))
+        .slice(0, WAVE_SIZE);
       if (jobs.length > 0) {
         await supabase.from("scrape_jobs").update({ status: "running" }).in("id", jobs.map((j) => j.id));
       }
@@ -226,8 +283,12 @@ Deno.serve(async (req) => {
         const actorId = job.actor_id || actors[job.source];
         try {
           const input = buildInput(job.source, job.country ?? "", job.keyword ?? "");
-          // Indeed is fast, others crawl multiple pages — give them more time
-          const perActorTimeout = job.source === "indeed" || job.source === "linkedin" ? 60_000 : 120_000;
+          // Per-source timeout tuning. Indeed is our money-maker — give it 90s.
+          const perActorTimeout =
+            job.source === "indeed" ? 90_000 :
+            job.source === "linkedin" ? 60_000 :
+            job.source === "google" ? 90_000 :
+            120_000;
           const items: any[] = await runActor(actorId, input, perActorTimeout);
           let inserted = 0;
           const synonyms = (ROLE_SYNONYMS[job.keyword ?? ""] ?? [job.keyword ?? ""]).map((s) => s.toLowerCase());
@@ -269,6 +330,54 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({
         ok: true, mode: "drain", processed: jobs.length, remaining: remaining ?? 0,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ---------- BULK MODE: queue a high-yield sweep across Balkans + EU ----------
+    if (mode === "bulk") {
+      const actorsB: Record<string,string> = { ...DEFAULT_ACTORS, ...(body.actors ?? {}) };
+      // Skip facebook (low keep-rate) and linkedin (often blocked) for bulk runs.
+      const bulkSources = body.sources ?? ["indeed","career_page","classifieds","google"];
+      const bulkCountries: string[] = body.countries ?? PRIORITY_COUNTRIES;
+      const bulkKeywords: string[] = body.keywords ?? PRIORITY_KEYWORDS;
+      const maxBulk = Math.min(body.maxJobs ?? 60, 80);
+
+      // Round-robin so we don't queue 20 Indeed jobs in a row before any web-scraper.
+      const bulkPlan: Array<{source:string;country:string;keyword:string}> = [];
+      const seen = new Set<string>();
+      outerB: for (let k = 0; k < bulkKeywords.length; k++) {
+        for (let c = 0; c < bulkCountries.length; c++) {
+          for (let s = 0; s < bulkSources.length; s++) {
+            const src = bulkSources[(s + k) % bulkSources.length];
+            const country = bulkCountries[(c + s) % bulkCountries.length];
+            const kw = bulkKeywords[k];
+            if (src === "indeed") {
+              const iso = COUNTRY_META[country]?.iso2;
+              if (!iso || !INDEED_ALLOWED.has(iso)) continue;
+            }
+            const key = `${src}|${country}|${kw}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            bulkPlan.push({ source: src, country, keyword: kw });
+            if (bulkPlan.length >= maxBulk) break outerB;
+          }
+        }
+      }
+
+      let bulkQueued = 0;
+      for (const j of bulkPlan) {
+        const actorId = actorsB[j.source];
+        if (!actorId) continue;
+        const { error } = await supabase.from("scrape_jobs").insert({
+          source: j.source, actor_id: actorId, country: j.country, keyword: j.keyword, status: "queued",
+        });
+        if (!error) bulkQueued++;
+      }
+
+      return new Response(JSON.stringify({
+        ok: true, mode: "bulk", queued: bulkQueued,
+        countries: bulkCountries.length, keywords: bulkKeywords.length, sources: bulkSources.length,
+        message: `Bulk queued ${bulkQueued} jobs across ${bulkCountries.length} countries × ${bulkKeywords.length} roles.`,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
