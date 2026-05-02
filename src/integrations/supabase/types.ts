@@ -59,9 +59,65 @@ export type Database = {
         }
         Relationships: []
       }
+      companies: {
+        Row: {
+          careers_url: string | null
+          country: string | null
+          created_at: string
+          employer_type: string
+          first_seen_at: string
+          id: string
+          industry: string | null
+          last_seen_at: string
+          linkedin_slug: string | null
+          metadata: Json
+          name: string
+          official_url: string | null
+          size_bucket: string | null
+          updated_at: string
+          website_domain: string | null
+        }
+        Insert: {
+          careers_url?: string | null
+          country?: string | null
+          created_at?: string
+          employer_type?: string
+          first_seen_at?: string
+          id?: string
+          industry?: string | null
+          last_seen_at?: string
+          linkedin_slug?: string | null
+          metadata?: Json
+          name: string
+          official_url?: string | null
+          size_bucket?: string | null
+          updated_at?: string
+          website_domain?: string | null
+        }
+        Update: {
+          careers_url?: string | null
+          country?: string | null
+          created_at?: string
+          employer_type?: string
+          first_seen_at?: string
+          id?: string
+          industry?: string | null
+          last_seen_at?: string
+          linkedin_slug?: string | null
+          metadata?: Json
+          name?: string
+          official_url?: string | null
+          size_bucket?: string | null
+          updated_at?: string
+          website_domain?: string | null
+        }
+        Relationships: []
+      }
       demand_leads: {
         Row: {
+          ai_rationale: string | null
           city: string | null
+          company_id: string | null
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
@@ -72,21 +128,29 @@ export type Database = {
           employer_name: string | null
           id: string
           matched_keywords: string[] | null
+          normalized_demand_id: string | null
           notes: string | null
           priority: Database["public"]["Enums"]["priority_tag"]
           raw_signal_id: string | null
+          review_status: string
           role: string
           salary_currency: string | null
           salary_max: number | null
           salary_min: number | null
+          score: number | null
+          score_breakdown: Json
+          snoozed_until: string | null
           source: Database["public"]["Enums"]["demand_source"]
           source_url: string | null
+          tier: string | null
           updated_at: string
           urgency_score: number
           visa_sponsorship: boolean
         }
         Insert: {
+          ai_rationale?: string | null
           city?: string | null
+          company_id?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -97,21 +161,29 @@ export type Database = {
           employer_name?: string | null
           id?: string
           matched_keywords?: string[] | null
+          normalized_demand_id?: string | null
           notes?: string | null
           priority?: Database["public"]["Enums"]["priority_tag"]
           raw_signal_id?: string | null
+          review_status?: string
           role: string
           salary_currency?: string | null
           salary_max?: number | null
           salary_min?: number | null
+          score?: number | null
+          score_breakdown?: Json
+          snoozed_until?: string | null
           source: Database["public"]["Enums"]["demand_source"]
           source_url?: string | null
+          tier?: string | null
           updated_at?: string
           urgency_score?: number
           visa_sponsorship?: boolean
         }
         Update: {
+          ai_rationale?: string | null
           city?: string | null
+          company_id?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -122,25 +194,52 @@ export type Database = {
           employer_name?: string | null
           id?: string
           matched_keywords?: string[] | null
+          normalized_demand_id?: string | null
           notes?: string | null
           priority?: Database["public"]["Enums"]["priority_tag"]
           raw_signal_id?: string | null
+          review_status?: string
           role?: string
           salary_currency?: string | null
           salary_max?: number | null
           salary_min?: number | null
+          score?: number | null
+          score_breakdown?: Json
+          snoozed_until?: string | null
           source?: Database["public"]["Enums"]["demand_source"]
           source_url?: string | null
+          tier?: string | null
           updated_at?: string
           urgency_score?: number
           visa_sponsorship?: boolean
         }
         Relationships: [
           {
+            foreignKeyName: "demand_leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_demand_stats"
+            referencedColumns: ["company_id"]
+          },
+          {
             foreignKeyName: "demand_leads_duplicate_of_fkey"
             columns: ["duplicate_of"]
             isOneToOne: false
             referencedRelation: "demand_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_leads_normalized_demand_id_fkey"
+            columns: ["normalized_demand_id"]
+            isOneToOne: false
+            referencedRelation: "normalized_demand"
             referencedColumns: ["id"]
           },
           {
@@ -194,6 +293,142 @@ export type Database = {
           },
         ]
       }
+      demand_provenance: {
+        Row: {
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          normalized_demand_id: string
+          raw_signal_id: string | null
+          source_id: string
+          source_url: string | null
+        }
+        Insert: {
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          normalized_demand_id: string
+          raw_signal_id?: string | null
+          source_id: string
+          source_url?: string | null
+        }
+        Update: {
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          normalized_demand_id?: string
+          raw_signal_id?: string | null
+          source_id?: string
+          source_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_provenance_normalized_demand_id_fkey"
+            columns: ["normalized_demand_id"]
+            isOneToOne: false
+            referencedRelation: "normalized_demand"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_provenance_raw_signal_id_fkey"
+            columns: ["raw_signal_id"]
+            isOneToOne: false
+            referencedRelation: "raw_signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_provenance_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "source_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      normalized_demand: {
+        Row: {
+          city: string | null
+          company_id: string
+          country: string
+          created_at: string
+          employment_type: string | null
+          expires_at: string | null
+          fingerprint: string
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          posted_at: string | null
+          role_normalized: string
+          role_title: string
+          salary_currency: string | null
+          salary_max: number | null
+          salary_min: number | null
+          sector: string | null
+          seen_count: number
+          updated_at: string
+          visa_sponsorship: boolean | null
+        }
+        Insert: {
+          city?: string | null
+          company_id: string
+          country: string
+          created_at?: string
+          employment_type?: string | null
+          expires_at?: string | null
+          fingerprint: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          posted_at?: string | null
+          role_normalized: string
+          role_title: string
+          salary_currency?: string | null
+          salary_max?: number | null
+          salary_min?: number | null
+          sector?: string | null
+          seen_count?: number
+          updated_at?: string
+          visa_sponsorship?: boolean | null
+        }
+        Update: {
+          city?: string | null
+          company_id?: string
+          country?: string
+          created_at?: string
+          employment_type?: string | null
+          expires_at?: string | null
+          fingerprint?: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          posted_at?: string | null
+          role_normalized?: string
+          role_title?: string
+          salary_currency?: string | null
+          salary_max?: number | null
+          salary_min?: number | null
+          sector?: string | null
+          seen_count?: number
+          updated_at?: string
+          visa_sponsorship?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "normalized_demand_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "normalized_demand_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_demand_stats"
+            referencedColumns: ["company_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -223,36 +458,45 @@ export type Database = {
       }
       raw_signals: {
         Row: {
+          company_domain: string | null
           created_at: string
           fingerprint: string
           id: string
           job_id: string | null
+          last_seen_at: string
           payload: Json
           raw_text: string | null
+          seen_count: number
           source: Database["public"]["Enums"]["demand_source"]
           source_id: string | null
           source_url: string | null
           structured: boolean
         }
         Insert: {
+          company_domain?: string | null
           created_at?: string
           fingerprint: string
           id?: string
           job_id?: string | null
+          last_seen_at?: string
           payload?: Json
           raw_text?: string | null
+          seen_count?: number
           source: Database["public"]["Enums"]["demand_source"]
           source_id?: string | null
           source_url?: string | null
           structured?: boolean
         }
         Update: {
+          company_domain?: string | null
           created_at?: string
           fingerprint?: string
           id?: string
           job_id?: string | null
+          last_seen_at?: string
           payload?: Json
           raw_text?: string | null
+          seen_count?: number
           source?: Database["public"]["Enums"]["demand_source"]
           source_id?: string | null
           source_url?: string | null
@@ -276,10 +520,13 @@ export type Database = {
           error: string | null
           finished_at: string | null
           id: string
+          input: Json
           items_found: number
           items_structured: number
           keyword: string | null
+          metrics: Json
           source: Database["public"]["Enums"]["demand_source"]
+          source_id: string | null
           started_at: string
           status: Database["public"]["Enums"]["job_status"]
         }
@@ -290,10 +537,13 @@ export type Database = {
           error?: string | null
           finished_at?: string | null
           id?: string
+          input?: Json
           items_found?: number
           items_structured?: number
           keyword?: string | null
+          metrics?: Json
           source: Database["public"]["Enums"]["demand_source"]
+          source_id?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["job_status"]
         }
@@ -304,12 +554,112 @@ export type Database = {
           error?: string | null
           finished_at?: string | null
           id?: string
+          input?: Json
           items_found?: number
           items_structured?: number
           keyword?: string | null
+          metrics?: Json
           source?: Database["public"]["Enums"]["demand_source"]
+          source_id?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["job_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scrape_jobs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "source_registry"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scrape_run_events: {
+        Row: {
+          created_at: string
+          data: Json
+          event_type: string
+          id: string
+          message: string | null
+          scrape_job_id: string
+          severity: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          event_type: string
+          id?: string
+          message?: string | null
+          scrape_job_id: string
+          severity?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          event_type?: string
+          id?: string
+          message?: string | null
+          scrape_job_id?: string
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scrape_run_events_scrape_job_id_fkey"
+            columns: ["scrape_job_id"]
+            isOneToOne: false
+            referencedRelation: "scrape_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_registry: {
+        Row: {
+          actor_or_endpoint: string | null
+          adapter: string
+          confidence_weight: number
+          created_at: string
+          default_input: Json
+          display_name: string
+          enabled: boolean
+          id: string
+          notes: string | null
+          rate_limit_per_hour: number
+          schedule_cron: string | null
+          source_family: Database["public"]["Enums"]["demand_source"]
+          trust_tier: number
+          updated_at: string
+        }
+        Insert: {
+          actor_or_endpoint?: string | null
+          adapter: string
+          confidence_weight: number
+          created_at?: string
+          default_input?: Json
+          display_name: string
+          enabled?: boolean
+          id: string
+          notes?: string | null
+          rate_limit_per_hour?: number
+          schedule_cron?: string | null
+          source_family: Database["public"]["Enums"]["demand_source"]
+          trust_tier: number
+          updated_at?: string
+        }
+        Update: {
+          actor_or_endpoint?: string | null
+          adapter?: string
+          confidence_weight?: number
+          created_at?: string
+          default_input?: Json
+          display_name?: string
+          enabled?: boolean
+          id?: string
+          notes?: string | null
+          rate_limit_per_hour?: number
+          schedule_cron?: string | null
+          source_family?: Database["public"]["Enums"]["demand_source"]
+          trust_tier?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -336,7 +686,17 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      company_demand_stats: {
+        Row: {
+          company_id: string | null
+          country: string | null
+          most_recent_posting: string | null
+          name: string | null
+          posting_count_30d: number | null
+          posting_count_7d: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
@@ -347,6 +707,8 @@ export type Database = {
         Returns: boolean
       }
       is_team_member: { Args: { _user_id: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "bd" | "viewer"
