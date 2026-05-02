@@ -126,6 +126,7 @@ Deno.serve(async (req) => {
       .from("scrape_jobs")
       .select("id, source_id, source")
       .eq("status", "queued")
+      .not("source_id", "is", null)
       .order("started_at", { ascending: true })
       .limit(WAVE_SIZE * 4);
     if (pickErr) throw pickErr;
