@@ -364,7 +364,7 @@ const Leads = () => {
       }
       if (filters.sizes.length && !filters.sizes.includes(l.company_size)) return false;
       if (filters.minScore > 0) {
-        const s = l.score ?? l.urgency_score ?? 0;
+        const s = l.computed_score ?? l.score ?? l.urgency_score ?? 0;
         if (s < filters.minScore) return false;
       }
       if (fromMs != null) {
@@ -416,10 +416,15 @@ const Leads = () => {
           const ad = a.demand_size ?? 0;
           const bd = b.demand_size ?? 0;
           if (ad !== bd) return bd - ad;
-          return (b.urgency_score ?? 0) - (a.urgency_score ?? 0);
+          return (b.computed_score ?? 0) - (a.computed_score ?? 0);
         }
         case "priority":
         default: {
+          // Composite Voynova score is the primary sort signal; priority tier
+          // breaks ties so manually-flagged hot leads stay near the top.
+          const av = a.computed_score ?? 0;
+          const bv = b.computed_score ?? 0;
+          if (av !== bv) return bv - av;
           const ar = PRIORITY_RANK[a.priority] ?? 9;
           const br = PRIORITY_RANK[b.priority] ?? 9;
           if (ar !== br) return ar - br;
