@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
     const sourceIds = Array.from(new Set(candidates.map((c) => c.source_id).filter(Boolean))) as string[];
     const { data: srcRows } = await supa
       .from("source_registry")
-      .select("id, adapter, trust_tier")
+      .select("id, adapter, trust_tier, monthly_budget_usd, monthly_spend_usd")
       .in("id", sourceIds.length ? sourceIds : ["__none__"]);
     const srcByid = new Map((srcRows ?? []).map((s: any) => [s.id, s]));
 
@@ -314,6 +314,19 @@ Deno.serve(async (req) => {
           finished_at: new Date().toISOString(),
         }).eq("id", job.id);
         await logRunEvent(supa, job.id, "dispatch.skipped_quota", q.reason ?? "paused", { provider }, "warn");
+        skippedQuota++;
+        results.push({ id: job.id, ok: false, status: "skipped_quota" });
+        continue;
+      }
+      // Per-source budget gate.
+      if (src && sourceOverBudget(src as any)) {
+        const reason = `source ${src.id} over monthly budget`;
+        await supa.from("scrape_jobs").update({
+          status: "skipped_quota",
+          error: reason,
+          finished_at: new Date().toISOString(),
+        }).eq("id", job.id);
+        await logRunEvent(supa, job.id, "dispatch.skipped_budget", reason, { source_id: src.id }, "warn");
         skippedQuota++;
         results.push({ id: job.id, ok: false, status: "skipped_quota" });
         continue;
