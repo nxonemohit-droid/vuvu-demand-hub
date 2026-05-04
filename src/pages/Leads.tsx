@@ -1088,6 +1088,63 @@ function MultiFilter({
   );
 }
 
+function DateRangeFilter({
+  from,
+  to,
+  onChange,
+}: {
+  from: string | null;
+  to: string | null;
+  onChange: (from: string | null, to: string | null) => void;
+}) {
+  const fromDate = from ? new Date(from) : undefined;
+  const toDate = to ? new Date(to) : undefined;
+  const fmt = (d?: Date) =>
+    d
+      ? d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+      : null;
+  const label =
+    fromDate || toDate
+      ? `${fmt(fromDate) ?? "…"} → ${fmt(toDate) ?? "…"}`
+      : "Date range";
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1.5">
+        <CalendarRange className="h-3.5 w-3.5" />
+        Date range (created)
+      </Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              "w-full justify-start text-left font-normal",
+              !fromDate && !toDate && "text-muted-foreground",
+            )}
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            {label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-0">
+          <CalendarUI
+            mode="range"
+            selected={{ from: fromDate, to: toDate }}
+            onSelect={(range) => {
+              const f = range?.from ? range.from.toISOString().slice(0, 10) : null;
+              const t = range?.to ? range.to.toISOString().slice(0, 10) : null;
+              onChange(f, t);
+            }}
+            numberOfMonths={2}
+            initialFocus
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () => void }) {
   const open = !!lead;
   const payload = (lead?.raw_signals?.payload ?? null) as Record<string, unknown> | null;
