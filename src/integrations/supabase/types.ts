@@ -461,6 +461,33 @@ export type Database = {
           },
         ]
       }
+      lead_contact_log: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          lead_id: string
+          note: string
+          user_id: string | null
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          note: string
+          user_id?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          note?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       lead_crm: {
         Row: {
           bookmarked: boolean
