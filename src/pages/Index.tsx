@@ -4,11 +4,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Briefcase, Users, Radar, AlertTriangle, Mail, Loader2, PlayCircle,
   RefreshCw, TrendingUp, Globe2, Sparkles, Activity, MapPin,
-  Zap,
+  Zap, Search, X,
 } from "lucide-react";
 import { useRoles } from "@/lib/auth";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ const Index = () => {
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [showAllLeads, setShowAllLeads] = useState(false);
+  const [leadQuery, setLeadQuery] = useState("");
   const [allLeads, setAllLeads] = useState<{country: string; source: string; priority: string; created_at: string}[]>([]);
 
   const loadAll = async () => {
@@ -388,7 +390,38 @@ const Index = () => {
                 </Button>
               </div>
             </div>
-            {leads.length === 0 ? (
+            {leads.length > 0 && (
+              <div className="relative">
+                <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={leadQuery}
+                  onChange={(e) => setLeadQuery(e.target.value)}
+                  placeholder="Filter by role, country, or employer…"
+                  className="h-9 pl-8 pr-8 text-sm"
+                />
+                {leadQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setLeadQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+            {(() => {
+              const q = leadQuery.trim().toLowerCase();
+              const filtered = q
+                ? leads.filter((l) =>
+                    [l.role, l.country, l.city, l.employer_name]
+                      .filter(Boolean)
+                      .some((v) => String(v).toLowerCase().includes(q)),
+                  )
+                : leads;
+              const visible = showAllLeads || q ? filtered : filtered.slice(0, 4);
+              return leads.length === 0 ? (
               <Card className="p-6 rounded-xl">
                 <EmptyState
                   icon={Briefcase}
@@ -396,19 +429,28 @@ const Index = () => {
                   hint="After a discovery run, AI will structure raw signals into prioritized leads here."
                 />
               </Card>
+            ) : filtered.length === 0 ? (
+              <Card className="p-6 rounded-xl">
+                <EmptyState
+                  icon={Search}
+                  title="No matches"
+                  hint={`No leads match "${leadQuery}". Try a different role, country, or employer.`}
+                />
+              </Card>
             ) : (
               <div
                 className={
-                  showAllLeads
+                  showAllLeads || q
                     ? "grid grid-cols-1 gap-3 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1 rounded-xl border bg-muted/20 p-3"
                     : "grid grid-cols-1 gap-3"
                 }
               >
-                {(showAllLeads ? leads : leads.slice(0, 4)).map((l) => (
+                {visible.map((l) => (
                   <LeadCard key={l.id} lead={l} />
                 ))}
               </div>
-            )}
+            );
+            })()}
           </aside>
         </section>
       </div>
