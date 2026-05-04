@@ -879,6 +879,23 @@ const Leads = () => {
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        aria-label="Select all filtered leads"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((l) => selectedIds.has(l.id))
+                        }
+                        onCheckedChange={(v) => {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (v) filtered.forEach((l) => next.add(l.id));
+                            else filtered.forEach((l) => next.delete(l.id));
+                            return next;
+                          });
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Employer</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Location</TableHead>
@@ -896,6 +913,23 @@ const Leads = () => {
                       className={`cursor-pointer hover:bg-muted/50 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
                       onClick={() => setSelected(l)}
                     >
+                      <TableCell
+                        className="w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          aria-label={`Select ${l.employer_name ?? "lead"}`}
+                          checked={selectedIds.has(l.id)}
+                          onCheckedChange={(v) => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (v) next.add(l.id);
+                              else next.delete(l.id);
+                              return next;
+                            });
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium max-w-[200px] truncate" title={l.employer_name ?? ""}>
                         <div className="flex items-center gap-1.5">
                           <span className="truncate">{l.employer_name ?? "—"}</span>
