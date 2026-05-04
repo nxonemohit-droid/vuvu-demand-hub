@@ -4,11 +4,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Briefcase, Users, Radar, AlertTriangle, Mail, Loader2, PlayCircle,
-  RefreshCw, TrendingUp, Globe2, Phone, ExternalLink, Sparkles, Activity, MapPin,
+  RefreshCw, TrendingUp, Globe2, Sparkles, Activity, MapPin,
   Zap,
 } from "lucide-react";
 import { useRoles } from "@/lib/auth";
@@ -17,25 +16,14 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, Cell,
 } from "recharts";
+import { LeadCard } from "@/components/leads/LeadCard";
+import { enrichMany, LEAD_SELECT_COLUMNS, type RawLead, type Lead } from "@/lib/lead-shape";
 
 type Stats = { leads: number; highPriority: number; candidates: number; signals: number };
 type RunRow = {
   id: string; source: string; country: string | null; keyword: string | null;
   status: string; items_found: number; items_structured: number; started_at: string; error: string | null;
 };
-type LeadRow = {
-  id: string; employer_name: string | null; role: string; country: string; city: string | null;
-  source: string; priority: string; urgency_score: number;
-  contact_email: string | null; contact_phone: string | null; source_url: string | null;
-  demand_size: number | null; visa_sponsorship: boolean; created_at: string;
-};
-
-const PRIORITY_STYLES: Record<string, string> = {
-  high: "bg-destructive/10 text-destructive border-destructive/30",
-  medium: "bg-primary/10 text-primary border-primary/30",
-  low: "bg-muted text-muted-foreground border-border",
-};
-
 const Index = () => {
   const { roles, user } = useRoles();
   const [stats, setStats] = useState<Stats | null>(null);
@@ -44,8 +32,8 @@ const Index = () => {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [waveStatus, setWaveStatus] = useState<string>("");
   const [runs, setRuns] = useState<RunRow[]>([]);
-  const [leads, setLeads] = useState<LeadRow[]>([]);
-  const [allLeads, setAllLeads] = useState<Pick<LeadRow,"country"|"source"|"priority"|"created_at">[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [allLeads, setAllLeads] = useState<{country: string; source: string; priority: string; created_at: string}[]>([]);
 
   const loadAll = async () => {
     const [leadsCount, high, candidates, signals, runsRes, leadsRes, allLeadsRes] = await Promise.all([
@@ -54,7 +42,7 @@ const Index = () => {
       supabase.from("candidates").select("id", { count: "exact", head: true }),
       supabase.from("raw_signals").select("id", { count: "exact", head: true }),
       supabase.from("scrape_jobs").select("id,source,country,keyword,status,items_found,items_structured,started_at,error").order("started_at", { ascending: false }).limit(6),
-      supabase.from("demand_leads").select("id,employer_name,role,country,city,source,priority,urgency_score,contact_email,contact_phone,source_url,demand_size,visa_sponsorship,created_at").order("urgency_score", { ascending: false }).limit(6),
+      supabase.from("demand_leads").select(LEAD_SELECT_COLUMNS).order("urgency_score", { ascending: false }).limit(6),
       supabase.from("demand_leads").select("country,source,priority,created_at").order("created_at", { ascending: false }).limit(500),
     ]);
     setStats({
@@ -62,7 +50,7 @@ const Index = () => {
       candidates: candidates.count ?? 0, signals: signals.count ?? 0,
     });
     setRuns((runsRes.data ?? []) as RunRow[]);
-    setLeads((leadsRes.data ?? []) as LeadRow[]);
+    setLeads(enrichMany(((leadsRes.data ?? []) as unknown) as RawLead[]));
     setAllLeads((allLeadsRes.data ?? []) as any);
   };
 
@@ -394,78 +382,7 @@ const Index = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {leads.map((l) => (
-                <Link
-                  key={l.id}
-                  to={`/leads/${l.id}`}
-                  className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
-                  aria-label={`Open lead ${l.employer_name ?? "Unknown employer"}`}
-                >
-                <Card className="p-5 rounded-xl hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5 transition-all group cursor-pointer">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-semibold truncate">{l.employer_name ?? "Unknown employer"}</div>
-                      <div className="text-sm text-muted-foreground capitalize truncate">{l.role}</div>
-                    </div>
-                    <Badge variant="outline" className={`capitalize ${PRIORITY_STYLES[l.priority] ?? ""}`}>
-                      {l.priority}
-                    </Badge>
-                  </div>
-
-                  <div className="mt-3 flex items-center gap-2 text-xs">
-                    <Progress value={l.urgency_score} className="h-1.5 flex-1" />
-                    <span className="text-muted-foreground tabular-nums w-8 text-right">{l.urgency_score}</span>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    <Badge variant="secondary" className="text-xs">
-                      <MapPin className="h-3 w-3 mr-1" />{l.country}{l.city ? ` · ${l.city}` : ""}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs capitalize">{l.source}</Badge>
-                    {l.demand_size ? (
-                      <Badge variant="secondary" className="text-xs">{l.demand_size} hires</Badge>
-                    ) : null}
-                    {l.visa_sponsorship && (
-                      <Badge className="text-xs bg-accent/15 text-accent border border-accent/30">Visa OK</Badge>
-                    )}
-                  </div>
-
-                  {(l.contact_email || l.contact_phone || l.source_url) && (
-                    <>
-                      <Separator className="my-3" />
-                      <div className="space-y-1 text-xs">
-                        {l.contact_email && (
-                          <div className="flex items-center gap-2 truncate">
-                            <Mail className="h-3.5 w-3.5 text-accent shrink-0" />
-                            <a
-                              href={`mailto:${l.contact_email}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="truncate hover:underline"
-                            >
-                              {l.contact_email}
-                            </a>
-                          </div>
-                        )}
-                        {l.contact_phone && (
-                          <div className="flex items-center gap-2 truncate">
-                            <Phone className="h-3.5 w-3.5 text-accent shrink-0" />
-                            <span className="truncate">{l.contact_phone}</span>
-                          </div>
-                        )}
-                        {l.source_url && (
-                          <a
-                            href={l.source_url} target="_blank" rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-2 text-muted-foreground hover:text-primary truncate"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{l.source_url}</span>
-                          </a>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </Card>
-                </Link>
+                <LeadCard key={l.id} lead={l} />
               ))}
             </div>
           )}
