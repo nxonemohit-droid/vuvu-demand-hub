@@ -29,6 +29,34 @@ const ADAPTER_FUNCTION: Record<string, string> = {
   firecrawl: "adapter-firecrawl",
 };
 
+const ADAPTER_PROVIDER: Record<string, string> = {
+  apify: "apify",
+  firecrawl: "firecrawl",
+};
+
+// Hard pause when provider is over this % of monthly budget.
+const PROVIDER_PAUSE_PCT = 95;
+// Delay between consecutive adapter invocations within a drain wave (ms).
+const PER_JOB_DELAY_MS = 1500;
+
+async function getQuotaMap(supa: ReturnType<typeof adminClient>) {
+  const { data } = await supa.from("provider_quota_state")
+    .select("provider, usage_pct, exhausted_at, cycle_end_at");
+  const m = new Map<string, { paused: boolean; reason: string | null }>();
+  for (const r of data ?? []) {
+    const pct = Number((r as any).usage_pct ?? 0);
+    const exhausted = Boolean((r as any).exhausted_at);
+    const paused = exhausted || pct >= PROVIDER_PAUSE_PCT;
+    const reason = exhausted
+      ? `quota exhausted; resets ${(r as any).cycle_end_at ?? "next cycle"}`
+      : (paused ? `usage at ${pct.toFixed(1)}% of monthly budget` : null);
+    m.set((r as any).provider, { paused, reason });
+  }
+  return m;
+}
+
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
 function shouldSkip(source: SourceRow, country: string): boolean {
   if (source.id === "indeed") {
     const iso = COUNTRY_META[country]?.iso2;
@@ -179,6 +207,7 @@ Deno.serve(async (req) => {
 
     // ---------- DRAIN ----------
     const WAVE_SIZE = Math.min(body.waveSize ?? 4, 8);
+    const quota = await getQuotaMap(supa);
     const { data: candidates, error: pickErr } = await supa
       .from("scrape_jobs")
       .select("id, source_id, source")
@@ -205,7 +234,10 @@ Deno.serve(async (req) => {
       .sort((a, b) => (srcByid.get(a.source_id!)?.trust_tier ?? 9) - (srcByid.get(b.source_id!)?.trust_tier ?? 9))
       .slice(0, WAVE_SIZE);
 
-    const results = await Promise.all(ordered.map(async (job) => {
+    const results: Array<{ id: string; ok: boolean; status: string }> = [];
+    let skippedQuota = 0;
+    for (let i = 0; i < ordered.length; i++) {
+      const job = ordered[i];
       const src = srcByid.get(job.source_id!);
       const adapterFn = ADAPTER_FUNCTION[src?.adapter ?? ""] ?? null;
       if (!adapterFn) {
@@ -213,18 +245,40 @@ Deno.serve(async (req) => {
           status: "failed", error: `no adapter for ${src?.adapter}`, finished_at: new Date().toISOString(),
         }).eq("id", job.id);
         await logRunEvent(supa, job.id, "dispatch.error", `no adapter for ${src?.adapter}`, {}, "error");
-        return { id: job.id, ok: false };
+        results.push({ id: job.id, ok: false, status: "failed" });
+        continue;
+      }
+      // Pre-flight quota check: if this adapter's provider is paused, mark the
+      // job as skipped_quota instead of burning a 403.
+      const provider = ADAPTER_PROVIDER[src?.adapter ?? ""] ?? src?.adapter ?? "";
+      const q = quota.get(provider);
+      if (q?.paused) {
+        await supa.from("scrape_jobs").update({
+          status: "skipped_quota",
+          error: q.reason ?? "provider quota paused",
+          finished_at: new Date().toISOString(),
+        }).eq("id", job.id);
+        await logRunEvent(supa, job.id, "dispatch.skipped_quota", q.reason ?? "paused", { provider }, "warn");
+        skippedQuota++;
+        results.push({ id: job.id, ok: false, status: "skipped_quota" });
+        continue;
       }
       try {
         const r = await invokeAdapter(adapterFn, job.id);
         const ok = r.ok;
         await r.text().catch(() => "");
-        return { id: job.id, ok };
+        results.push({ id: job.id, ok, status: ok ? "ok" : "err" });
       } catch (e) {
         await logRunEvent(supa, job.id, "dispatch.error", String(e), {}, "error");
-        return { id: job.id, ok: false };
+        results.push({ id: job.id, ok: false, status: "err" });
       }
-    }));
+      // Refresh quota map after each call so a freshly-detected 403 stops the wave.
+      if (i < ordered.length - 1) {
+        await sleep(PER_JOB_DELAY_MS);
+        const fresh = await getQuotaMap(supa);
+        for (const [k, v] of fresh) quota.set(k, v);
+      }
+    }
 
     const { count: remaining } = await supa
       .from("scrape_jobs")
@@ -242,6 +296,7 @@ Deno.serve(async (req) => {
       ok: true, mode: "drain",
       processed: results.length,
       succeeded: results.filter((r) => r.ok).length,
+      skipped_quota: skippedQuota,
       remaining: remaining ?? 0,
     });
   } catch (e) {
