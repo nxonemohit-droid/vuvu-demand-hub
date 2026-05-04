@@ -33,6 +33,7 @@ const Index = () => {
   const [waveStatus, setWaveStatus] = useState<string>("");
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [showAllLeads, setShowAllLeads] = useState(false);
   const [allLeads, setAllLeads] = useState<{country: string; source: string; priority: string; created_at: string}[]>([]);
 
   const loadAll = async () => {
@@ -42,7 +43,7 @@ const Index = () => {
       supabase.from("candidates").select("id", { count: "exact", head: true }),
       supabase.from("raw_signals").select("id", { count: "exact", head: true }),
       supabase.from("scrape_jobs").select("id,source,country,keyword,status,items_found,items_structured,started_at,error").order("started_at", { ascending: false }).limit(6),
-      supabase.from("demand_leads").select(LEAD_SELECT_COLUMNS).order("urgency_score", { ascending: false }).limit(6),
+      supabase.from("demand_leads").select(LEAD_SELECT_COLUMNS).order("urgency_score", { ascending: false }).limit(50),
       supabase.from("demand_leads").select("country,source,priority,created_at").order("created_at", { ascending: false }).limit(500),
     ]);
     setStats({
@@ -368,11 +369,24 @@ const Index = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Lead column</h2>
-                <p className="text-xs text-muted-foreground">Click a card to open the lead detail page</p>
+                <p className="text-xs text-muted-foreground">
+                  {showAllLeads ? `Showing ${leads.length} leads · scroll to browse` : "Showing top 4 · click a card to open"}
+                </p>
               </div>
-              <Button size="sm" variant="outline" asChild className="h-8">
-                <Link to="/leads">View all</Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={showAllLeads ? "default" : "outline"}
+                  className="h-8"
+                  onClick={() => setShowAllLeads((v) => !v)}
+                  disabled={leads.length === 0}
+                >
+                  {showAllLeads ? "Show top 4" : "Show all leads"}
+                </Button>
+                <Button size="sm" variant="outline" asChild className="h-8">
+                  <Link to="/leads">Open page</Link>
+                </Button>
+              </div>
             </div>
             {leads.length === 0 ? (
               <Card className="p-6 rounded-xl">
@@ -383,8 +397,14 @@ const Index = () => {
                 />
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-3">
-                {leads.slice(0, 4).map((l) => (
+              <div
+                className={
+                  showAllLeads
+                    ? "grid grid-cols-1 gap-3 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1 rounded-xl border bg-muted/20 p-3"
+                    : "grid grid-cols-1 gap-3"
+                }
+              >
+                {(showAllLeads ? leads : leads.slice(0, 4)).map((l) => (
                   <LeadCard key={l.id} lead={l} />
                 ))}
               </div>
