@@ -155,6 +155,7 @@ export type Database = {
           snoozed_until: string | null
           source: Database["public"]["Enums"]["demand_source"]
           source_url: string | null
+          sponsorship_signals: string[]
           target_audience_type: string | null
           tier: string | null
           updated_at: string
@@ -191,6 +192,7 @@ export type Database = {
           snoozed_until?: string | null
           source: Database["public"]["Enums"]["demand_source"]
           source_url?: string | null
+          sponsorship_signals?: string[]
           target_audience_type?: string | null
           tier?: string | null
           updated_at?: string
@@ -227,6 +229,7 @@ export type Database = {
           snoozed_until?: string | null
           source?: Database["public"]["Enums"]["demand_source"]
           source_url?: string | null
+          sponsorship_signals?: string[]
           target_audience_type?: string | null
           tier?: string | null
           updated_at?: string
