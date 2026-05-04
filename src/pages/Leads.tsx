@@ -1248,8 +1248,8 @@ const Leads = () => {
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-12 text-center text-sm text-muted-foreground">
-              No leads match your filters. Try clearing some chips or turning off Recruiter Mode.
+            <div className="p-12">
+              <FilteredEmptyState onClear={clearAllFilters} />
             </div>
           ) : (
             <div className="overflow-x-auto">
