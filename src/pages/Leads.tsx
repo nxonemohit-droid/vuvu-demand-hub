@@ -54,6 +54,9 @@ import {
   Mail,
   Phone,
   RefreshCw,
+  Download,
+  FileJson,
+  FileSpreadsheet,
   Search,
   Globe,
   MapPin,
@@ -87,6 +90,13 @@ import {
 } from "@/lib/lead-taxonomies";
 import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/lead-scoring";
 import { dedupeAndEnrich, type Enrichment } from "@/lib/lead-enrichment";
+import { exportLeads, safeFileSlug } from "@/lib/lead-export";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type RawLead = {
   id: string;
