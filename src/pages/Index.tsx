@@ -382,78 +382,7 @@ const Index = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {leads.map((l) => (
-                <Link
-                  key={l.id}
-                  to={`/leads/${l.id}`}
-                  className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
-                  aria-label={`Open lead ${l.employer_name ?? "Unknown employer"}`}
-                >
-                <Card className="p-5 rounded-xl hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5 transition-all group cursor-pointer">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-semibold truncate">{l.employer_name ?? "Unknown employer"}</div>
-                      <div className="text-sm text-muted-foreground capitalize truncate">{l.role}</div>
-                    </div>
-                    <Badge variant="outline" className={`capitalize ${PRIORITY_STYLES[l.priority] ?? ""}`}>
-                      {l.priority}
-                    </Badge>
-                  </div>
-
-                  <div className="mt-3 flex items-center gap-2 text-xs">
-                    <Progress value={l.urgency_score} className="h-1.5 flex-1" />
-                    <span className="text-muted-foreground tabular-nums w-8 text-right">{l.urgency_score}</span>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    <Badge variant="secondary" className="text-xs">
-                      <MapPin className="h-3 w-3 mr-1" />{l.country}{l.city ? ` · ${l.city}` : ""}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs capitalize">{l.source}</Badge>
-                    {l.demand_size ? (
-                      <Badge variant="secondary" className="text-xs">{l.demand_size} hires</Badge>
-                    ) : null}
-                    {l.visa_sponsorship && (
-                      <Badge className="text-xs bg-accent/15 text-accent border border-accent/30">Visa OK</Badge>
-                    )}
-                  </div>
-
-                  {(l.contact_email || l.contact_phone || l.source_url) && (
-                    <>
-                      <Separator className="my-3" />
-                      <div className="space-y-1 text-xs">
-                        {l.contact_email && (
-                          <div className="flex items-center gap-2 truncate">
-                            <Mail className="h-3.5 w-3.5 text-accent shrink-0" />
-                            <a
-                              href={`mailto:${l.contact_email}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="truncate hover:underline"
-                            >
-                              {l.contact_email}
-                            </a>
-                          </div>
-                        )}
-                        {l.contact_phone && (
-                          <div className="flex items-center gap-2 truncate">
-                            <Phone className="h-3.5 w-3.5 text-accent shrink-0" />
-                            <span className="truncate">{l.contact_phone}</span>
-                          </div>
-                        )}
-                        {l.source_url && (
-                          <a
-                            href={l.source_url} target="_blank" rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-2 text-muted-foreground hover:text-primary truncate"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{l.source_url}</span>
-                          </a>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </Card>
-                </Link>
+                <LeadCard key={l.id} lead={l} />
               ))}
             </div>
           )}
