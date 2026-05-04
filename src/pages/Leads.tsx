@@ -481,6 +481,16 @@ const Leads = () => {
     return sorted;
   }, [allLeads, filters]);
 
+  // Reset pagination whenever filters/sort change.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filters]);
+
+  const visibleLeads = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
+
   const activeChipCount =
     filters.countries.length +
     filters.audiences.length +
