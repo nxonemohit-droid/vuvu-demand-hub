@@ -762,6 +762,33 @@ const Leads = () => {
                 }
               />
             ))}
+            {filters.sizes.map((s) => (
+              <ActiveChip
+                key={`sz-${s}`}
+                label={sizeLabel(s)}
+                onClear={() =>
+                  setFilters({ ...filters, sizes: filters.sizes.filter((x) => x !== s) })
+                }
+              />
+            ))}
+            {filters.minScore > 0 && (
+              <ActiveChip
+                label={`Score ≥ ${filters.minScore}`}
+                onClear={() => setFilters({ ...filters, minScore: 0 })}
+              />
+            )}
+            {filters.dateFrom && (
+              <ActiveChip
+                label={`From ${filters.dateFrom}`}
+                onClear={() => setFilters({ ...filters, dateFrom: null })}
+              />
+            )}
+            {filters.dateTo && (
+              <ActiveChip
+                label={`To ${filters.dateTo}`}
+                onClear={() => setFilters({ ...filters, dateTo: null })}
+              />
+            )}
           </div>
         )}
 
