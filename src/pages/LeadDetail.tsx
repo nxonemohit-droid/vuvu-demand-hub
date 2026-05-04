@@ -36,6 +36,7 @@ import {
   type RawLead,
 } from "@/lib/lead-shape";
 import { buildOutreachTemplate } from "@/lib/lead-outreach";
+import { LeadCrmCard } from "@/components/leads/LeadCrmCard";
 
 export default function LeadDetail() {
   const { id = "" } = useParams<{ id: string }>();
@@ -233,6 +234,9 @@ export default function LeadDetail() {
       </div>
 
       <div className="px-6 lg:px-8 py-6 max-w-5xl mx-auto space-y-6">
+        {/* CRM */}
+        <LeadCrmCard leadId={lead.id} />
+
         {/* Overview */}
         <Card className="p-5 rounded-xl">
           <SectionTitle>Overview</SectionTitle>
