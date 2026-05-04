@@ -533,6 +533,23 @@ const Leads = () => {
             <Button size="sm" variant="outline" onClick={load}>
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" disabled={!allLeads.length}>
+                  <Download className="h-4 w-4 mr-2" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportLeads(allLeads, "csv")}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Export CSV ({allLeads.length})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportLeads(allLeads, "json")}>
+                  <FileJson className="h-4 w-4 mr-2" />
+                  Export JSON ({allLeads.length})
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
