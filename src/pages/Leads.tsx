@@ -641,16 +641,14 @@ const Leads = () => {
                 <BreadcrumbItem>
                   <BreadcrumbPage>Leads</BreadcrumbPage>
                 </BreadcrumbItem>
-                {(search || activePresetId || onlyBookmarked) && (
+                {(filters.search || bookmarkedOnly) && (
                   <>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
                       <BreadcrumbPage className="text-muted-foreground font-normal">
-                        {onlyBookmarked
+                        {bookmarkedOnly
                           ? "Bookmarked"
-                          : activePresetId
-                            ? "Preset"
-                            : `Search: "${search}"`}
+                          : `Search: "${filters.search}"`}
                       </BreadcrumbPage>
                     </BreadcrumbItem>
                   </>
