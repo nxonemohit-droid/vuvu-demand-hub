@@ -81,6 +81,7 @@ import {
   CheckSquare,
   Copy,
   Sparkle,
+  Star,
 } from "lucide-react";
 import {
   TARGET_AUDIENCE_OPTIONS,
@@ -314,6 +315,8 @@ const Leads = () => {
   const [presetName, setPresetName] = useState("");
   const PAGE_SIZE = 21;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const [bookmarkedOnly, setBookmarkedOnly] = useState(false);
 
   const recruiterMode = useMemo(
     () =>
@@ -367,6 +370,22 @@ const Leads = () => {
     load();
   }, []);
 
+  // Load the set of bookmarked lead ids from the CRM table.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("lead_crm")
+        .select("lead_id")
+        .eq("bookmarked", true);
+      if (cancelled || error) return;
+      setBookmarkedIds(new Set((data ?? []).map((r) => r.lead_id as string)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // persist recruiter mode
   useEffect(() => {
     try {
@@ -386,6 +405,7 @@ const Leads = () => {
       .filter((a) => a.startsWith("employer:"))
       .map((a) => a.slice("employer:".length));
     const out = allLeads.filter((l) => {
+      if (bookmarkedOnly && !bookmarkedIds.has(l.id)) return false;
       if (filters.countries.length && !filters.countries.includes(l.country)) return false;
       if (audPeople.length || audEmployerSectors.length) {
         const matchesPeople =
@@ -479,12 +499,12 @@ const Leads = () => {
       }
     });
     return sorted;
-  }, [allLeads, filters]);
+  }, [allLeads, filters, bookmarkedOnly, bookmarkedIds]);
 
   // Reset pagination whenever filters/sort change.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [filters]);
+  }, [filters, bookmarkedOnly]);
 
   const visibleLeads = useMemo(
     () => filtered.slice(0, visibleCount),
@@ -725,6 +745,17 @@ const Leads = () => {
             </Select>
             <Button variant="outline" onClick={() => setSaveOpen(true)} disabled={!activeChipCount}>
               <Save className="h-4 w-4 mr-2" /> Save preset
+            </Button>
+            <Button
+              variant={bookmarkedOnly ? "default" : "outline"}
+              onClick={() => setBookmarkedOnly((v) => !v)}
+              aria-pressed={bookmarkedOnly}
+              title="Show only bookmarked leads"
+            >
+              <Star
+                className={`h-4 w-4 mr-2 ${bookmarkedOnly ? "fill-current" : ""}`}
+              />
+              Bookmarked{bookmarkedOnly ? ` (${bookmarkedIds.size})` : ""}
             </Button>
             <Button
               variant="ghost"
