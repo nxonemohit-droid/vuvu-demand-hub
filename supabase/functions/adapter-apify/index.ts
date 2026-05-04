@@ -25,39 +25,46 @@ function buildApifyInput(source: SourceRow, job: ScrapeJobRow): Record<string, u
   const meta = COUNTRY_META[country];
   const synonyms = ROLE_SYNONYMS[keyword] ?? [keyword];
   const baseInput = { ...(source.default_input ?? {}), ...(job.input ?? {}) };
+  // Apply the per-source result cap so we don't burn credits on bulk scrapes.
+  // Apify actors use varying field names; set them all so whichever one the
+  // actor honours gets the smaller value.
+  const cap = Math.max(1, source.max_items_per_run ?? 30);
+  const withCap = (extra: Record<string, unknown>) => ({
+    maxItems: cap, maxResults: cap, maxConcurrency: 1,
+    ...baseInput, ...extra,
+  });
 
   switch (source.id) {
     case "linkedin_official":
     case "linkedin_bebity": {
-      return {
-        ...baseInput,
+      return withCap({
         location: country,
         keyword: synonyms.slice(0, 2).join(" OR "),
-      };
+        rows: cap,
+      });
     }
     case "indeed": {
       if (!meta || !INDEED_ALLOWED.has(meta.iso2)) return null;
       const syns = synonyms.slice(0, 3);
       const position = `(${syns.join(" OR ")}) (hiring OR urgent OR "visa sponsorship")`;
-      return { ...baseInput, country: meta.iso2, position };
+      return withCap({ country: meta.iso2, position });
     }
     case "google_jobs": {
       const queries = synonyms.slice(0, 3).map((s) => `${s} ${country} hiring`);
-      return {
-        ...baseInput,
+      return withCap({
         queries: queries.join("\n"),
         countryCode: meta?.iso2.toLowerCase() ?? "us",
         languageCode: meta?.langs[0] ?? "en",
-      };
+      });
     }
     case "facebook_public": {
       const urls = synonyms.slice(0, 3).flatMap((s) => [
         { url: `https://www.facebook.com/search/posts/?q=${encodeURIComponent(`${s} ${country} hiring`)}` },
       ]);
-      return { ...baseInput, startUrls: urls };
+      return withCap({ startUrls: urls });
     }
     default:
-      return baseInput;
+      return withCap({});
   }
 }
 
@@ -122,7 +129,7 @@ Deno.serve(async (req) => {
     if (!job.source_id) throw new Error(`scrape_job ${job.id} missing source_id`);
     const { data: source, error: srcErr } = await supa
       .from("source_registry")
-      .select("id, source_family, adapter, actor_or_endpoint, default_input, trust_tier, confidence_weight, enabled")
+      .select("id, source_family, adapter, actor_or_endpoint, default_input, trust_tier, confidence_weight, enabled, priority, monthly_budget_usd, monthly_spend_usd, max_items_per_run")
       .eq("id", job.source_id)
       .single<SourceRow>();
     if (srcErr || !source) throw srcErr ?? new Error(`source_registry ${job.source_id} not found`);
