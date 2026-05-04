@@ -30,6 +30,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Calendar as CalendarUI } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import {
   Popover,
   PopoverContent,
@@ -56,6 +59,9 @@ import {
   MapPin,
   Building2,
   Calendar,
+  CalendarRange,
+  Users,
+  Gauge,
   Tag,
   Sparkles,
   Bookmark,
@@ -70,6 +76,7 @@ import {
   SECTOR_OPTIONS,
   TARGET_COUNTRIES,
   WORKER_ORIGINS,
+  COMPANY_SIZE_OPTIONS,
   SORT_OPTIONS,
   BUILTIN_PRESETS,
   RECRUITER_MODE_FILTERS,
@@ -99,7 +106,11 @@ type RawLead = {
   raw_signals: { payload: Record<string, unknown> | null } | null;
 };
 
-type Lead = RawLead & { linkedin_url: string | null; website_url: string | null };
+type Lead = RawLead & {
+  linkedin_url: string | null;
+  website_url: string | null;
+  company_size: string;
+};
 
 const PRIORITY_STYLES: Record<string, string> = {
   high: "bg-destructive/10 text-destructive border-destructive/30",
@@ -188,6 +199,47 @@ function sectorLabel(value: string): string {
   return SECTOR_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
+function sizeLabel(value: string): string {
+  return COMPANY_SIZE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+/** Infer company size bucket from headcount/employees fields in raw payload. */
+function inferCompanySize(payload: Record<string, unknown> | null | undefined): string {
+  if (!payload) return "unknown";
+  const candidateKeys = [
+    "company_size","companySize","employees","employee_count","employeeCount",
+    "headcount","staff_count","size","company_employees",
+  ];
+  let n: number | null = null;
+  for (const key of candidateKeys) {
+    const v = payload[key];
+    if (typeof v === "number" && Number.isFinite(v)) { n = v; break; }
+    if (typeof v === "string") {
+      const m = v.match(/(\d[\d,\.]*)/);
+      if (m) {
+        const parsed = parseInt(m[1].replace(/[,\.]/g, ""), 10);
+        if (Number.isFinite(parsed)) { n = parsed; break; }
+      }
+      const lower = v.toLowerCase();
+      if (/1\s*-\s*50|small|<\s*50/.test(lower)) return "small";
+      if (/51\s*-\s*250|medium|mid/.test(lower)) return "medium";
+      if (/251\s*-\s*1000|large/.test(lower)) return "large";
+      if (/1000\+|enterprise|10000?\+/.test(lower)) return "enterprise";
+    }
+  }
+  if (n == null) return "unknown";
+  if (n <= 50) return "small";
+  if (n <= 250) return "medium";
+  if (n <= 1000) return "large";
+  return "enterprise";
+}
+
+function isoDay(d: string | null): number | null {
+  if (!d) return null;
+  const t = new Date(d).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
 type SavedPreset = { id: string; name: string; filters: LeadFilters };
 
 function loadSavedPresets(): SavedPreset[] {
@@ -252,6 +304,7 @@ const Leads = () => {
         ...raw,
         linkedin_url: pickLinkedIn(raw),
         website_url: pickWebsite(raw),
+        company_size: inferCompanySize(raw.raw_signals?.payload ?? null),
       };
     });
     setAllLeads(enriched);
@@ -274,11 +327,25 @@ const Leads = () => {
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
+    const fromMs = isoDay(filters.dateFrom);
+    const toMs = isoDay(filters.dateTo);
+    // Split audience filter into "people" types and "employer:<sector>" tags.
+    const audPeople = filters.audiences.filter((a) => !a.startsWith("employer:"));
+    const audEmployerSectors = filters.audiences
+      .filter((a) => a.startsWith("employer:"))
+      .map((a) => a.slice("employer:".length));
     const out = allLeads.filter((l) => {
       if (filters.countries.length && !filters.countries.includes(l.country)) return false;
-      if (filters.audiences.length) {
-        if (!l.target_audience_type || !filters.audiences.includes(l.target_audience_type))
-          return false;
+      if (audPeople.length || audEmployerSectors.length) {
+        const matchesPeople =
+          audPeople.length > 0 &&
+          l.target_audience_type != null &&
+          audPeople.includes(l.target_audience_type);
+        const matchesEmployer =
+          audEmployerSectors.length > 0 &&
+          l.target_audience_type === "employer_direct" &&
+          (l.sector_tags ?? []).some((t) => audEmployerSectors.includes(t));
+        if (!matchesPeople && !matchesEmployer) return false;
       }
       if (filters.workerOrigins.length) {
         const focus = l.worker_origin_focus ?? [];
@@ -287,6 +354,20 @@ const Leads = () => {
       if (filters.sectors.length) {
         const tags = l.sector_tags ?? [];
         if (!tags.some((t) => filters.sectors.includes(t))) return false;
+      }
+      if (filters.sizes.length && !filters.sizes.includes(l.company_size)) return false;
+      if (filters.minScore > 0) {
+        const s = l.score ?? l.urgency_score ?? 0;
+        if (s < filters.minScore) return false;
+      }
+      if (fromMs != null) {
+        const t = new Date(l.created_at).getTime();
+        if (t < fromMs) return false;
+      }
+      if (toMs != null) {
+        const t = new Date(l.created_at).getTime();
+        // include the whole "to" day
+        if (t > toMs + 24 * 3600 * 1000 - 1) return false;
       }
       for (const req of filters.contactReq) {
         if (req === "email" && !l.contact_email) return false;
@@ -341,7 +422,11 @@ const Leads = () => {
     filters.audiences.length +
     filters.workerOrigins.length +
     filters.sectors.length +
+    filters.sizes.length +
     filters.contactReq.length +
+    (filters.minScore > 0 ? 1 : 0) +
+    (filters.dateFrom ? 1 : 0) +
+    (filters.dateTo ? 1 : 0) +
     (filters.search ? 1 : 0);
 
   const toggleRecruiterMode = (on: boolean) => {
@@ -459,7 +544,7 @@ const Leads = () => {
           </div>
 
           {/* Filter rows */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
             <MultiFilter
               label="Target audience"
               icon={<Filter className="h-3.5 w-3.5" />}
@@ -488,6 +573,70 @@ const Leads = () => {
               selected={filters.sectors}
               onChange={(v) => setFilters({ ...filters, sectors: v })}
             />
+            <MultiFilter
+              label="Company size"
+              icon={<Users className="h-3.5 w-3.5" />}
+              options={COMPANY_SIZE_OPTIONS}
+              selected={filters.sizes}
+              onChange={(v) => setFilters({ ...filters, sizes: v })}
+            />
+          </div>
+
+          {/* Score slider + date range */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-1">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1.5">
+                  <Gauge className="h-3.5 w-3.5" />
+                  Min priority score
+                </Label>
+                <span className="text-xs font-medium text-foreground">
+                  {filters.minScore > 0 ? `≥ ${filters.minScore}` : "Any"}
+                </span>
+              </div>
+              <Slider
+                value={[filters.minScore]}
+                min={0}
+                max={100}
+                step={5}
+                onValueChange={(v) => setFilters({ ...filters, minScore: v[0] ?? 0 })}
+              />
+            </div>
+
+            <DateRangeFilter
+              from={filters.dateFrom}
+              to={filters.dateTo}
+              onChange={(from, to) => setFilters({ ...filters, dateFrom: from, dateTo: to })}
+            />
+
+            <div className="flex flex-wrap items-end gap-2 lg:justify-end">
+              {[7, 30, 90].map((d) => (
+                <Button
+                  key={d}
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setFilters({
+                      ...filters,
+                      dateFrom: new Date(Date.now() - d * 24 * 3600 * 1000)
+                        .toISOString()
+                        .slice(0, 10),
+                      dateTo: null,
+                    })
+                  }
+                >
+                  Last {d}d
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setFilters({ ...filters, dateFrom: null, dateTo: null })}
+                disabled={!filters.dateFrom && !filters.dateTo}
+              >
+                Clear dates
+              </Button>
+            </div>
           </div>
 
           {/* Contact requirement chips */}
@@ -613,6 +762,33 @@ const Leads = () => {
                 }
               />
             ))}
+            {filters.sizes.map((s) => (
+              <ActiveChip
+                key={`sz-${s}`}
+                label={sizeLabel(s)}
+                onClear={() =>
+                  setFilters({ ...filters, sizes: filters.sizes.filter((x) => x !== s) })
+                }
+              />
+            ))}
+            {filters.minScore > 0 && (
+              <ActiveChip
+                label={`Score ≥ ${filters.minScore}`}
+                onClear={() => setFilters({ ...filters, minScore: 0 })}
+              />
+            )}
+            {filters.dateFrom && (
+              <ActiveChip
+                label={`From ${filters.dateFrom}`}
+                onClear={() => setFilters({ ...filters, dateFrom: null })}
+              />
+            )}
+            {filters.dateTo && (
+              <ActiveChip
+                label={`To ${filters.dateTo}`}
+                onClear={() => setFilters({ ...filters, dateTo: null })}
+              />
+            )}
           </div>
         )}
 
@@ -909,6 +1085,63 @@ function MultiFilter({
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+function DateRangeFilter({
+  from,
+  to,
+  onChange,
+}: {
+  from: string | null;
+  to: string | null;
+  onChange: (from: string | null, to: string | null) => void;
+}) {
+  const fromDate = from ? new Date(from) : undefined;
+  const toDate = to ? new Date(to) : undefined;
+  const fmt = (d?: Date) =>
+    d
+      ? d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+      : null;
+  const label =
+    fromDate || toDate
+      ? `${fmt(fromDate) ?? "…"} → ${fmt(toDate) ?? "…"}`
+      : "Date range";
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1.5">
+        <CalendarRange className="h-3.5 w-3.5" />
+        Date range (created)
+      </Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              "w-full justify-start text-left font-normal",
+              !fromDate && !toDate && "text-muted-foreground",
+            )}
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            {label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-0">
+          <CalendarUI
+            mode="range"
+            selected={{ from: fromDate, to: toDate }}
+            onSelect={(range) => {
+              const f = range?.from ? range.from.toISOString().slice(0, 10) : null;
+              const t = range?.to ? range.to.toISOString().slice(0, 10) : null;
+              onChange(f, t);
+            }}
+            numberOfMonths={2}
+            initialFocus
+            className={cn("p-3 pointer-events-auto")}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
 

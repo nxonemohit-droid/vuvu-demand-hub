@@ -1,17 +1,23 @@
 // Centralised taxonomies for the Leads search experience.
-// Edit here to broaden filters across the UI and (later) backfill scripts.
 
 export const WORKER_ORIGINS = ["India", "Nepal", "Bangladesh"] as const;
 export type WorkerOrigin = (typeof WORKER_ORIGINS)[number];
 
 export const TARGET_AUDIENCE_OPTIONS: { value: string; label: string }[] = [
+  // People
   { value: "recruiter", label: "Recruiters" },
   { value: "recruitment_agency", label: "Recruitment Agencies" },
   { value: "hr_manager", label: "HR Managers" },
   { value: "hiring_manager", label: "Hiring Managers" },
-  { value: "staffing", label: "Staffing" },
+  { value: "staffing", label: "Staffing Companies" },
   { value: "freelance_recruiter", label: "Freelance Recruiters" },
   { value: "employer_direct", label: "Employer Direct" },
+  // Employer-by-sector quick-pick (matches sector_tags)
+  { value: "employer:construction", label: "Construction Employers" },
+  { value: "employer:hospitality", label: "Hospitality Employers" },
+  { value: "employer:logistics", label: "Logistics Employers" },
+  { value: "employer:manufacturing", label: "Manufacturing Employers" },
+  { value: "employer:agriculture", label: "Agriculture Employers" },
 ];
 
 export const SECTOR_OPTIONS: { value: string; label: string }[] = [
@@ -26,18 +32,26 @@ export const SECTOR_OPTIONS: { value: string; label: string }[] = [
   { value: "retail", label: "Retail" },
 ];
 
-// Balkans + EU countries we actively target. Order: Balkans first, then EU.
-export const TARGET_COUNTRIES = [
-  "Serbia","Croatia","Slovenia","Bosnia and Herzegovina","Montenegro",
-  "North Macedonia","Albania","Bulgaria","Romania","Greece",
-  "Germany","Austria","Netherlands","Belgium","France","Italy",
-  "Spain","Portugal","Poland","Czechia","Slovakia","Hungary","Malta",
-] as const;
-
+// Balkans + EU target countries.
 export const BALKAN_COUNTRIES = [
   "Serbia","Croatia","Slovenia","Bosnia and Herzegovina","Montenegro",
-  "North Macedonia","Albania","Bulgaria","Romania","Greece",
+  "North Macedonia","Albania","Kosovo","Bulgaria","Romania",
 ] as const;
+
+export const EU_COUNTRIES = [
+  "Germany","Poland","Czechia","Hungary","Slovakia","Austria",
+  "Italy","Portugal","Greece","Cyprus","Malta","Netherlands",
+] as const;
+
+export const TARGET_COUNTRIES = [...BALKAN_COUNTRIES, ...EU_COUNTRIES] as const;
+
+export const COMPANY_SIZE_OPTIONS: { value: string; label: string }[] = [
+  { value: "small", label: "Small (1–50)" },
+  { value: "medium", label: "Medium (51–250)" },
+  { value: "large", label: "Large (251–1000)" },
+  { value: "enterprise", label: "Enterprise (1000+)" },
+  { value: "unknown", label: "Unknown size" },
+];
 
 export type SortKey = "priority" | "recency" | "country" | "industry";
 
@@ -56,7 +70,11 @@ export type LeadFilters = {
   workerOrigins: string[];
   audiences: string[];
   sectors: string[];
+  sizes: string[];
   contactReq: ContactRequirement[];
+  minScore: number;            // 0..100
+  dateFrom: string | null;     // ISO yyyy-mm-dd
+  dateTo: string | null;       // ISO yyyy-mm-dd
   sort: SortKey;
 };
 
@@ -66,7 +84,11 @@ export const EMPTY_FILTERS: LeadFilters = {
   workerOrigins: [],
   audiences: [],
   sectors: [],
+  sizes: [],
   contactReq: [],
+  minScore: 0,
+  dateFrom: null,
+  dateTo: null,
   sort: "priority",
 };
 
@@ -90,7 +112,7 @@ export const BUILTIN_PRESETS: { id: string; name: string; filters: LeadFilters }
     name: "EU · Hospitality",
     filters: {
       ...EMPTY_FILTERS,
-      countries: ["Germany","Austria","Netherlands","France","Italy","Spain","Portugal","Greece"],
+      countries: ["Germany","Austria","Netherlands","Italy","Portugal","Greece"],
       sectors: ["hospitality"],
       sort: "priority",
     },
@@ -104,5 +126,15 @@ export const BUILTIN_PRESETS: { id: string; name: string; filters: LeadFilters }
     id: "with-email",
     name: "Has email · recent",
     filters: { ...EMPTY_FILTERS, contactReq: ["email"], sort: "recency" },
+  },
+  {
+    id: "high-score-30d",
+    name: "Score ≥ 70 · last 30 days",
+    filters: {
+      ...EMPTY_FILTERS,
+      minScore: 70,
+      dateFrom: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+      sort: "recency",
+    },
   },
 ];
