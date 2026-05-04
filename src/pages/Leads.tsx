@@ -1540,6 +1540,73 @@ const Leads = () => {
       </Dialog>
 
       <LeadDetailDrawer lead={selected} onClose={() => setSelected(null)} />
+
+      {/* Stats sidebar */}
+      <Sheet open={statsOpen} onOpenChange={setStatsOpen}>
+        <SheetContent side="right" className="w-[380px] sm:w-[420px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Stats</SheetTitle>
+            <SheetDescription>{filtered.length} leads in current filter</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-6">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Average score</div>
+              <div className="text-3xl font-bold">{stats.avgScore}<span className="text-base text-muted-foreground"> / 100</span></div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Top countries</div>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RBarChart data={stats.countries} layout="vertical" margin={{ left: 10 }}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                    <RTooltip cursor={{ fill: "hsl(var(--muted))" }} />
+                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  </RBarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Top industries</div>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RBarChart data={stats.industries} layout="vertical" margin={{ left: 10 }}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                    <RTooltip cursor={{ fill: "hsl(var(--muted))" }} />
+                    <Bar dataKey="value" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
+                  </RBarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Source trust</div>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={stats.sources} dataKey="value" nameKey="name" innerRadius={36} outerRadius={64}>
+                      {stats.sources.map((s) => (
+                        <Cell key={s.name} fill={s.name === "high" ? "hsl(142 71% 45%)" : s.name === "medium" ? "hsl(38 92% 50%)" : "hsl(var(--destructive))"} />
+                      ))}
+                    </Pie>
+                    <RTooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Compare modal */}
+      <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Compare leads ({selectedLeads.length})</DialogTitle>
+          </DialogHeader>
+          <CompareTable leads={selectedLeads} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
