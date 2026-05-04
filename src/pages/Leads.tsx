@@ -81,6 +81,7 @@ import {
   CheckSquare,
   Copy,
   Sparkle,
+  Star,
 } from "lucide-react";
 import {
   TARGET_AUDIENCE_OPTIONS,
