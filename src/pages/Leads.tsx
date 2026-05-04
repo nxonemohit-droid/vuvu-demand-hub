@@ -85,6 +85,7 @@ import {
   type SortKey,
   type ContactRequirement,
 } from "@/lib/lead-taxonomies";
+import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/lead-scoring";
 
 type RawLead = {
   id: string;
@@ -111,6 +112,8 @@ type Lead = RawLead & {
   linkedin_url: string | null;
   website_url: string | null;
   company_size: string;
+  computed_score: number;
+  score_breakdown: ScoreBreakdown;
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
