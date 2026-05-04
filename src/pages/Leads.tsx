@@ -962,6 +962,53 @@ const Leads = () => {
             />
           </div>
 
+          {/* Trust / role / stale row */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Trust tier</Label>
+              <Select value={minTrust} onValueChange={(v) => setMinTrust(v as TrustTier | "all")}>
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All sources</SelectItem>
+                  <SelectItem value="high">High (Company / LinkedIn)</SelectItem>
+                  <SelectItem value="medium">Medium (Indeed / Directory)</SelectItem>
+                  <SelectItem value="low">Low (Facebook / Classifieds)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Role type</Label>
+              <Select value={roleTypeFilter} onValueChange={(v) => setRoleTypeFilter(v as RoleType | "all")}>
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All roles</SelectItem>
+                  <SelectItem value="decision_maker">Decision Maker</SelectItem>
+                  <SelectItem value="recruiter">Recruiter</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <Label htmlFor="hide-stale" className="text-xs text-muted-foreground cursor-pointer">
+                Hide stale (&gt;45d)
+              </Label>
+              <Switch id="hide-stale" checked={hideStale} onCheckedChange={setHideStale} />
+            </div>
+            <Button
+              size="sm"
+              variant={statsOpen ? "default" : "outline"}
+              onClick={() => setStatsOpen((v) => !v)}
+              aria-pressed={statsOpen}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              {statsOpen ? "Hide stats" : "Stats"}
+            </Button>
+          </div>
+
           {/* Score slider + date range */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-1">
             <div className="space-y-2">
