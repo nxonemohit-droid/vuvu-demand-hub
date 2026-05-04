@@ -10,6 +10,7 @@ import KeywordAudit from "./pages/KeywordAudit.tsx";
 import Leads from "./pages/Leads.tsx";
 import LeadDetail from "./pages/LeadDetail.tsx";
 import Candidates from "./pages/Candidates.tsx";
+import Settings from "./pages/Settings.tsx";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/leads" element={<Leads />} />
           <Route path="/leads/:id" element={<LeadDetail />} />
           <Route path="/candidates" element={<Candidates />} />
+          <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
