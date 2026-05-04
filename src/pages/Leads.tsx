@@ -1383,6 +1383,20 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
   const allUrls = lead ? collectUrls(payload) : [];
   const linkedinUrls = allUrls.filter((u) => /linkedin\.com\//i.test(u));
   const otherUrls = allUrls.filter((u) => !/linkedin\.com\//i.test(u));
+  const outreach = lead ? buildOutreachTemplate(lead) : null;
+  const primaryEmail = allEmails[0] ?? lead?.enrichment?.email_patterns?.[0] ?? "";
+  const mailtoHref = lead && outreach
+    ? `mailto:${primaryEmail}?subject=${encodeURIComponent(outreach.subject)}&body=${encodeURIComponent(outreach.body)}`
+    : "";
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error("Could not copy to clipboard");
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
