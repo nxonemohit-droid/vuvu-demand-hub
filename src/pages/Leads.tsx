@@ -86,6 +86,7 @@ import {
   type ContactRequirement,
 } from "@/lib/lead-taxonomies";
 import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/lead-scoring";
+import { dedupeAndEnrich, type Enrichment } from "@/lib/lead-enrichment";
 
 type RawLead = {
   id: string;
@@ -114,6 +115,7 @@ type Lead = RawLead & {
   company_size: string;
   computed_score: number;
   score_breakdown: ScoreBreakdown;
+  enrichment: Enrichment;
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
@@ -302,7 +304,7 @@ const Leads = () => {
       setLoading(false);
       return;
     }
-    const enriched: Lead[] = (data ?? []).map((l) => {
+    const scored = (data ?? []).map((l) => {
       const raw = l as unknown as RawLead;
       const breakdown = computeLeadScore(raw);
       return {
@@ -314,7 +316,11 @@ const Leads = () => {
         score_breakdown: breakdown,
       };
     });
-    setAllLeads(enriched);
+    // Dedupe by domain + company name; fold contacts/emails from duplicates.
+    const deduped: Lead[] = dedupeAndEnrich(scored, (l) =>
+      collectEmails(l.raw_signals?.payload ?? null),
+    );
+    setAllLeads(deduped);
     setTotalCount(countRes.count ?? 0);
     setLoading(false);
   };
@@ -845,7 +851,23 @@ const Leads = () => {
                       onClick={() => setSelected(l)}
                     >
                       <TableCell className="font-medium max-w-[200px] truncate" title={l.employer_name ?? ""}>
-                        {l.employer_name ?? "—"}
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate">{l.employer_name ?? "—"}</span>
+                          {l.enrichment.duplicate_count > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] py-0 px-1.5 h-5 shrink-0"
+                              title={`Merged with ${l.enrichment.duplicate_count} duplicate lead(s)`}
+                            >
+                              +{l.enrichment.duplicate_count}
+                            </Badge>
+                          )}
+                        </div>
+                        {l.enrichment.domain && (
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {l.enrichment.domain}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="max-w-[220px] truncate" title={l.role}>
                         {l.role}
@@ -1257,6 +1279,64 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                     Contact links
                   </h3>
+                  {(lead.enrichment.domain ||
+                    lead.enrichment.duplicate_count > 0 ||
+                    lead.enrichment.email_patterns.length > 0 ||
+                    lead.enrichment.extra_emails.length > 0) && (
+                    <div className="mb-3 rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                        {lead.enrichment.domain && (
+                          <span>
+                            <span className="text-muted-foreground">Domain: </span>
+                            <span className="font-medium">{lead.enrichment.domain}</span>
+                          </span>
+                        )}
+                        {lead.enrichment.duplicate_count > 0 && (
+                          <span>
+                            <span className="text-muted-foreground">Merged from: </span>
+                            <span className="font-medium">
+                              {lead.enrichment.duplicate_count} duplicate
+                              {lead.enrichment.duplicate_count > 1 ? "s" : ""}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                      {lead.enrichment.extra_emails.length > 0 && (
+                        <div className="text-xs">
+                          <div className="text-muted-foreground mb-1">Other emails found</div>
+                          <div className="flex flex-wrap gap-1">
+                            {lead.enrichment.extra_emails.slice(0, 8).map((e) => (
+                              <a
+                                key={e}
+                                href={`mailto:${e}`}
+                                className="px-1.5 py-0.5 rounded border border-border bg-background hover:bg-muted text-[11px]"
+                              >
+                                {e}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {lead.enrichment.email_patterns.length > 0 && (
+                        <div className="text-xs">
+                          <div className="text-muted-foreground mb-1">
+                            Likely work emails (unverified)
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {lead.enrichment.email_patterns.slice(0, 8).map((e) => (
+                              <a
+                                key={e}
+                                href={`mailto:${e}`}
+                                className="px-1.5 py-0.5 rounded border border-dashed border-border bg-background hover:bg-muted text-[11px] text-muted-foreground"
+                              >
+                                {e}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {allEmails.length === 0 &&
                       !lead.contact_phone &&
