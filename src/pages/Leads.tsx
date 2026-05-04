@@ -1279,6 +1279,64 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                     Contact links
                   </h3>
+                  {(lead.enrichment.domain ||
+                    lead.enrichment.duplicate_count > 0 ||
+                    lead.enrichment.email_patterns.length > 0 ||
+                    lead.enrichment.extra_emails.length > 0) && (
+                    <div className="mb-3 rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                        {lead.enrichment.domain && (
+                          <span>
+                            <span className="text-muted-foreground">Domain: </span>
+                            <span className="font-medium">{lead.enrichment.domain}</span>
+                          </span>
+                        )}
+                        {lead.enrichment.duplicate_count > 0 && (
+                          <span>
+                            <span className="text-muted-foreground">Merged from: </span>
+                            <span className="font-medium">
+                              {lead.enrichment.duplicate_count} duplicate
+                              {lead.enrichment.duplicate_count > 1 ? "s" : ""}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                      {lead.enrichment.extra_emails.length > 0 && (
+                        <div className="text-xs">
+                          <div className="text-muted-foreground mb-1">Other emails found</div>
+                          <div className="flex flex-wrap gap-1">
+                            {lead.enrichment.extra_emails.slice(0, 8).map((e) => (
+                              <a
+                                key={e}
+                                href={`mailto:${e}`}
+                                className="px-1.5 py-0.5 rounded border border-border bg-background hover:bg-muted text-[11px]"
+                              >
+                                {e}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {lead.enrichment.email_patterns.length > 0 && (
+                        <div className="text-xs">
+                          <div className="text-muted-foreground mb-1">
+                            Likely work emails (unverified)
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {lead.enrichment.email_patterns.slice(0, 8).map((e) => (
+                              <a
+                                key={e}
+                                href={`mailto:${e}`}
+                                className="px-1.5 py-0.5 rounded border border-dashed border-border bg-background hover:bg-muted text-[11px] text-muted-foreground"
+                              >
+                                {e}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {allEmails.length === 0 &&
                       !lead.contact_phone &&
