@@ -1250,6 +1250,19 @@ const Leads = () => {
           )}
         </Card>
         )}
+        {viewMode === "table" && !loading && filtered.length > visibleLeads.length && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <p className="text-xs text-muted-foreground">
+              Showing {visibleLeads.length} of {filtered.length} leads
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            >
+              Load more
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Save preset dialog */}
