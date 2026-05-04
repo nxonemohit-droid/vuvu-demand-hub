@@ -920,6 +920,41 @@ const Leads = () => {
           </div>
         )}
 
+        {/* Bulk actions toolbar */}
+        {selectedIds.size > 0 && (
+          <div className="sticky top-[88px] z-20 animate-in fade-in slide-in-from-top-2">
+            <Card className="rounded-xl border-primary/40 bg-primary/5 backdrop-blur p-3 flex flex-wrap items-center gap-2 shadow-md">
+              <div className="flex items-center gap-2 px-2 text-sm font-medium text-primary">
+                <CheckSquare className="h-4 w-4" />
+                {selectedIds.size} selected
+              </div>
+              <Separator orientation="vertical" className="h-6" />
+              <Button size="sm" variant="outline" onClick={bulkExportCsv}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Export CSV
+              </Button>
+              <Button size="sm" variant="outline" onClick={bulkExportPdf}>
+                <FileText className="h-4 w-4 mr-2" /> Export PDF
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={bulkMarkHighPriority}
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Flame className="h-4 w-4 mr-2" /> Mark High Priority
+              </Button>
+              <Button size="sm" onClick={bulkAddToOutreach}>
+                <Send className="h-4 w-4 mr-2" /> Add to Outreach
+              </Button>
+              <div className="ml-auto">
+                <Button size="sm" variant="ghost" onClick={clearSelection}>
+                  <X className="h-4 w-4 mr-1" /> Clear
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Table */}
         <Card className="rounded-xl overflow-hidden">
           {loading ? (
