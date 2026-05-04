@@ -423,6 +423,21 @@ const Leads = () => {
     };
   }, []);
 
+  // Load blacklisted domains.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.from("lead_blacklist").select("domain");
+      if (cancelled || error) return;
+      setBlacklistedDomains(
+        new Set(((data ?? []) as Array<{ domain: string }>).map((r) => r.domain.toLowerCase())),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // persist recruiter mode
   useEffect(() => {
     try {
