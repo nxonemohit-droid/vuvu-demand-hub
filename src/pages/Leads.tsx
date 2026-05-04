@@ -19,6 +19,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Briefcase,
@@ -28,6 +37,11 @@ import {
   Phone,
   RefreshCw,
   Search,
+  Globe,
+  MapPin,
+  Building2,
+  Calendar,
+  Tag,
 } from "lucide-react";
 
 type RawLead = {
@@ -84,6 +98,42 @@ function pickLinkedIn(lead: RawLead): string | null {
   return null;
 }
 
+function collectUrls(payload: Record<string, unknown> | null | undefined): string[] {
+  if (!payload) return [];
+  const urls = new Set<string>();
+  const walk = (v: unknown) => {
+    if (!v) return;
+    if (typeof v === "string") {
+      const matches = v.match(/https?:\/\/[^\s"'<>)]+/gi);
+      if (matches) matches.forEach((m) => urls.add(m));
+    } else if (Array.isArray(v)) {
+      v.forEach(walk);
+    } else if (typeof v === "object") {
+      Object.values(v as Record<string, unknown>).forEach(walk);
+    }
+  };
+  walk(payload);
+  return Array.from(urls);
+}
+
+function collectEmails(payload: Record<string, unknown> | null | undefined): string[] {
+  if (!payload) return [];
+  const emails = new Set<string>();
+  const walk = (v: unknown) => {
+    if (!v) return;
+    if (typeof v === "string") {
+      const m = v.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
+      if (m) m.forEach((e) => emails.add(e));
+    } else if (Array.isArray(v)) {
+      v.forEach(walk);
+    } else if (typeof v === "object") {
+      Object.values(v as Record<string, unknown>).forEach(walk);
+    }
+  };
+  walk(payload);
+  return Array.from(emails);
+}
+
 const Leads = () => {
   const [loading, setLoading] = useState(true);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
@@ -91,6 +141,7 @@ const Leads = () => {
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState<string>("all");
   const [priority, setPriority] = useState<string>("all");
+  const [selected, setSelected] = useState<Lead | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -236,7 +287,11 @@ const Leads = () => {
               </TableHeader>
               <TableBody>
                 {filtered.map((l) => (
-                  <TableRow key={l.id}>
+                  <TableRow
+                    key={l.id}
+                    className="cursor-pointer hover:bg-muted/40"
+                    onClick={() => setSelected(l)}
+                  >
                     <TableCell className="font-medium">
                       {l.employer_name ?? "—"}
                     </TableCell>
@@ -255,7 +310,7 @@ const Leads = () => {
                         {l.priority}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {l.contact_email ? (
                         <a
                           href={`mailto:${l.contact_email}`}
@@ -271,7 +326,7 @@ const Leads = () => {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {l.contact_phone ? (
                         <a
                           href={`tel:${l.contact_phone}`}
@@ -284,7 +339,7 @@ const Leads = () => {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {l.linkedin_url ? (
                         <a
                           href={l.linkedin_url}
@@ -299,7 +354,7 @@ const Leads = () => {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {l.source_url ? (
                         <a
                           href={l.source_url}
@@ -322,6 +377,11 @@ const Leads = () => {
           )}
         </Card>
       </div>
+
+      <LeadDetailDrawer
+        lead={selected}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 };
