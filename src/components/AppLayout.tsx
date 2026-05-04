@@ -8,11 +8,17 @@ import {
   PlayCircle,
   Settings,
   LogOut,
+  HelpCircle,
 } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -96,8 +102,52 @@ export const AppLayout = () => {
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
+      <ShortcutHelpButton />
     </div>
   );
 };
 
 export default AppLayout;
+
+const ShortcutHelpButton = () => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <button
+        type="button"
+        aria-label="Keyboard shortcuts"
+        className="fixed bottom-4 right-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full border bg-card text-muted-foreground shadow-md hover:text-foreground hover:bg-muted transition-colors"
+      >
+        <HelpCircle className="h-5 w-5" />
+      </button>
+    </PopoverTrigger>
+    <PopoverContent side="top" align="end" className="w-72">
+      <div className="space-y-2">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Keyboard shortcuts
+        </div>
+        <ul className="text-sm space-y-1.5">
+          <ShortcutRow keys={["/"]} label="Focus search (on Leads)" />
+          <ShortcutRow keys={["Esc"]} label="Clear all filters" />
+          <ShortcutRow keys={["N"]} label="Focus notes (on Lead detail)" />
+          <ShortcutRow keys={["?"]} label="Show this help" />
+        </ul>
+      </div>
+    </PopoverContent>
+  </Popover>
+);
+
+const ShortcutRow = ({ keys, label }: { keys: string[]; label: string }) => (
+  <li className="flex items-center justify-between gap-3">
+    <span className="text-foreground/80">{label}</span>
+    <span className="flex items-center gap-1">
+      {keys.map((k) => (
+        <kbd
+          key={k}
+          className="inline-flex h-5 min-w-5 items-center justify-center rounded border bg-muted px-1.5 text-[11px] font-medium text-foreground"
+        >
+          {k}
+        </kbd>
+      ))}
+    </span>
+  </li>
+);
