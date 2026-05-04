@@ -86,6 +86,7 @@ import {
   type ContactRequirement,
 } from "@/lib/lead-taxonomies";
 import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/lead-scoring";
+import { dedupeAndEnrich, type Enrichment } from "@/lib/lead-enrichment";
 
 type RawLead = {
   id: string;
@@ -114,6 +115,7 @@ type Lead = RawLead & {
   company_size: string;
   computed_score: number;
   score_breakdown: ScoreBreakdown;
+  enrichment: Enrichment;
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
