@@ -1245,6 +1245,12 @@ const Leads = () => {
               <Button size="sm" onClick={bulkAddToOutreach}>
                 <Send className="h-4 w-4 mr-2" /> Add to Outreach
               </Button>
+              {selectedIds.size >= 2 && (
+                <Button size="sm" variant="secondary" onClick={() => setCompareOpen(true)}>
+                  <GitCompareArrows className="h-4 w-4 mr-2" />
+                  Compare ({selectedIds.size})
+                </Button>
+              )}
               <div className="ml-auto">
                 <Button size="sm" variant="ghost" onClick={clearSelection}>
                   <X className="h-4 w-4 mr-1" /> Clear
