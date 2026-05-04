@@ -19,6 +19,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Briefcase,
@@ -28,6 +37,11 @@ import {
   Phone,
   RefreshCw,
   Search,
+  Globe,
+  MapPin,
+  Building2,
+  Calendar,
+  Tag,
 } from "lucide-react";
 
 type RawLead = {
@@ -84,6 +98,42 @@ function pickLinkedIn(lead: RawLead): string | null {
   return null;
 }
 
+function collectUrls(payload: Record<string, unknown> | null | undefined): string[] {
+  if (!payload) return [];
+  const urls = new Set<string>();
+  const walk = (v: unknown) => {
+    if (!v) return;
+    if (typeof v === "string") {
+      const matches = v.match(/https?:\/\/[^\s"'<>)]+/gi);
+      if (matches) matches.forEach((m) => urls.add(m));
+    } else if (Array.isArray(v)) {
+      v.forEach(walk);
+    } else if (typeof v === "object") {
+      Object.values(v as Record<string, unknown>).forEach(walk);
+    }
+  };
+  walk(payload);
+  return Array.from(urls);
+}
+
+function collectEmails(payload: Record<string, unknown> | null | undefined): string[] {
+  if (!payload) return [];
+  const emails = new Set<string>();
+  const walk = (v: unknown) => {
+    if (!v) return;
+    if (typeof v === "string") {
+      const m = v.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
+      if (m) m.forEach((e) => emails.add(e));
+    } else if (Array.isArray(v)) {
+      v.forEach(walk);
+    } else if (typeof v === "object") {
+      Object.values(v as Record<string, unknown>).forEach(walk);
+    }
+  };
+  walk(payload);
+  return Array.from(emails);
+}
+
 const Leads = () => {
   const [loading, setLoading] = useState(true);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
@@ -91,6 +141,7 @@ const Leads = () => {
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState<string>("all");
   const [priority, setPriority] = useState<string>("all");
+  const [selected, setSelected] = useState<Lead | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -236,7 +287,11 @@ const Leads = () => {
               </TableHeader>
               <TableBody>
                 {filtered.map((l) => (
-                  <TableRow key={l.id}>
+                  <TableRow
+                    key={l.id}
+                    className="cursor-pointer hover:bg-muted/40"
+                    onClick={() => setSelected(l)}
+                  >
                     <TableCell className="font-medium">
                       {l.employer_name ?? "—"}
                     </TableCell>
@@ -255,7 +310,7 @@ const Leads = () => {
                         {l.priority}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {l.contact_email ? (
                         <a
                           href={`mailto:${l.contact_email}`}
@@ -271,7 +326,7 @@ const Leads = () => {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {l.contact_phone ? (
                         <a
                           href={`tel:${l.contact_phone}`}
@@ -284,7 +339,7 @@ const Leads = () => {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {l.linkedin_url ? (
                         <a
                           href={l.linkedin_url}
@@ -299,7 +354,7 @@ const Leads = () => {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {l.source_url ? (
                         <a
                           href={l.source_url}
@@ -322,8 +377,207 @@ const Leads = () => {
           )}
         </Card>
       </div>
+
+      <LeadDetailDrawer
+        lead={selected}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 };
 
 export default Leads;
+
+function LeadDetailDrawer({
+  lead,
+  onClose,
+}: {
+  lead: Lead | null;
+  onClose: () => void;
+}) {
+  const open = !!lead;
+  const payload = (lead?.raw_signals?.payload ?? null) as
+    | Record<string, unknown>
+    | null;
+  const allEmails = lead
+    ? Array.from(
+        new Set(
+          [lead.contact_email, ...collectEmails(payload)].filter(
+            (e): e is string => !!e,
+          ),
+        ),
+      )
+    : [];
+  const allUrls = lead ? collectUrls(payload) : [];
+  const linkedinUrls = allUrls.filter((u) => /linkedin\.com\//i.test(u));
+  const otherUrls = allUrls.filter((u) => !/linkedin\.com\//i.test(u));
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col p-0">
+        {lead && (
+          <>
+            <SheetHeader className="p-6 pb-4 border-b">
+              <SheetTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-accent" />
+                {lead.employer_name ?? "Unknown employer"}
+              </SheetTitle>
+              <SheetDescription>{lead.role}</SheetDescription>
+            </SheetHeader>
+            <ScrollArea className="flex-1">
+              <div className="p-6 space-y-6">
+                {/* Extracted fields */}
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    Extracted fields
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <Field
+                      icon={<MapPin className="h-3.5 w-3.5" />}
+                      label="Location"
+                      value={[lead.country, lead.city].filter(Boolean).join(" · ") || "—"}
+                    />
+                    <Field
+                      icon={<Tag className="h-3.5 w-3.5" />}
+                      label="Priority"
+                      value={lead.priority}
+                    />
+                    <Field label="Score" value={lead.score?.toString() ?? "—"} />
+                    <Field
+                      label="Urgency"
+                      value={lead.urgency_score?.toString() ?? "0"}
+                    />
+                    <Field label="Contact name" value={lead.contact_name ?? "—"} />
+                    <Field
+                      icon={<Calendar className="h-3.5 w-3.5" />}
+                      label="Created"
+                      value={new Date(lead.created_at).toLocaleString("en-GB")}
+                    />
+                  </div>
+                </section>
+
+                <Separator />
+
+                {/* Contacts */}
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    Contact links
+                  </h3>
+                  <div className="space-y-2">
+                    {allEmails.length === 0 &&
+                      !lead.contact_phone &&
+                      linkedinUrls.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          No direct contact details found.
+                        </p>
+                      )}
+                    {allEmails.map((e) => (
+                      <a
+                        key={e}
+                        href={`mailto:${e}`}
+                        className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                        {e}
+                      </a>
+                    ))}
+                    {lead.contact_phone && (
+                      <a
+                        href={`tel:${lead.contact_phone}`}
+                        className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        {lead.contact_phone}
+                      </a>
+                    )}
+                    {linkedinUrls.map((u) => (
+                      <a
+                        key={u}
+                        href={u}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-primary hover:underline break-all"
+                      >
+                        <Linkedin className="h-3.5 w-3.5 shrink-0" />
+                        {u}
+                      </a>
+                    ))}
+                    {lead.source_url && (
+                      <a
+                        href={lead.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-foreground hover:underline break-all"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        {lead.source_url}
+                      </a>
+                    )}
+                  </div>
+                </section>
+
+                {otherUrls.length > 0 && (
+                  <>
+                    <Separator />
+                    <section>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                        Other URLs in payload ({otherUrls.length})
+                      </h3>
+                      <div className="space-y-1.5 max-h-48 overflow-auto">
+                        {otherUrls.map((u) => (
+                          <a
+                            key={u}
+                            href={u}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground break-all"
+                          >
+                            <Globe className="h-3 w-3 shrink-0" />
+                            {u}
+                          </a>
+                        ))}
+                      </div>
+                    </section>
+                  </>
+                )}
+
+                <Separator />
+
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    Raw payload
+                  </h3>
+                  <pre className="text-xs bg-muted/50 border rounded-lg p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">
+                    {payload
+                      ? JSON.stringify(payload, null, 2)
+                      : "No raw payload available."}
+                  </pre>
+                </section>
+              </div>
+            </ScrollArea>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function Field({
+  icon,
+  label,
+  value,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground flex items-center gap-1 mb-0.5">
+        {icon}
+        {label}
+      </div>
+      <div className="font-medium capitalize-first break-words">{value}</div>
+    </div>
+  );
+}
