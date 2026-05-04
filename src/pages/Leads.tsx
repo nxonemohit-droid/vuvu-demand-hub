@@ -353,7 +353,7 @@ const Leads = () => {
   const [statsOpen, setStatsOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [blacklistedDomains, setBlacklistedDomains] = useState<Set<string>>(new Set());
-  const searchInputRef = useState<HTMLInputElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const recruiterMode = useMemo(
     () =>
