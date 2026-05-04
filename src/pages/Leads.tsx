@@ -562,12 +562,62 @@ const Leads = () => {
       }
     });
     return sorted;
-  }, [allLeads, filters, bookmarkedOnly, bookmarkedIds]);
+  }, [allLeads, filters, bookmarkedOnly, bookmarkedIds, hideStale, minTrust, roleTypeFilter]);
 
   // Reset pagination whenever filters/sort change.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [filters, bookmarkedOnly]);
+  }, [filters, bookmarkedOnly, hideStale, minTrust, roleTypeFilter]);
+
+  // ---- Data quality + stats -------------------------------------------------
+  const dataQuality = useMemo(() => {
+    const n = filtered.length || 1;
+    const stat = (pred: (l: Lead) => boolean) =>
+      Math.round((filtered.filter(pred).length / n) * 100);
+    return {
+      total: filtered.length,
+      email: stat((l) => !!l.contact_email),
+      phone: stat((l) => !!l.contact_phone),
+      linkedin: stat((l) => !!l.linkedin_url),
+      fresh: stat((l) => getFreshness(l.created_at) === "fresh"),
+      highTrust: stat((l) =>
+        getTrustTier(
+          ((l.raw_signals?.payload as Record<string, unknown> | null)?.source as string | undefined) ??
+            l.source_url,
+        ) === "high",
+      ),
+    };
+  }, [filtered]);
+
+  const stats = useMemo(() => {
+    const countries = new Map<string, number>();
+    const industries = new Map<string, number>();
+    const sources = new Map<string, number>();
+    let scoreSum = 0;
+    for (const l of filtered) {
+      countries.set(l.country, (countries.get(l.country) ?? 0) + 1);
+      for (const t of l.sector_tags ?? []) {
+        industries.set(t, (industries.get(t) ?? 0) + 1);
+      }
+      const src = getTrustTier(
+        ((l.raw_signals?.payload as Record<string, unknown> | null)?.source as string | undefined) ??
+          l.source_url,
+      );
+      sources.set(src, (sources.get(src) ?? 0) + 1);
+      scoreSum += l.computed_score ?? 0;
+    }
+    const top = (m: Map<string, number>, n = 5) =>
+      Array.from(m.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, n)
+        .map(([name, value]) => ({ name, value }));
+    return {
+      countries: top(countries),
+      industries: top(industries),
+      sources: Array.from(sources.entries()).map(([name, value]) => ({ name, value })),
+      avgScore: filtered.length ? Math.round(scoreSum / filtered.length) : 0,
+    };
+  }, [filtered]);
 
   const visibleLeads = useMemo(
     () => filtered.slice(0, visibleCount),
