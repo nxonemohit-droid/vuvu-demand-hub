@@ -461,6 +461,36 @@ export type Database = {
           },
         ]
       }
+      lead_crm: {
+        Row: {
+          bookmarked: boolean
+          created_at: string
+          id: string
+          lead_id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["lead_crm_status"]
+          updated_at: string
+        }
+        Insert: {
+          bookmarked?: boolean
+          created_at?: string
+          id?: string
+          lead_id: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["lead_crm_status"]
+          updated_at?: string
+        }
+        Update: {
+          bookmarked?: boolean
+          created_at?: string
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["lead_crm_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       normalized_demand: {
         Row: {
           city: string | null
@@ -865,6 +895,12 @@ export type Database = {
         | "company_site"
         | "directory"
       job_status: "queued" | "running" | "succeeded" | "failed"
+      lead_crm_status:
+        | "new"
+        | "contacted"
+        | "in_progress"
+        | "converted"
+        | "rejected"
       priority_tag: "high" | "medium" | "low"
     }
     CompositeTypes: {
@@ -1006,6 +1042,13 @@ export const Constants = {
         "directory",
       ],
       job_status: ["queued", "running", "succeeded", "failed"],
+      lead_crm_status: [
+        "new",
+        "contacted",
+        "in_progress",
+        "converted",
+        "rejected",
+      ],
       priority_tag: ["high", "medium", "low"],
     },
   },
