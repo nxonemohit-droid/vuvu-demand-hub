@@ -2254,3 +2254,82 @@ function Field({
     </div>
   );
 }
+
+function QualityPill({ label, pct }: { label: string; pct: number }) {
+  const tone =
+    pct >= 70
+      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+      : pct >= 40
+        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+        : "bg-destructive/10 text-destructive border-destructive/30";
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[11px] ${tone}`}>
+      <span className="font-medium">{label}</span>
+      <span className="tabular-nums">{pct}%</span>
+    </span>
+  );
+}
+
+function FilteredEmptyState({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center py-8">
+      <Search className="h-10 w-10 text-muted-foreground mb-3" />
+      <h3 className="text-base font-semibold">No leads match these filters</h3>
+      <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+        Try removing a filter, broadening your search, or clearing all filters to start over.
+      </p>
+      <Button className="mt-4" onClick={onClear}>
+        <X className="h-4 w-4 mr-2" /> Clear all filters
+      </Button>
+    </div>
+  );
+}
+
+function CompareTable({ leads }: { leads: Lead[] }) {
+  if (leads.length < 2) {
+    return <p className="text-sm text-muted-foreground">Select 2 or more leads to compare.</p>;
+  }
+  const bestScore = Math.max(...leads.map((l) => l.computed_score ?? 0));
+  const newest = Math.max(...leads.map((l) => new Date(l.created_at).getTime()));
+  const rows: { label: string; render: (l: Lead) => React.ReactNode; isBest: (l: Lead) => boolean }[] = [
+    { label: "Score", render: (l) => Math.round(l.computed_score ?? 0), isBest: (l) => (l.computed_score ?? 0) === bestScore },
+    { label: "Country", render: (l) => l.country, isBest: () => false },
+    { label: "Role", render: (l) => l.role, isBest: () => false },
+    { label: "Email", render: (l) => l.contact_email ?? "—", isBest: (l) => !!l.contact_email },
+    { label: "Phone", render: (l) => l.contact_phone ?? "—", isBest: (l) => !!l.contact_phone },
+    { label: "LinkedIn", render: (l) => (l.linkedin_url ? "Yes" : "—"), isBest: (l) => !!l.linkedin_url },
+    { label: "Website", render: (l) => (l.website_url ? "Yes" : "—"), isBest: (l) => !!l.website_url },
+    { label: "Created", render: (l) => new Date(l.created_at).toLocaleDateString("en-GB"), isBest: (l) => new Date(l.created_at).getTime() === newest },
+  ];
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left py-2 pr-3 text-xs uppercase tracking-wider text-muted-foreground">Field</th>
+            {leads.map((l) => (
+              <th key={l.id} className="text-left py-2 px-3 font-semibold">
+                {l.employer_name ?? "Unknown"}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label} className="border-b last:border-0">
+              <td className="py-2 pr-3 text-xs text-muted-foreground">{row.label}</td>
+              {leads.map((l) => (
+                <td
+                  key={l.id}
+                  className={`py-2 px-3 ${row.isBest(l) ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-medium" : ""}`}
+                >
+                  {row.render(l)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
