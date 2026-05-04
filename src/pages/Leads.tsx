@@ -85,6 +85,7 @@ import {
   type SortKey,
   type ContactRequirement,
 } from "@/lib/lead-taxonomies";
+import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/lead-scoring";
 
 type RawLead = {
   id: string;
@@ -111,6 +112,8 @@ type Lead = RawLead & {
   linkedin_url: string | null;
   website_url: string | null;
   company_size: string;
+  computed_score: number;
+  score_breakdown: ScoreBreakdown;
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
@@ -301,11 +304,14 @@ const Leads = () => {
     }
     const enriched: Lead[] = (data ?? []).map((l) => {
       const raw = l as unknown as RawLead;
+      const breakdown = computeLeadScore(raw);
       return {
         ...raw,
         linkedin_url: pickLinkedIn(raw),
         website_url: pickWebsite(raw),
         company_size: inferCompanySize(raw.raw_signals?.payload ?? null),
+        computed_score: breakdown.total,
+        score_breakdown: breakdown,
       };
     });
     setAllLeads(enriched);
@@ -358,7 +364,7 @@ const Leads = () => {
       }
       if (filters.sizes.length && !filters.sizes.includes(l.company_size)) return false;
       if (filters.minScore > 0) {
-        const s = l.score ?? l.urgency_score ?? 0;
+        const s = l.computed_score ?? l.score ?? l.urgency_score ?? 0;
         if (s < filters.minScore) return false;
       }
       if (fromMs != null) {
@@ -410,10 +416,15 @@ const Leads = () => {
           const ad = a.demand_size ?? 0;
           const bd = b.demand_size ?? 0;
           if (ad !== bd) return bd - ad;
-          return (b.urgency_score ?? 0) - (a.urgency_score ?? 0);
+          return (b.computed_score ?? 0) - (a.computed_score ?? 0);
         }
         case "priority":
         default: {
+          // Composite Voynova score is the primary sort signal; priority tier
+          // breaks ties so manually-flagged hot leads stay near the top.
+          const av = a.computed_score ?? 0;
+          const bv = b.computed_score ?? 0;
+          if (av !== bv) return bv - av;
           const ar = PRIORITY_RANK[a.priority] ?? 9;
           const br = PRIORITY_RANK[b.priority] ?? 9;
           if (ar !== br) return ar - br;
@@ -1204,7 +1215,7 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
                       label="Worker source"
                       value={(lead.worker_origin_focus ?? []).join(", ") || "—"}
                     />
-                    <Field label="Score" value={lead.score?.toString() ?? "—"} />
+                    <Field label="Score" value={`${lead.computed_score} / 100`} />
                     <Field label="Urgency" value={lead.urgency_score?.toString() ?? "0"} />
                     <Field label="Contact name" value={lead.contact_name ?? "—"} />
                     <Field
@@ -1212,6 +1223,31 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
                       label="Created"
                       value={new Date(lead.created_at).toLocaleString("en-GB")}
                     />
+                  </div>
+                  <div className="mt-4 rounded-lg border border-border/60 bg-muted/30 p-3">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                      Score breakdown
+                    </div>
+                    <div className="space-y-1.5">
+                      {SCORE_DIMENSIONS.map((d) => {
+                        const val = lead.score_breakdown[d.key];
+                        const pct = Math.round((val / d.max) * 100);
+                        return (
+                          <div key={d.key} className="flex items-center gap-2 text-xs">
+                            <span className="w-44 shrink-0 text-muted-foreground">{d.label}</span>
+                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full bg-primary"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-12 text-right tabular-nums">
+                              {val}/{d.max}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </section>
 
