@@ -10,7 +10,6 @@ import {
   Briefcase, Users, Radar, AlertTriangle, Mail, Loader2, PlayCircle,
   RefreshCw, TrendingUp, Globe2, Sparkles, Activity, MapPin,
   Zap, Search, X,
-  Filter,
 } from "lucide-react";
 import { useRoles } from "@/lib/auth";
 import { toast } from "sonner";
