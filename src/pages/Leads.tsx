@@ -106,7 +106,11 @@ type RawLead = {
   raw_signals: { payload: Record<string, unknown> | null } | null;
 };
 
-type Lead = RawLead & { linkedin_url: string | null; website_url: string | null };
+type Lead = RawLead & {
+  linkedin_url: string | null;
+  website_url: string | null;
+  company_size: string;
+};
 
 const PRIORITY_STYLES: Record<string, string> = {
   high: "bg-destructive/10 text-destructive border-destructive/30",
@@ -300,6 +304,7 @@ const Leads = () => {
         ...raw,
         linkedin_url: pickLinkedIn(raw),
         website_url: pickWebsite(raw),
+        company_size: inferCompanySize(raw.raw_signals?.payload ?? null),
       };
     });
     setAllLeads(enriched);
