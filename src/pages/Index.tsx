@@ -225,8 +225,9 @@ const Index = () => {
           />
         </section>
 
-        {/* CHARTS */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* CHARTS + LEAD COLUMN */}
+        <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="p-5 rounded-xl lg:col-span-2">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -281,10 +282,9 @@ const Index = () => {
               </div>
             )}
           </Card>
-        </section>
 
         {/* COUNTRY + RUNS */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:col-span-2">
           <Card className="p-5 rounded-xl">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -361,31 +361,35 @@ const Index = () => {
               </ul>
             )}
           </Card>
-        </section>
-
-        {/* TOP LEADS */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-lg font-semibold">Top opportunities</h2>
-              <p className="text-xs text-muted-foreground">Highest-urgency employer leads ready for outreach</p>
-            </div>
+        </div>
           </div>
-          {leads.length === 0 ? (
-            <Card className="p-10 rounded-xl">
-              <EmptyState
-                icon={Briefcase}
-                title="No demand leads yet"
-                hint="After a discovery run, AI will structure raw signals into prioritized leads here."
-              />
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {leads.map((l) => (
-                <LeadCard key={l.id} lead={l} />
-              ))}
+
+          <aside className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Lead column</h2>
+                <p className="text-xs text-muted-foreground">Click a card to open the lead detail page</p>
+              </div>
+              <Button size="sm" variant="outline" asChild className="h-8">
+                <Link to="/leads">View all</Link>
+              </Button>
             </div>
-          )}
+            {leads.length === 0 ? (
+              <Card className="p-6 rounded-xl">
+                <EmptyState
+                  icon={Briefcase}
+                  title="No demand leads yet"
+                  hint="After a discovery run, AI will structure raw signals into prioritized leads here."
+                />
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {leads.slice(0, 4).map((l) => (
+                  <LeadCard key={l.id} lead={l} />
+                ))}
+              </div>
+            )}
+          </aside>
         </section>
       </div>
     </div>
