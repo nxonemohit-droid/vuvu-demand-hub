@@ -106,7 +106,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LayoutGrid, List, ArrowUpRight } from "lucide-react";
+import { LayoutGrid, List, ArrowUpRight, ArrowLeft } from "lucide-react";
 import { LeadCard } from "@/components/leads/LeadCard";
 
 type RawLead = {
@@ -620,6 +620,12 @@ const Leads = () => {
       <div className="border-b bg-background/60 backdrop-blur sticky top-0 z-20">
         <div className="px-6 lg:px-8 py-5 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-1"
+            >
+              <ArrowLeft className="h-3 w-3" /> Dashboard
+            </Link>
             <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
               <Briefcase className="h-3.5 w-3.5 text-accent" />
               Lead search
