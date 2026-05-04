@@ -507,20 +507,89 @@ export default function LeadDetail() {
         {/* Activity */}
         <Card className="p-5 rounded-xl">
           <SectionTitle icon={<Activity className="h-4 w-4 text-muted-foreground" />}>
-            Activity
+            Contact log
           </SectionTitle>
-          <div className="mt-3 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2 py-3 border-l-2 border-border pl-3 ml-1">
-              <span>
-                Lead created on{" "}
-                <span className="text-foreground">
+
+          {/* Add entry */}
+          <div className="mt-3 space-y-2">
+            <div className="flex gap-2">
+              <Select value={newChannel} onValueChange={setNewChannel}>
+                <SelectTrigger className="w-36 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CHANNEL_OPTIONS.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      <span className="inline-flex items-center gap-2">
+                        {channelIcon(c.value)} {c.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={addLogEntry}
+                disabled={savingLog || !newNote.trim()}
+                className="ml-auto"
+              >
+                {savingLog ? "Saving…" : "Add entry"}
+              </Button>
+            </div>
+            <Textarea
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="What happened? (e.g. Sent intro email, left voicemail, scheduled call for Friday)"
+              rows={2}
+              className="text-sm"
+            />
+          </div>
+
+          <Separator className="my-4" />
+
+          {/* Timeline */}
+          <div className="space-y-0">
+            {logLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : logEntries.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-2">
+                No log entries yet. Lead created on{" "}
+                <span className="text-foreground not-italic">
                   {new Date(lead.created_at).toLocaleString("en-GB")}
                 </span>
-              </span>
-            </div>
-            <p className="mt-2 text-xs italic">
-              Notes and status changes will appear here as your team works this lead.
-            </p>
+                .
+              </p>
+            ) : (
+              <ol className="relative border-l-2 border-border ml-2 space-y-4 pl-4">
+                {logEntries.map((entry) => (
+                  <li key={entry.id} className="relative">
+                    <span className="absolute -left-[1.4rem] top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-card border text-primary">
+                      {channelIcon(entry.channel)}
+                    </span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="secondary" className="capitalize text-[10px] py-0">
+                        {entry.channel}
+                      </Badge>
+                      <span>{new Date(entry.created_at).toLocaleString("en-GB")}</span>
+                    </div>
+                    <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">
+                      {entry.note}
+                    </p>
+                  </li>
+                ))}
+                <li className="relative">
+                  <span className="absolute -left-[1.4rem] top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-muted border text-muted-foreground">
+                    <Sparkle className="h-3 w-3" />
+                  </span>
+                  <div className="text-xs text-muted-foreground">
+                    Lead created · {new Date(lead.created_at).toLocaleString("en-GB")}
+                  </div>
+                </li>
+              </ol>
+            )}
           </div>
         </Card>
       </div>
