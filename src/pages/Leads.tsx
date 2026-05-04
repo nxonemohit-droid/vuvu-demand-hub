@@ -1098,7 +1098,7 @@ const Leads = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((l, i) => (
+                  {visibleLeads.map((l, i) => (
                     <TableRow
                       key={l.id}
                       className={`cursor-pointer hover:bg-muted/50 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
