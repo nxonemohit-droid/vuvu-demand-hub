@@ -1,6 +1,8 @@
 // CSV / JSON exporters for demand leads.
-// CSV is a flat row per lead with the most useful fields (incl. enrichment).
+// CSV uses papaparse with the canonical Voynova column set so downstream
+// CRMs / spreadsheets always get a predictable shape.
 // JSON is the full enriched object so downstream tooling can use everything.
+import Papa from "papaparse";
 
 type AnyLead = Record<string, unknown> & {
   id: string;
@@ -22,6 +24,7 @@ type AnyLead = Record<string, unknown> & {
   worker_origin_focus?: string[] | null;
   demand_size?: number | null;
   created_at?: string;
+  notes?: string | null;
   enrichment?: {
     domain?: string | null;
     duplicate_count?: number;
@@ -30,44 +33,38 @@ type AnyLead = Record<string, unknown> & {
   };
 };
 
-const CSV_COLUMNS: { key: string; header: string; get: (l: AnyLead) => unknown }[] = [
-  { key: "id",            header: "ID",                   get: (l) => l.id },
-  { key: "employer_name", header: "Employer",             get: (l) => l.employer_name ?? "" },
-  { key: "role",          header: "Role",                 get: (l) => l.role ?? "" },
-  { key: "country",       header: "Country",              get: (l) => l.country ?? "" },
-  { key: "city",          header: "City",                 get: (l) => l.city ?? "" },
-  { key: "priority",      header: "Priority",             get: (l) => l.priority ?? "" },
-  { key: "score",         header: "Score",                get: (l) => l.computed_score ?? 0 },
-  { key: "urgency",       header: "Urgency",              get: (l) => l.urgency_score ?? 0 },
-  { key: "audience",      header: "Audience",             get: (l) => l.target_audience_type ?? "" },
-  { key: "sectors",       header: "Sectors",              get: (l) => (l.sector_tags ?? []).join("; ") },
-  { key: "worker_origin", header: "Worker source",        get: (l) => (l.worker_origin_focus ?? []).join("; ") },
-  { key: "demand_size",   header: "Demand size",          get: (l) => l.demand_size ?? "" },
-  { key: "contact_name",  header: "Contact name",         get: (l) => l.contact_name ?? "" },
-  { key: "contact_email", header: "Contact email",        get: (l) => l.contact_email ?? "" },
-  { key: "contact_phone", header: "Contact phone",        get: (l) => l.contact_phone ?? "" },
-  { key: "domain",        header: "Domain",               get: (l) => l.enrichment?.domain ?? "" },
-  { key: "website",       header: "Website",              get: (l) => l.website_url ?? "" },
-  { key: "linkedin",      header: "LinkedIn",             get: (l) => l.linkedin_url ?? "" },
-  { key: "source_url",    header: "Source URL",           get: (l) => l.source_url ?? "" },
-  { key: "extra_emails",  header: "Other emails",         get: (l) => (l.enrichment?.extra_emails ?? []).join("; ") },
-  { key: "email_guesses", header: "Likely emails (guess)", get: (l) => (l.enrichment?.email_patterns ?? []).slice(0, 6).join("; ") },
-  { key: "duplicates",    header: "Duplicates merged",    get: (l) => l.enrichment?.duplicate_count ?? 0 },
-  { key: "created_at",    header: "Created at",           get: (l) => l.created_at ?? "" },
+/**
+ * Canonical Voynova lead-export column set.
+ * Order is meaningful — keep stable so partner imports don't break.
+ */
+const CSV_COLUMNS: { header: string; get: (l: AnyLead) => unknown }[] = [
+  { header: "company",             get: (l) => l.employer_name ?? "" },
+  { header: "contact_name",        get: (l) => l.contact_name ?? "" },
+  { header: "role",                get: (l) => l.role ?? "" },
+  { header: "email",               get: (l) => l.contact_email ?? "" },
+  { header: "phone",               get: (l) => l.contact_phone ?? "" },
+  { header: "website",             get: (l) => l.website_url ?? "" },
+  { header: "linkedin",            get: (l) => l.linkedin_url ?? "" },
+  { header: "country",             get: (l) => l.country ?? "" },
+  { header: "city",                get: (l) => l.city ?? "" },
+  { header: "industry",            get: (l) => (l.sector_tags ?? []).join("; ") },
+  { header: "worker_origin_focus", get: (l) => (l.worker_origin_focus ?? []).join("; ") },
+  { header: "priority_score",      get: (l) => l.computed_score ?? l.urgency_score ?? 0 },
+  { header: "signal_date",         get: (l) => l.created_at ?? "" },
+  { header: "source_url",          get: (l) => l.source_url ?? "" },
+  { header: "notes",               get: (l) => l.notes ?? "" },
 ];
 
-function csvEscape(value: unknown): string {
-  if (value == null) return "";
-  const s = String(value);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
 export function leadsToCsv(leads: AnyLead[]): string {
-  const head = CSV_COLUMNS.map((c) => csvEscape(c.header)).join(",");
-  const rows = leads.map((l) => CSV_COLUMNS.map((c) => csvEscape(c.get(l))).join(","));
+  const fields = CSV_COLUMNS.map((c) => c.header);
+  const data = leads.map((l) => {
+    const row: Record<string, unknown> = {};
+    for (const c of CSV_COLUMNS) row[c.header] = c.get(l) ?? "";
+    return row;
+  });
+  const csv = Papa.unparse({ fields, data }, { quotes: true, newline: "\r\n" });
   // BOM so Excel treats UTF-8 correctly.
-  return "\uFEFF" + [head, ...rows].join("\r\n");
+  return "\uFEFF" + csv;
 }
 
 export function leadsToJson(leads: AnyLead[]): string {
