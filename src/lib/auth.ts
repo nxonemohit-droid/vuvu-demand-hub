@@ -26,6 +26,16 @@ export function useRoles() {
   const { user, loading: sessionLoading } = useSession();
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        setRefreshTick((t) => t + 1);
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (sessionLoading) return;
@@ -42,7 +52,7 @@ export function useRoles() {
         setRoles((data ?? []).map((r) => r.role as AppRole));
         setLoading(false);
       });
-  }, [user, sessionLoading]);
+  }, [user, sessionLoading, refreshTick]);
 
   return {
     user,
