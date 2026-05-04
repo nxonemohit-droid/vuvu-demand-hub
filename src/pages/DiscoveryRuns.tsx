@@ -95,6 +95,7 @@ const DiscoveryRuns = () => {
 
   return (
     <div className="p-6 md:p-8 space-y-6">
+      <QuotaBanner showRetry />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">Discovery Runs</h1>
