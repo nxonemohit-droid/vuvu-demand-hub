@@ -1007,6 +1007,27 @@ const Leads = () => {
         )}
 
         {/* Table */}
+        {viewMode === "cards" ? (
+          <div>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-44 rounded-xl" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <Card className="p-12 text-center text-sm text-muted-foreground rounded-xl">
+                No leads match your filters. Try clearing some chips or turning off Recruiter Mode.
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filtered.map((l) => (
+                  <LeadCard key={l.id} lead={l} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
         <Card className="rounded-xl overflow-hidden">
           {loading ? (
             <div className="p-6 space-y-3">
