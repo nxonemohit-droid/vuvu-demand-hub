@@ -282,10 +282,9 @@ const Index = () => {
               </div>
             )}
           </Card>
-        </section>
 
         {/* COUNTRY + RUNS */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:col-span-2">
           <Card className="p-5 rounded-xl">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -362,6 +361,7 @@ const Index = () => {
               </ul>
             )}
           </Card>
+        </div>
           </div>
 
           <aside className="space-y-3">
