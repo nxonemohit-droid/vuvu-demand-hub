@@ -37,6 +37,7 @@ const Index = () => {
   const [showAllLeads, setShowAllLeads] = useState(false);
   const [leadQuery, setLeadQuery] = useState("");
   const [allLeads, setAllLeads] = useState<{country: string; source: string; priority: string; created_at: string}[]>([]);
+  const [funnel, setFunnel] = useState({ total: 0, contacted: 0, in_progress: 0, converted: 0 });
 
   const loadAll = async () => {
     const [leadsCount, high, candidates, signals, runsRes, leadsRes, allLeadsRes] = await Promise.all([
@@ -55,6 +56,18 @@ const Index = () => {
     setRuns((runsRes.data ?? []) as RunRow[]);
     setLeads(enrichMany(((leadsRes.data ?? []) as unknown) as RawLead[]));
     setAllLeads((allLeadsRes.data ?? []) as any);
+    // Funnel counts from lead_crm
+    const [contactedRes, inProgressRes, convertedRes] = await Promise.all([
+      supabase.from("lead_crm").select("id", { count: "exact", head: true }).eq("status", "contacted"),
+      supabase.from("lead_crm").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
+      supabase.from("lead_crm").select("id", { count: "exact", head: true }).eq("status", "converted"),
+    ]);
+    setFunnel({
+      total: leadsCount.count ?? 0,
+      contacted: contactedRes.count ?? 0,
+      in_progress: inProgressRes.count ?? 0,
+      converted: convertedRes.count ?? 0,
+    });
   };
 
   useEffect(() => { loadAll(); }, []);
@@ -364,6 +377,18 @@ const Index = () => {
               </ul>
             )}
           </Card>
+
+          {/* PIPELINE FUNNEL */}
+          <Card className="p-5 rounded-xl lg:col-span-3">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-semibold">Pipeline funnel</h2>
+                <p className="text-xs text-muted-foreground">Lead progression through CRM stages</p>
+              </div>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <FunnelStrip funnel={funnel} />
+          </Card>
         </div>
           </div>
 
@@ -495,6 +520,42 @@ const StatusBadge = ({ status }: { status: string }) => {
 const EmptyMini = ({ label }: { label: string }) => (
   <div className="h-full grid place-items-center text-xs text-muted-foreground">{label}</div>
 );
+
+const FunnelStrip = ({
+  funnel,
+}: {
+  funnel: { total: number; contacted: number; in_progress: number; converted: number };
+}) => {
+  const stages = [
+    { key: "total", label: "Total Leads", value: funnel.total, tone: "bg-primary/10 text-primary border-primary/30" },
+    { key: "contacted", label: "Contacted", value: funnel.contacted, tone: "bg-accent/10 text-accent border-accent/30" },
+    { key: "in_progress", label: "In Progress", value: funnel.in_progress, tone: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
+    { key: "converted", label: "Converted", value: funnel.converted, tone: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
+  ];
+  const max = Math.max(1, ...stages.map((s) => s.value));
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {stages.map((s, i) => {
+        const pct = Math.round((s.value / max) * 100);
+        const conv = i > 0 && stages[0].value > 0
+          ? Math.round((s.value / stages[0].value) * 100)
+          : null;
+        return (
+          <div key={s.key} className={`rounded-xl border p-4 ${s.tone}`}>
+            <div className="text-xs uppercase tracking-wide opacity-80">{s.label}</div>
+            <div className="text-3xl font-semibold tabular-nums mt-1">{s.value}</div>
+            <div className="mt-2 h-1.5 rounded-full bg-foreground/10 overflow-hidden">
+              <div className="h-full bg-current opacity-70" style={{ width: `${pct}%` }} />
+            </div>
+            {conv != null && (
+              <div className="text-[11px] mt-1 opacity-80">{conv}% of total</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const EmptyState = ({ icon: Icon, title, hint }: { icon: any; title: string; hint: string }) => (
   <div className="text-center py-6">
