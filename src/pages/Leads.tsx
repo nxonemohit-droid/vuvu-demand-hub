@@ -1237,8 +1237,6 @@ function buildOutreachTemplate(lead: Lead): { subject: string; body: string } {
   return { subject, body };
 }
 
-function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () => void }) {
-
 function ContactIcon({
   href,
   external,
