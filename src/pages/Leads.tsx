@@ -116,6 +116,28 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LayoutGrid, List, ArrowUpRight, ArrowLeft } from "lucide-react";
 import { LeadCard } from "@/components/leads/LeadCard";
+import {
+  classifyRoleType,
+  extractDomain,
+  getFreshness,
+  getTrustTier,
+  TRUST_RANK,
+  type TrustTier,
+  type RoleType,
+} from "@/lib/lead-classifiers";
+import { useHotkeys } from "@/hooks/use-hotkeys";
+import {
+  BarChart as RBarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { BarChart3, GitCompareArrows, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 type RawLead = {
   id: string;
