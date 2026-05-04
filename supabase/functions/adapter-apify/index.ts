@@ -158,6 +158,22 @@ Deno.serve(async (req) => {
     const { items, apifyRunId } = await runApifyActor(actorId, input, timeoutMs);
     await logRunEvent(supa, job.id, "actor.done", `Got ${items.length} items`, { apifyRunId });
 
+    // Best-effort fetch of run cost from Apify so we can track $/lead and
+    // per-source budget. Failures here must not fail the whole job.
+    let costUsd: number | null = null;
+    if (apifyRunId) {
+      try {
+        const rr = await fetch(
+          `https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${APIFY_TOKEN}`,
+        );
+        if (rr.ok) {
+          const rj = await rr.json();
+          const u = rj?.data?.usageTotalUsd;
+          if (typeof u === "number") costUsd = u;
+        }
+      } catch (_) { /* swallow */ }
+    }
+
     const legacy = legacySourceForRegistryId(source.id);
     let inserted = 0;
     for (const it of items.slice(0, 80)) {
@@ -185,9 +201,20 @@ Deno.serve(async (req) => {
       apify_run_id: apifyRunId,
       items_found: items.length,
       items_structured: inserted,
+      cost_usd: costUsd,
       finished_at: new Date().toISOString(),
     }).eq("id", job.id);
-    await logRunEvent(supa, job.id, "signals.persisted", `Inserted ${inserted}`, { items: items.length });
+    await logRunEvent(supa, job.id, "signals.persisted", `Inserted ${inserted}`, { items: items.length, cost_usd: costUsd });
+
+    // Increment per-source monthly spend so the dispatcher can pause sources
+    // that have burnt their slice of the budget.
+    if (costUsd && costUsd > 0) {
+      const newSpend = Number(source.monthly_spend_usd ?? 0) + costUsd;
+      await supa.from("source_registry").update({
+        monthly_spend_usd: newSpend,
+        updated_at: new Date().toISOString(),
+      }).eq("id", source.id);
+    }
 
     return jsonResponse({ ok: true, items: items.length, inserted });
   } catch (e) {
