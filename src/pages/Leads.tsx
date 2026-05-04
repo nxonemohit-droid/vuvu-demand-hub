@@ -544,7 +544,7 @@ const Leads = () => {
           </div>
 
           {/* Filter rows */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
             <MultiFilter
               label="Target audience"
               icon={<Filter className="h-3.5 w-3.5" />}
@@ -573,6 +573,70 @@ const Leads = () => {
               selected={filters.sectors}
               onChange={(v) => setFilters({ ...filters, sectors: v })}
             />
+            <MultiFilter
+              label="Company size"
+              icon={<Users className="h-3.5 w-3.5" />}
+              options={COMPANY_SIZE_OPTIONS}
+              selected={filters.sizes}
+              onChange={(v) => setFilters({ ...filters, sizes: v })}
+            />
+          </div>
+
+          {/* Score slider + date range */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-1">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1.5">
+                  <Gauge className="h-3.5 w-3.5" />
+                  Min priority score
+                </Label>
+                <span className="text-xs font-medium text-foreground">
+                  {filters.minScore > 0 ? `≥ ${filters.minScore}` : "Any"}
+                </span>
+              </div>
+              <Slider
+                value={[filters.minScore]}
+                min={0}
+                max={100}
+                step={5}
+                onValueChange={(v) => setFilters({ ...filters, minScore: v[0] ?? 0 })}
+              />
+            </div>
+
+            <DateRangeFilter
+              from={filters.dateFrom}
+              to={filters.dateTo}
+              onChange={(from, to) => setFilters({ ...filters, dateFrom: from, dateTo: to })}
+            />
+
+            <div className="flex flex-wrap items-end gap-2 lg:justify-end">
+              {[7, 30, 90].map((d) => (
+                <Button
+                  key={d}
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setFilters({
+                      ...filters,
+                      dateFrom: new Date(Date.now() - d * 24 * 3600 * 1000)
+                        .toISOString()
+                        .slice(0, 10),
+                      dateTo: null,
+                    })
+                  }
+                >
+                  Last {d}d
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setFilters({ ...filters, dateFrom: null, dateTo: null })}
+                disabled={!filters.dateFrom && !filters.dateTo}
+              >
+                Clear dates
+              </Button>
+            </div>
           </div>
 
           {/* Contact requirement chips */}
