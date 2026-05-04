@@ -100,6 +100,7 @@ type RawLead = {
   contact_phone: string | null;
   source_url: string | null;
   created_at: string;
+  demand_size: number | null;
   worker_origin_focus: string[] | null;
   target_audience_type: string | null;
   sector_tags: string[] | null;
@@ -286,7 +287,7 @@ const Leads = () => {
       supabase
         .from("demand_leads")
         .select(
-          "id,employer_name,role,country,city,priority,score,urgency_score,contact_email,contact_name,contact_phone,source_url,created_at,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)",
+          "id,employer_name,role,country,city,priority,score,urgency_score,contact_email,contact_name,contact_phone,source_url,created_at,demand_size,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)",
         )
         .order("urgency_score", { ascending: false })
         .limit(2000),
@@ -404,6 +405,12 @@ const Leads = () => {
           const ai = (a.sector_tags ?? [])[0] ?? "";
           const bi = (b.sector_tags ?? [])[0] ?? "";
           return ai.localeCompare(bi);
+        }
+        case "demand": {
+          const ad = a.demand_size ?? 0;
+          const bd = b.demand_size ?? 0;
+          if (ad !== bd) return bd - ad;
+          return (b.urgency_score ?? 0) - (a.urgency_score ?? 0);
         }
         case "priority":
         default: {
