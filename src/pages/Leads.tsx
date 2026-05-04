@@ -28,6 +28,21 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Briefcase,
@@ -42,7 +57,27 @@ import {
   Building2,
   Calendar,
   Tag,
+  Sparkles,
+  Bookmark,
+  X,
+  ChevronDown,
+  Filter,
+  Save,
+  Trash2,
 } from "lucide-react";
+import {
+  TARGET_AUDIENCE_OPTIONS,
+  SECTOR_OPTIONS,
+  TARGET_COUNTRIES,
+  WORKER_ORIGINS,
+  SORT_OPTIONS,
+  BUILTIN_PRESETS,
+  RECRUITER_MODE_FILTERS,
+  EMPTY_FILTERS,
+  type LeadFilters,
+  type SortKey,
+  type ContactRequirement,
+} from "@/lib/lead-taxonomies";
 
 type RawLead = {
   id: string;
@@ -58,10 +93,13 @@ type RawLead = {
   contact_phone: string | null;
   source_url: string | null;
   created_at: string;
+  worker_origin_focus: string[] | null;
+  target_audience_type: string | null;
+  sector_tags: string[] | null;
   raw_signals: { payload: Record<string, unknown> | null } | null;
 };
 
-type Lead = RawLead & { linkedin_url: string | null };
+type Lead = RawLead & { linkedin_url: string | null; website_url: string | null };
 
 const PRIORITY_STYLES: Record<string, string> = {
   high: "bg-destructive/10 text-destructive border-destructive/30",
@@ -69,31 +107,44 @@ const PRIORITY_STYLES: Record<string, string> = {
   low: "bg-muted text-muted-foreground border-border",
 };
 
+const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+const SAVED_PRESETS_KEY = "voynova.leads.savedPresets.v1";
+const RECRUITER_MODE_KEY = "voynova.leads.recruiterMode.v1";
+
 function pickLinkedIn(lead: RawLead): string | null {
-  if (lead.source_url && /linkedin\.com\//i.test(lead.source_url)) {
-    return lead.source_url;
-  }
+  if (lead.source_url && /linkedin\.com\//i.test(lead.source_url)) return lead.source_url;
   const payload = lead.raw_signals?.payload;
   if (!payload || typeof payload !== "object") return null;
-
-  const candidateKeys = [
-    "linkedin_url",
-    "linkedinUrl",
-    "linkedin",
-    "company_linkedin",
-    "companyLinkedin",
-    "employer_linkedin",
-  ];
-  for (const key of candidateKeys) {
+  const candidates = ["linkedin_url","linkedinUrl","linkedin","company_linkedin","companyLinkedin","employer_linkedin"];
+  for (const key of candidates) {
     const v = (payload as Record<string, unknown>)[key];
     if (typeof v === "string" && v.includes("linkedin.com")) return v;
   }
-  // Shallow scan of nested objects/strings for any linkedin.com URL
   for (const v of Object.values(payload)) {
-    if (typeof v === "string" && /https?:\/\/[^\s"']*linkedin\.com\/[^\s"']+/i.test(v)) {
-      const match = v.match(/https?:\/\/[^\s"']*linkedin\.com\/[^\s"']+/i);
-      if (match) return match[0];
+    if (typeof v === "string") {
+      const m = v.match(/https?:\/\/[^\s"']*linkedin\.com\/[^\s"']+/i);
+      if (m) return m[0];
     }
+  }
+  return null;
+}
+
+function pickWebsite(lead: RawLead): string | null {
+  const payload = lead.raw_signals?.payload as Record<string, unknown> | null | undefined;
+  if (payload) {
+    for (const key of ["website","company_website","companyWebsite","website_url","employer_website","url"]) {
+      const v = payload[key];
+      if (typeof v === "string" && /^https?:\/\//i.test(v) && !/linkedin\.com|facebook\.com|indeed\.com/i.test(v)) {
+        return v;
+      }
+    }
+  }
+  if (
+    lead.source_url &&
+    !/linkedin\.com|facebook\.com|indeed\.com|google\.com/i.test(lead.source_url)
+  ) {
+    return lead.source_url;
   }
   return null;
 }
@@ -104,13 +155,10 @@ function collectUrls(payload: Record<string, unknown> | null | undefined): strin
   const walk = (v: unknown) => {
     if (!v) return;
     if (typeof v === "string") {
-      const matches = v.match(/https?:\/\/[^\s"'<>)]+/gi);
-      if (matches) matches.forEach((m) => urls.add(m));
-    } else if (Array.isArray(v)) {
-      v.forEach(walk);
-    } else if (typeof v === "object") {
-      Object.values(v as Record<string, unknown>).forEach(walk);
-    }
+      const m = v.match(/https?:\/\/[^\s"'<>)]+/gi);
+      if (m) m.forEach((x) => urls.add(x));
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (typeof v === "object") Object.values(v as Record<string, unknown>).forEach(walk);
   };
   walk(payload);
   return Array.from(urls);
@@ -124,24 +172,61 @@ function collectEmails(payload: Record<string, unknown> | null | undefined): str
     if (typeof v === "string") {
       const m = v.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
       if (m) m.forEach((e) => emails.add(e));
-    } else if (Array.isArray(v)) {
-      v.forEach(walk);
-    } else if (typeof v === "object") {
-      Object.values(v as Record<string, unknown>).forEach(walk);
-    }
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (typeof v === "object") Object.values(v as Record<string, unknown>).forEach(walk);
   };
   walk(payload);
   return Array.from(emails);
+}
+
+function audienceLabel(value: string | null): string {
+  if (!value) return "—";
+  return TARGET_AUDIENCE_OPTIONS.find((o) => o.value === value)?.label ?? value.replace(/_/g, " ");
+}
+
+function sectorLabel(value: string): string {
+  return SECTOR_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+type SavedPreset = { id: string; name: string; filters: LeadFilters };
+
+function loadSavedPresets(): SavedPreset[] {
+  try {
+    const raw = localStorage.getItem(SAVED_PRESETS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as SavedPreset[];
+  } catch {
+    return [];
+  }
 }
 
 const Leads = () => {
   const [loading, setLoading] = useState(true);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [search, setSearch] = useState("");
-  const [country, setCountry] = useState<string>("all");
-  const [priority, setPriority] = useState<string>("all");
+  const [filters, setFilters] = useState<LeadFilters>(() => {
+    try {
+      const wasRecruiter = localStorage.getItem(RECRUITER_MODE_KEY) === "1";
+      return wasRecruiter ? RECRUITER_MODE_FILTERS : EMPTY_FILTERS;
+    } catch {
+      return EMPTY_FILTERS;
+    }
+  });
   const [selected, setSelected] = useState<Lead | null>(null);
+  const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(loadSavedPresets);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [presetName, setPresetName] = useState("");
+
+  const recruiterMode = useMemo(
+    () =>
+      filters.workerOrigins.length === RECRUITER_MODE_FILTERS.workerOrigins.length &&
+      filters.audiences.length === RECRUITER_MODE_FILTERS.audiences.length &&
+      filters.sectors.length === RECRUITER_MODE_FILTERS.sectors.length &&
+      filters.countries.length === RECRUITER_MODE_FILTERS.countries.length,
+    [filters],
+  );
 
   const load = async () => {
     setLoading(true);
@@ -149,26 +234,27 @@ const Leads = () => {
       supabase
         .from("demand_leads")
         .select(
-          "id,employer_name,role,country,city,priority,score,urgency_score,contact_email,contact_name,contact_phone,source_url,created_at,raw_signals(payload)",
+          "id,employer_name,role,country,city,priority,score,urgency_score,contact_email,contact_name,contact_phone,source_url,created_at,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)",
         )
         .order("urgency_score", { ascending: false })
-        .limit(1000),
+        .limit(2000),
       supabase.from("demand_leads").select("id", { count: "exact", head: true }),
     ]);
     if (error) {
       console.error(error);
+      toast.error("Failed to load leads");
       setLoading(false);
       return;
     }
-    const enriched: Lead[] = (data ?? []).map((l) => ({
-      ...(l as unknown as RawLead),
-      linkedin_url: pickLinkedIn(l as unknown as RawLead),
-    }));
-    // Keep only leads with at least one of: email, phone, linkedin
-    const contactable = enriched.filter(
-      (l) => l.contact_email || l.contact_phone || l.linkedin_url,
-    );
-    setAllLeads(contactable);
+    const enriched: Lead[] = (data ?? []).map((l) => {
+      const raw = l as unknown as RawLead;
+      return {
+        ...raw,
+        linkedin_url: pickLinkedIn(raw),
+        website_url: pickWebsite(raw),
+      };
+    });
+    setAllLeads(enriched);
     setTotalCount(countRes.count ?? 0);
     setLoading(false);
   };
@@ -177,234 +263,662 @@ const Leads = () => {
     load();
   }, []);
 
-  const countries = useMemo(() => {
-    return Array.from(new Set(allLeads.map((l) => l.country).filter(Boolean))).sort();
-  }, [allLeads]);
+  // persist recruiter mode
+  useEffect(() => {
+    try {
+      localStorage.setItem(RECRUITER_MODE_KEY, recruiterMode ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [recruiterMode]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return allLeads.filter((l) => {
-      if (country !== "all" && l.country !== country) return false;
-      if (priority !== "all" && l.priority !== priority) return false;
-      if (!q) return true;
-      return (
-        l.employer_name?.toLowerCase().includes(q) ||
-        l.role?.toLowerCase().includes(q) ||
-        l.city?.toLowerCase().includes(q) ||
-        l.contact_email?.toLowerCase().includes(q)
-      );
+    const q = filters.search.trim().toLowerCase();
+    const out = allLeads.filter((l) => {
+      if (filters.countries.length && !filters.countries.includes(l.country)) return false;
+      if (filters.audiences.length) {
+        if (!l.target_audience_type || !filters.audiences.includes(l.target_audience_type))
+          return false;
+      }
+      if (filters.workerOrigins.length) {
+        const focus = l.worker_origin_focus ?? [];
+        if (!focus.some((w) => filters.workerOrigins.includes(w))) return false;
+      }
+      if (filters.sectors.length) {
+        const tags = l.sector_tags ?? [];
+        if (!tags.some((t) => filters.sectors.includes(t))) return false;
+      }
+      for (const req of filters.contactReq) {
+        if (req === "email" && !l.contact_email) return false;
+        if (req === "phone" && !l.contact_phone) return false;
+        if (req === "website" && !l.website_url) return false;
+      }
+      if (q) {
+        const hay = [
+          l.employer_name,
+          l.role,
+          l.city,
+          l.country,
+          l.contact_email,
+          l.contact_name,
+          l.target_audience_type,
+          (l.sector_tags ?? []).join(" "),
+          (l.worker_origin_focus ?? []).join(" "),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
     });
-  }, [allLeads, search, country, priority]);
+
+    const sorted = [...out].sort((a, b) => {
+      switch (filters.sort) {
+        case "recency":
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case "country":
+          return (a.country ?? "").localeCompare(b.country ?? "");
+        case "industry": {
+          const ai = (a.sector_tags ?? [])[0] ?? "";
+          const bi = (b.sector_tags ?? [])[0] ?? "";
+          return ai.localeCompare(bi);
+        }
+        case "priority":
+        default: {
+          const ar = PRIORITY_RANK[a.priority] ?? 9;
+          const br = PRIORITY_RANK[b.priority] ?? 9;
+          if (ar !== br) return ar - br;
+          return (b.urgency_score ?? 0) - (a.urgency_score ?? 0);
+        }
+      }
+    });
+    return sorted;
+  }, [allLeads, filters]);
+
+  const activeChipCount =
+    filters.countries.length +
+    filters.audiences.length +
+    filters.workerOrigins.length +
+    filters.sectors.length +
+    filters.contactReq.length +
+    (filters.search ? 1 : 0);
+
+  const toggleRecruiterMode = (on: boolean) => {
+    setFilters(on ? RECRUITER_MODE_FILTERS : EMPTY_FILTERS);
+  };
+
+  const applyPreset = (p: { filters: LeadFilters }) => {
+    setFilters(p.filters);
+    toast.success("Preset applied");
+  };
+
+  const savePreset = () => {
+    const name = presetName.trim();
+    if (!name) {
+      toast.error("Give the preset a name");
+      return;
+    }
+    const next: SavedPreset = { id: crypto.randomUUID(), name, filters };
+    const updated = [next, ...savedPresets];
+    setSavedPresets(updated);
+    try {
+      localStorage.setItem(SAVED_PRESETS_KEY, JSON.stringify(updated));
+    } catch {
+      /* ignore */
+    }
+    setPresetName("");
+    setSaveOpen(false);
+    toast.success(`Saved "${name}"`);
+  };
+
+  const deletePreset = (id: string) => {
+    const updated = savedPresets.filter((p) => p.id !== id);
+    setSavedPresets(updated);
+    try {
+      localStorage.setItem(SAVED_PRESETS_KEY, JSON.stringify(updated));
+    } catch {
+      /* ignore */
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
-      <div className="border-b bg-background/60 backdrop-blur">
-        <div className="px-8 py-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+      <div className="border-b bg-background/60 backdrop-blur sticky top-0 z-20">
+        <div className="px-6 lg:px-8 py-5 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
               <Briefcase className="h-3.5 w-3.5 text-accent" />
-              Leads with contact info
+              Lead search
             </div>
-            <h1 className="text-3xl font-bold mt-1">Reachable Leads</h1>
+            <h1 className="text-3xl font-bold mt-1">Leads</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Showing leads with at least one of: email, phone, or LinkedIn URL.{" "}
-              <span className="font-medium text-foreground">
-                {allLeads.length}
-              </span>{" "}
-              of {totalCount} total leads are reachable.
+              <span className="font-medium text-foreground">{filtered.length}</span> of{" "}
+              {allLeads.length} loaded · {totalCount} total in database
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={load}>
-            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+              <Sparkles
+                className={`h-4 w-4 ${recruiterMode ? "text-accent" : "text-muted-foreground"}`}
+              />
+              <Label htmlFor="recruiter-mode" className="text-sm cursor-pointer">
+                Recruiter Mode
+              </Label>
+              <Switch
+                id="recruiter-mode"
+                checked={recruiterMode}
+                onCheckedChange={toggleRecruiterMode}
+              />
+            </div>
+            <Button size="sm" variant="outline" onClick={load}>
+              <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="p-8 space-y-4">
-        <Card className="p-4 rounded-xl">
-          <div className="flex flex-col md:flex-row gap-3">
+      <div className="p-6 lg:p-8 space-y-4">
+        {/* Search + sort + presets */}
+        <Card className="p-4 rounded-xl space-y-4">
+          <div className="flex flex-col lg:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search employer, role, city, email…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search employer, role, city, sector, contact…"
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                 className="pl-9"
               />
             </div>
-            <Select value={country} onValueChange={setCountry}>
-              <SelectTrigger className="md:w-48">
-                <SelectValue placeholder="Country" />
+            <Select
+              value={filters.sort}
+              onValueChange={(v) => setFilters({ ...filters, sort: v as SortKey })}
+            >
+              <SelectTrigger className="lg:w-56">
+                <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All countries</SelectItem>
-                {countries.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
+                {SORT_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={priority} onValueChange={setPriority}>
-              <SelectTrigger className="md:w-40">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All priorities</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-              </SelectContent>
-            </Select>
+            <Button variant="outline" onClick={() => setSaveOpen(true)} disabled={!activeChipCount}>
+              <Save className="h-4 w-4 mr-2" /> Save preset
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              disabled={!activeChipCount}
+            >
+              <X className="h-4 w-4 mr-2" /> Clear
+            </Button>
+          </div>
+
+          {/* Filter rows */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <MultiFilter
+              label="Target audience"
+              icon={<Filter className="h-3.5 w-3.5" />}
+              options={TARGET_AUDIENCE_OPTIONS}
+              selected={filters.audiences}
+              onChange={(v) => setFilters({ ...filters, audiences: v })}
+            />
+            <MultiFilter
+              label="Country"
+              icon={<MapPin className="h-3.5 w-3.5" />}
+              options={TARGET_COUNTRIES.map((c) => ({ value: c, label: c }))}
+              selected={filters.countries}
+              onChange={(v) => setFilters({ ...filters, countries: v })}
+            />
+            <MultiFilter
+              label="Worker source"
+              icon={<Globe className="h-3.5 w-3.5" />}
+              options={WORKER_ORIGINS.map((c) => ({ value: c, label: c }))}
+              selected={filters.workerOrigins}
+              onChange={(v) => setFilters({ ...filters, workerOrigins: v })}
+            />
+            <MultiFilter
+              label="Industry / sector"
+              icon={<Tag className="h-3.5 w-3.5" />}
+              options={SECTOR_OPTIONS}
+              selected={filters.sectors}
+              onChange={(v) => setFilters({ ...filters, sectors: v })}
+            />
+          </div>
+
+          {/* Contact requirement chips */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider mr-1">
+              Has
+            </span>
+            {(["email", "phone", "website"] as ContactRequirement[]).map((req) => {
+              const on = filters.contactReq.includes(req);
+              return (
+                <button
+                  key={req}
+                  type="button"
+                  onClick={() => {
+                    const next = on
+                      ? filters.contactReq.filter((r) => r !== req)
+                      : [...filters.contactReq, req];
+                    setFilters({ ...filters, contactReq: next });
+                  }}
+                  className={`text-xs px-3 py-1.5 rounded-full border capitalize transition ${
+                    on
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card hover:bg-muted border-border"
+                  }`}
+                >
+                  {req === "email" && <Mail className="h-3 w-3 mr-1 inline" />}
+                  {req === "phone" && <Phone className="h-3 w-3 mr-1 inline" />}
+                  {req === "website" && <Globe className="h-3 w-3 mr-1 inline" />}
+                  {req}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Preset row */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider mr-1 inline-flex items-center gap-1">
+              <Bookmark className="h-3 w-3" /> Presets
+            </span>
+            {BUILTIN_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => applyPreset(p)}
+                className="text-xs px-3 py-1.5 rounded-full border bg-card hover:bg-muted hover:border-accent transition"
+              >
+                {p.name}
+              </button>
+            ))}
+            {savedPresets.map((p) => (
+              <span
+                key={p.id}
+                className="inline-flex items-center gap-1 text-xs rounded-full border bg-accent/5 border-accent/30 overflow-hidden"
+              >
+                <button
+                  onClick={() => applyPreset(p)}
+                  className="px-3 py-1.5 hover:bg-accent/10 transition"
+                >
+                  ★ {p.name}
+                </button>
+                <button
+                  onClick={() => deletePreset(p.id)}
+                  className="px-2 py-1.5 hover:bg-destructive/10 hover:text-destructive transition"
+                  aria-label={`Delete ${p.name}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
           </div>
         </Card>
 
+        {/* Active filter chips */}
+        {activeChipCount > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {filters.countries.map((c) => (
+              <ActiveChip
+                key={`c-${c}`}
+                label={c}
+                onClear={() =>
+                  setFilters({ ...filters, countries: filters.countries.filter((x) => x !== c) })
+                }
+              />
+            ))}
+            {filters.audiences.map((a) => (
+              <ActiveChip
+                key={`a-${a}`}
+                label={audienceLabel(a)}
+                onClear={() =>
+                  setFilters({ ...filters, audiences: filters.audiences.filter((x) => x !== a) })
+                }
+              />
+            ))}
+            {filters.workerOrigins.map((w) => (
+              <ActiveChip
+                key={`w-${w}`}
+                label={`From ${w}`}
+                onClear={() =>
+                  setFilters({
+                    ...filters,
+                    workerOrigins: filters.workerOrigins.filter((x) => x !== w),
+                  })
+                }
+              />
+            ))}
+            {filters.sectors.map((s) => (
+              <ActiveChip
+                key={`s-${s}`}
+                label={sectorLabel(s)}
+                onClear={() =>
+                  setFilters({ ...filters, sectors: filters.sectors.filter((x) => x !== s) })
+                }
+              />
+            ))}
+            {filters.contactReq.map((r) => (
+              <ActiveChip
+                key={`r-${r}`}
+                label={`Has ${r}`}
+                onClear={() =>
+                  setFilters({
+                    ...filters,
+                    contactReq: filters.contactReq.filter((x) => x !== r),
+                  })
+                }
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Table */}
         <Card className="rounded-xl overflow-hidden">
           {loading ? (
             <div className="p-6 space-y-3">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center text-sm text-muted-foreground">
-              No reachable leads match your filters.
+              No leads match your filters. Try clearing some chips or turning off Recruiter Mode.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employer</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>LinkedIn</TableHead>
-                  <TableHead>Source</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((l) => (
-                  <TableRow
-                    key={l.id}
-                    className="cursor-pointer hover:bg-muted/40"
-                    onClick={() => setSelected(l)}
-                  >
-                    <TableCell className="font-medium">
-                      {l.employer_name ?? "—"}
-                    </TableCell>
-                    <TableCell className="max-w-[220px] truncate" title={l.role}>
-                      {l.role}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {l.country}
-                      {l.city ? ` · ${l.city}` : ""}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`capitalize ${PRIORITY_STYLES[l.priority] ?? ""}`}
-                      >
-                        {l.priority}
-                      </Badge>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {l.contact_email ? (
-                        <a
-                          href={`mailto:${l.contact_email}`}
-                          className="text-primary hover:underline inline-flex items-center gap-1"
-                          title={l.contact_name ?? undefined}
-                        >
-                          <Mail className="h-3.5 w-3.5" />
-                          <span className="truncate max-w-[180px]">
-                            {l.contact_email}
-                          </span>
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {l.contact_phone ? (
-                        <a
-                          href={`tel:${l.contact_phone}`}
-                          className="text-primary hover:underline inline-flex items-center gap-1"
-                        >
-                          <Phone className="h-3.5 w-3.5" />
-                          {l.contact_phone}
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {l.linkedin_url ? (
-                        <a
-                          href={l.linkedin_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline inline-flex items-center gap-1"
-                        >
-                          <Linkedin className="h-3.5 w-3.5" />
-                          View
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {l.source_url ? (
-                        <a
-                          href={l.source_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-                          title={l.source_url}
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          Open
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-card z-10">
+                  <TableRow>
+                    <TableHead>Employer</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Audience</TableHead>
+                    <TableHead>Sectors</TableHead>
+                    <TableHead>Worker source</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead className="text-center">Contacts</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((l, i) => (
+                    <TableRow
+                      key={l.id}
+                      className={`cursor-pointer hover:bg-muted/50 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
+                      onClick={() => setSelected(l)}
+                    >
+                      <TableCell className="font-medium max-w-[200px] truncate" title={l.employer_name ?? ""}>
+                        {l.employer_name ?? "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[220px] truncate" title={l.role}>
+                        {l.role}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {l.country}
+                        {l.city ? ` · ${l.city}` : ""}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <span className="text-muted-foreground">
+                          {audienceLabel(l.target_audience_type)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {(l.sector_tags ?? []).slice(0, 3).map((t) => (
+                            <Badge
+                              key={t}
+                              variant="outline"
+                              className="text-[10px] py-0 px-1.5 h-5"
+                            >
+                              {sectorLabel(t)}
+                            </Badge>
+                          ))}
+                          {(l.sector_tags ?? []).length > 3 && (
+                            <span className="text-[10px] text-muted-foreground">
+                              +{(l.sector_tags ?? []).length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 max-w-[140px]">
+                          {(l.worker_origin_focus ?? []).map((w) => (
+                            <Badge
+                              key={w}
+                              variant="outline"
+                              className="text-[10px] py-0 px-1.5 h-5 bg-accent/10 text-accent border-accent/30"
+                            >
+                              {w}
+                            </Badge>
+                          ))}
+                          {!l.worker_origin_focus?.length && (
+                            <span className="text-[10px] text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`capitalize ${PRIORITY_STYLES[l.priority] ?? ""}`}
+                        >
+                          {l.priority}
+                        </Badge>
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <ContactIcon
+                            href={l.contact_email ? `mailto:${l.contact_email}` : null}
+                            title={l.contact_email ?? undefined}
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </ContactIcon>
+                          <ContactIcon
+                            href={l.contact_phone ? `tel:${l.contact_phone}` : null}
+                            title={l.contact_phone ?? undefined}
+                          >
+                            <Phone className="h-3.5 w-3.5" />
+                          </ContactIcon>
+                          <ContactIcon
+                            href={l.linkedin_url}
+                            external
+                            title={l.linkedin_url ?? undefined}
+                          >
+                            <Linkedin className="h-3.5 w-3.5" />
+                          </ContactIcon>
+                          <ContactIcon
+                            href={l.website_url}
+                            external
+                            title={l.website_url ?? undefined}
+                          >
+                            <Globe className="h-3.5 w-3.5" />
+                          </ContactIcon>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </Card>
       </div>
 
-      <LeadDetailDrawer
-        lead={selected}
-        onClose={() => setSelected(null)}
-      />
+      {/* Save preset dialog */}
+      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save current filters as preset</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            placeholder="e.g. Serbia construction agencies"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && savePreset()}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={savePreset}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <LeadDetailDrawer lead={selected} onClose={() => setSelected(null)} />
     </div>
   );
 };
 
 export default Leads;
 
-function LeadDetailDrawer({
-  lead,
-  onClose,
+function ContactIcon({
+  href,
+  external,
+  title,
+  children,
 }: {
-  lead: Lead | null;
-  onClose: () => void;
+  href: string | null;
+  external?: boolean;
+  title?: string;
+  children: React.ReactNode;
 }) {
+  if (!href) {
+    return (
+      <span
+        className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground/30 cursor-not-allowed"
+        aria-hidden
+      >
+        {children}
+      </span>
+    );
+  }
+  return (
+    <a
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener noreferrer" : undefined}
+      title={title}
+      className="inline-flex items-center justify-center w-7 h-7 rounded-md text-primary hover:bg-primary/10 transition"
+    >
+      {children}
+    </a>
+  );
+}
+
+function ActiveChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary border border-primary/30 rounded-full px-2.5 py-1">
+      {label}
+      <button onClick={onClear} className="hover:text-destructive">
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
+function MultiFilter({
+  label,
+  icon,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const visible = useMemo(
+    () =>
+      q.trim()
+        ? options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
+        : options,
+    [options, q],
+  );
+  const toggle = (v: string) =>
+    onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-full justify-between font-normal">
+          <span className="inline-flex items-center gap-2 text-sm truncate">
+            {icon}
+            {label}
+            {selected.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                {selected.length}
+              </Badge>
+            )}
+          </span>
+          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-0">
+        <div className="p-2 border-b">
+          <Input
+            placeholder={`Filter ${label.toLowerCase()}…`}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="h-8"
+          />
+        </div>
+        <ScrollArea className="max-h-64">
+          <div className="p-1">
+            {visible.length === 0 && (
+              <div className="px-3 py-4 text-sm text-muted-foreground text-center">No matches</div>
+            )}
+            {visible.map((o) => {
+              const on = selected.includes(o.value);
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => toggle(o.value)}
+                  className={`w-full text-left text-sm px-3 py-1.5 rounded-md flex items-center gap-2 hover:bg-muted ${
+                    on ? "text-primary font-medium" : ""
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+                      on ? "bg-primary border-primary text-primary-foreground" : "border-border"
+                    }`}
+                  >
+                    {on ? "✓" : ""}
+                  </span>
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </ScrollArea>
+        {selected.length > 0 && (
+          <div className="p-2 border-t flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">{selected.length} selected</span>
+            <Button size="sm" variant="ghost" onClick={() => onChange([])}>
+              Clear
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () => void }) {
   const open = !!lead;
-  const payload = (lead?.raw_signals?.payload ?? null) as
-    | Record<string, unknown>
-    | null;
+  const payload = (lead?.raw_signals?.payload ?? null) as Record<string, unknown> | null;
   const allEmails = lead
     ? Array.from(
         new Set(
-          [lead.contact_email, ...collectEmails(payload)].filter(
-            (e): e is string => !!e,
-          ),
+          [lead.contact_email, ...collectEmails(payload)].filter((e): e is string => !!e),
         ),
       )
     : [];
@@ -426,7 +940,6 @@ function LeadDetailDrawer({
             </SheetHeader>
             <ScrollArea className="flex-1">
               <div className="p-6 space-y-6">
-                {/* Extracted fields */}
                 <section>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                     Extracted fields
@@ -442,11 +955,17 @@ function LeadDetailDrawer({
                       label="Priority"
                       value={lead.priority}
                     />
-                    <Field label="Score" value={lead.score?.toString() ?? "—"} />
+                    <Field label="Audience" value={audienceLabel(lead.target_audience_type)} />
                     <Field
-                      label="Urgency"
-                      value={lead.urgency_score?.toString() ?? "0"}
+                      label="Sectors"
+                      value={(lead.sector_tags ?? []).map(sectorLabel).join(", ") || "—"}
                     />
+                    <Field
+                      label="Worker source"
+                      value={(lead.worker_origin_focus ?? []).join(", ") || "—"}
+                    />
+                    <Field label="Score" value={lead.score?.toString() ?? "—"} />
+                    <Field label="Urgency" value={lead.urgency_score?.toString() ?? "0"} />
                     <Field label="Contact name" value={lead.contact_name ?? "—"} />
                     <Field
                       icon={<Calendar className="h-3.5 w-3.5" />}
@@ -458,7 +977,6 @@ function LeadDetailDrawer({
 
                 <Separator />
 
-                {/* Contacts */}
                 <section>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                     Contact links
@@ -466,7 +984,8 @@ function LeadDetailDrawer({
                   <div className="space-y-2">
                     {allEmails.length === 0 &&
                       !lead.contact_phone &&
-                      linkedinUrls.length === 0 && (
+                      linkedinUrls.length === 0 &&
+                      !lead.website_url && (
                         <p className="text-sm text-muted-foreground">
                           No direct contact details found.
                         </p>
@@ -502,12 +1021,23 @@ function LeadDetailDrawer({
                         {u}
                       </a>
                     ))}
-                    {lead.source_url && (
+                    {lead.website_url && (
+                      <a
+                        href={lead.website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-foreground hover:underline break-all"
+                      >
+                        <Globe className="h-3.5 w-3.5 shrink-0" />
+                        {lead.website_url}
+                      </a>
+                    )}
+                    {lead.source_url && lead.source_url !== lead.website_url && (
                       <a
                         href={lead.source_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-foreground hover:underline break-all"
+                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground break-all"
                       >
                         <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                         {lead.source_url}
@@ -548,9 +1078,7 @@ function LeadDetailDrawer({
                     Raw payload
                   </h3>
                   <pre className="text-xs bg-muted/50 border rounded-lg p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">
-                    {payload
-                      ? JSON.stringify(payload, null, 2)
-                      : "No raw payload available."}
+                    {payload ? JSON.stringify(payload, null, 2) : "No raw payload available."}
                   </pre>
                 </section>
               </div>
@@ -577,7 +1105,7 @@ function Field({
         {icon}
         {label}
       </div>
-      <div className="font-medium capitalize-first break-words">{value}</div>
+      <div className="font-medium break-words">{value}</div>
     </div>
   );
 }
