@@ -104,6 +104,42 @@ export const RECRUITER_MODE_FILTERS: LeadFilters = {
 
 export const BUILTIN_PRESETS: { id: string; name: string; filters: LeadFilters }[] = [
   {
+    id: "hot-balkan-construction",
+    name: "🔥 Hot Balkan Construction",
+    filters: {
+      ...EMPTY_FILTERS,
+      countries: [...BALKAN_COUNTRIES],
+      sectors: ["construction"],
+      workerOrigins: [...WORKER_ORIGINS],
+      minScore: 70,
+      dateFrom: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+      sort: "demand",
+    },
+  },
+  {
+    id: "eu-hospitality-now",
+    name: "🛎️ EU Hospitality Hiring Now",
+    filters: {
+      ...EMPTY_FILTERS,
+      countries: ["Germany","Austria","Netherlands","Italy","Portugal","Greece","Cyprus","Malta"],
+      sectors: ["hospitality"],
+      workerOrigins: [...WORKER_ORIGINS],
+      minScore: 60,
+      dateFrom: new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+      sort: "recency",
+    },
+  },
+  {
+    id: "nepal-india-pipeline",
+    name: "🇳🇵🇮🇳 Nepal–India Pipeline",
+    filters: {
+      ...EMPTY_FILTERS,
+      countries: [...TARGET_COUNTRIES],
+      workerOrigins: ["Nepal", "India"],
+      sort: "demand",
+    },
+  },
+  {
     id: "balkans-construction",
     name: "Balkans · Construction",
     filters: { ...EMPTY_FILTERS, countries: [...BALKAN_COUNTRIES], sectors: ["construction"], sort: "priority" },
