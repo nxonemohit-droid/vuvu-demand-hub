@@ -55,6 +55,53 @@ export default function LeadDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [showJson, setShowJson] = useState(false);
+  const [logEntries, setLogEntries] = useState<ContactLogEntry[]>([]);
+  const [logLoading, setLogLoading] = useState(false);
+  const [newChannel, setNewChannel] = useState<string>("note");
+  const [newNote, setNewNote] = useState("");
+  const [savingLog, setSavingLog] = useState(false);
+
+  const loadLog = async () => {
+    if (!id) return;
+    setLogLoading(true);
+    const { data, error } = await supabase
+      .from("lead_contact_log")
+      .select("id, channel, note, created_at, user_id")
+      .eq("lead_id", id)
+      .order("created_at", { ascending: false });
+    if (!error) setLogEntries((data ?? []) as ContactLogEntry[]);
+    setLogLoading(false);
+  };
+
+  useEffect(() => {
+    loadLog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const addLogEntry = async () => {
+    const note = newNote.trim();
+    if (!note) {
+      toast.error("Add a note before saving");
+      return;
+    }
+    setSavingLog(true);
+    const { data: userData } = await supabase.auth.getUser();
+    const { error } = await supabase.from("lead_contact_log").insert({
+      lead_id: id,
+      channel: newChannel,
+      note,
+      user_id: userData.user?.id ?? null,
+    });
+    setSavingLog(false);
+    if (error) {
+      toast.error("Failed to save log entry");
+      return;
+    }
+    setNewNote("");
+    setNewChannel("note");
+    toast.success("Log entry saved");
+    loadLog();
+  };
 
   useEffect(() => {
     let cancelled = false;
