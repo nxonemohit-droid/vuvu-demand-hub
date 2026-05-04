@@ -195,6 +195,7 @@ const ActorHealth = () => {
   return (
     <div className="min-h-screen bg-muted/20 p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
+        <QuotaBanner />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <Link to="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2">
