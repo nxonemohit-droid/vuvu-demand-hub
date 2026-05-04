@@ -394,7 +394,13 @@ const Index = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {leads.map((l) => (
-                <Card key={l.id} className="p-5 rounded-xl hover:shadow-lg transition-shadow group">
+                <Link
+                  key={l.id}
+                  to={`/leads/${l.id}`}
+                  className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+                  aria-label={`Open lead ${l.employer_name ?? "Unknown employer"}`}
+                >
+                <Card className="p-5 rounded-xl hover:shadow-lg hover:border-primary/40 hover:-translate-y-0.5 transition-all group cursor-pointer">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-semibold truncate">{l.employer_name ?? "Unknown employer"}</div>
@@ -430,7 +436,13 @@ const Index = () => {
                         {l.contact_email && (
                           <div className="flex items-center gap-2 truncate">
                             <Mail className="h-3.5 w-3.5 text-accent shrink-0" />
-                            <a href={`mailto:${l.contact_email}`} className="truncate hover:underline">{l.contact_email}</a>
+                            <a
+                              href={`mailto:${l.contact_email}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="truncate hover:underline"
+                            >
+                              {l.contact_email}
+                            </a>
                           </div>
                         )}
                         {l.contact_phone && (
@@ -442,6 +454,7 @@ const Index = () => {
                         {l.source_url && (
                           <a
                             href={l.source_url} target="_blank" rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                             className="flex items-center gap-2 text-muted-foreground hover:text-primary truncate"
                           >
                             <ExternalLink className="h-3.5 w-3.5 shrink-0" />
@@ -452,6 +465,7 @@ const Index = () => {
                     </>
                   )}
                 </Card>
+                </Link>
               ))}
             </div>
           )}
