@@ -779,6 +779,7 @@ export type Database = {
         Row: {
           actor_id: string | null
           apify_run_id: string | null
+          cost_usd: number | null
           country: string | null
           error: string | null
           finished_at: string | null
@@ -797,6 +798,7 @@ export type Database = {
         Insert: {
           actor_id?: string | null
           apify_run_id?: string | null
+          cost_usd?: number | null
           country?: string | null
           error?: string | null
           finished_at?: string | null
@@ -815,6 +817,7 @@ export type Database = {
         Update: {
           actor_id?: string | null
           apify_run_id?: string | null
+          cost_usd?: number | null
           country?: string | null
           error?: string | null
           finished_at?: string | null
@@ -902,10 +905,15 @@ export type Database = {
           display_name: string
           enabled: boolean
           id: string
+          max_items_per_run: number
+          monthly_budget_usd: number | null
+          monthly_spend_usd: number
           notes: string | null
+          priority: number
           rate_limit_per_hour: number
           schedule_cron: string | null
           source_family: Database["public"]["Enums"]["demand_source"]
+          spend_cycle_start: string
           trust_tier: number
           updated_at: string
         }
@@ -918,10 +926,15 @@ export type Database = {
           display_name: string
           enabled?: boolean
           id: string
+          max_items_per_run?: number
+          monthly_budget_usd?: number | null
+          monthly_spend_usd?: number
           notes?: string | null
+          priority?: number
           rate_limit_per_hour?: number
           schedule_cron?: string | null
           source_family: Database["public"]["Enums"]["demand_source"]
+          spend_cycle_start?: string
           trust_tier: number
           updated_at?: string
         }
@@ -934,10 +947,15 @@ export type Database = {
           display_name?: string
           enabled?: boolean
           id?: string
+          max_items_per_run?: number
+          monthly_budget_usd?: number | null
+          monthly_spend_usd?: number
           notes?: string | null
+          priority?: number
           rate_limit_per_hour?: number
           schedule_cron?: string | null
           source_family?: Database["public"]["Enums"]["demand_source"]
+          spend_cycle_start?: string
           trust_tier?: number
           updated_at?: string
         }
