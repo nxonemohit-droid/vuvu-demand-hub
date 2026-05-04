@@ -10,6 +10,7 @@ import {
   Briefcase, Users, Radar, AlertTriangle, Mail, Loader2, PlayCircle,
   RefreshCw, TrendingUp, Globe2, Sparkles, Activity, MapPin,
   Zap, Search, X,
+  Filter,
 } from "lucide-react";
 import { useRoles } from "@/lib/auth";
 import { toast } from "sonner";
@@ -37,6 +38,7 @@ const Index = () => {
   const [showAllLeads, setShowAllLeads] = useState(false);
   const [leadQuery, setLeadQuery] = useState("");
   const [allLeads, setAllLeads] = useState<{country: string; source: string; priority: string; created_at: string}[]>([]);
+  const [funnel, setFunnel] = useState({ total: 0, contacted: 0, in_progress: 0, converted: 0 });
 
   const loadAll = async () => {
     const [leadsCount, high, candidates, signals, runsRes, leadsRes, allLeadsRes] = await Promise.all([
@@ -55,6 +57,18 @@ const Index = () => {
     setRuns((runsRes.data ?? []) as RunRow[]);
     setLeads(enrichMany(((leadsRes.data ?? []) as unknown) as RawLead[]));
     setAllLeads((allLeadsRes.data ?? []) as any);
+    // Funnel counts from lead_crm
+    const [contactedRes, inProgressRes, convertedRes] = await Promise.all([
+      supabase.from("lead_crm").select("id", { count: "exact", head: true }).eq("status", "contacted"),
+      supabase.from("lead_crm").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
+      supabase.from("lead_crm").select("id", { count: "exact", head: true }).eq("status", "converted"),
+    ]);
+    setFunnel({
+      total: leadsCount.count ?? 0,
+      contacted: contactedRes.count ?? 0,
+      in_progress: inProgressRes.count ?? 0,
+      converted: convertedRes.count ?? 0,
+    });
   };
 
   useEffect(() => { loadAll(); }, []);
