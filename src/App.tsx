@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound.tsx";
 import ActorHealth from "./pages/ActorHealth.tsx";
 import KeywordAudit from "./pages/KeywordAudit.tsx";
 import Leads from "./pages/Leads.tsx";
+import LeadDetail from "./pages/LeadDetail.tsx";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/actor-health" element={<ActorHealth />} />
           <Route path="/keyword-audit" element={<KeywordAudit />} />
           <Route path="/leads" element={<Leads />} />
+          <Route path="/leads/:id" element={<LeadDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

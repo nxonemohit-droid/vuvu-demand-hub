@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LayoutGrid, List, ArrowUpRight } from "lucide-react";
+import { LeadCard } from "@/components/leads/LeadCard";
 
 type RawLead = {
   id: string;
@@ -291,6 +294,21 @@ const Leads = () => {
   });
   const [selected, setSelected] = useState<Lead | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"cards" | "table">(() => {
+    try {
+      const v = localStorage.getItem("voynova.leads.viewMode.v1");
+      return v === "table" ? "table" : "cards";
+    } catch {
+      return "cards";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("voynova.leads.viewMode.v1", viewMode);
+    } catch {
+      /* ignore */
+    }
+  }, [viewMode]);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(loadSavedPresets);
   const [saveOpen, setSaveOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
@@ -595,6 +613,36 @@ const Leads = () => {
             <Button size="sm" variant="outline" onClick={load}>
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
+            <div
+              className="inline-flex rounded-md border bg-card overflow-hidden"
+              role="group"
+              aria-label="View mode"
+            >
+              <button
+                type="button"
+                aria-pressed={viewMode === "cards"}
+                onClick={() => setViewMode("cards")}
+                className={`px-2.5 py-1.5 text-xs inline-flex items-center gap-1.5 ${
+                  viewMode === "cards"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Cards
+              </button>
+              <button
+                type="button"
+                aria-pressed={viewMode === "table"}
+                onClick={() => setViewMode("table")}
+                className={`px-2.5 py-1.5 text-xs inline-flex items-center gap-1.5 border-l ${
+                  viewMode === "table"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <List className="h-3.5 w-3.5" /> Table
+              </button>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" disabled={!allLeads.length}>
@@ -958,6 +1006,27 @@ const Leads = () => {
         )}
 
         {/* Table */}
+        {viewMode === "cards" ? (
+          <div>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-44 rounded-xl" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <Card className="p-12 text-center text-sm text-muted-foreground rounded-xl">
+                No leads match your filters. Try clearing some chips or turning off Recruiter Mode.
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filtered.map((l) => (
+                  <LeadCard key={l.id} lead={l} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
         <Card className="rounded-xl overflow-hidden">
           {loading ? (
             <div className="p-6 space-y-3">
@@ -1025,9 +1094,17 @@ const Leads = () => {
                           }}
                         />
                       </TableCell>
-                      <TableCell className="font-medium max-w-[200px] truncate" title={l.employer_name ?? ""}>
+                      <TableCell className="font-medium max-w-[220px] truncate" title={l.employer_name ?? ""}>
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate">{l.employer_name ?? "—"}</span>
+                          <Link
+                            to={`/leads/${l.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="truncate hover:underline text-primary inline-flex items-center gap-1 group/link"
+                            aria-label={`Open ${l.employer_name ?? "lead"} detail`}
+                          >
+                            <span className="truncate">{l.employer_name ?? "—"}</span>
+                            <ArrowUpRight className="h-3 w-3 opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
+                          </Link>
                           {l.enrichment.duplicate_count > 0 && (
                             <Badge
                               variant="outline"
@@ -1145,6 +1222,7 @@ const Leads = () => {
             </div>
           )}
         </Card>
+        )}
       </div>
 
       {/* Save preset dialog */}
