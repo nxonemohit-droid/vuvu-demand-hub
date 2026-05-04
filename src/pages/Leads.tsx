@@ -74,6 +74,10 @@ import {
   Filter,
   Save,
   Trash2,
+  FileText,
+  Flame,
+  Send,
+  CheckSquare,
 } from "lucide-react";
 import {
   TARGET_AUDIENCE_OPTIONS,
@@ -91,7 +95,7 @@ import {
 } from "@/lib/lead-taxonomies";
 import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/lead-scoring";
 import { dedupeAndEnrich, type Enrichment } from "@/lib/lead-enrichment";
-import { exportLeads, safeFileSlug } from "@/lib/lead-export";
+import { exportLeads, exportLeadsPdf, safeFileSlug } from "@/lib/lead-export";
 import {
   DropdownMenu,
   DropdownMenuContent,
