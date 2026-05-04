@@ -25,6 +25,10 @@ export type SourceRow = {
   trust_tier: number;
   confidence_weight: number;
   enabled: boolean;
+  priority?: number;
+  monthly_budget_usd?: number | null;
+  monthly_spend_usd?: number;
+  max_items_per_run?: number;
 };
 
 export async function logRunEvent(
