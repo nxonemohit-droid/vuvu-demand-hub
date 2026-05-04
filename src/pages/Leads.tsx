@@ -78,6 +78,8 @@ import {
   Flame,
   Send,
   CheckSquare,
+  Copy,
+  Sparkle,
 } from "lucide-react";
 import {
   TARGET_AUDIENCE_OPTIONS,
