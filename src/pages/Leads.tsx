@@ -451,6 +451,8 @@ const Leads = () => {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         case "country":
           return (a.country ?? "").localeCompare(b.country ?? "");
+        case "employer":
+          return (a.employer_name ?? "").localeCompare(b.employer_name ?? "");
         case "industry": {
           const ai = (a.sector_tags ?? [])[0] ?? "";
           const bi = (b.sector_tags ?? [])[0] ?? "";
