@@ -1689,6 +1689,71 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
                   </div>
                 </section>
 
+                {outreach && (
+                  <>
+                    <Separator />
+                    <section>
+                      <div className="flex items-center justify-between mb-3 gap-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Sparkle className="h-3.5 w-3.5 text-accent" />
+                          Recommended outreach
+                        </h3>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copy(`${outreach.subject}\n\n${outreach.body}`, "Email")}
+                          >
+                            <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy email
+                          </Button>
+                          <Button size="sm" asChild disabled={!primaryEmail}>
+                            <a href={mailtoHref || "#"}>
+                              <Mail className="h-3.5 w-3.5 mr-1.5" />
+                              {primaryEmail ? "Open mailto" : "No email"}
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                            <span>Subject</span>
+                            <button
+                              type="button"
+                              onClick={() => copy(outreach.subject, "Subject")}
+                              className="hover:text-foreground inline-flex items-center gap-1"
+                            >
+                              <Copy className="h-3 w-3" /> copy
+                            </button>
+                          </div>
+                          <p className="text-sm font-medium">{outreach.subject}</p>
+                        </div>
+                        <Separator />
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                            <span>Body</span>
+                            <button
+                              type="button"
+                              onClick={() => copy(outreach.body, "Body")}
+                              className="hover:text-foreground inline-flex items-center gap-1"
+                            >
+                              <Copy className="h-3 w-3" /> copy
+                            </button>
+                          </div>
+                          <pre className="text-xs whitespace-pre-wrap font-sans leading-relaxed text-foreground">
+                            {outreach.body}
+                          </pre>
+                        </div>
+                        {!primaryEmail && (
+                          <p className="text-[11px] text-muted-foreground">
+                            No verified email — copy the message and paste it into LinkedIn or your CRM.
+                          </p>
+                        )}
+                      </div>
+                    </section>
+                  </>
+                )}
+
                 {otherUrls.length > 0 && (
                   <>
                     <Separator />
