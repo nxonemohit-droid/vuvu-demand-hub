@@ -81,8 +81,8 @@ function aggregate(jobs: JobRow[]): ActorStat[] {
   for (const [key, rows] of byKey) {
     const [source, actorId] = key.split("::");
     const total = rows.length;
-    const succeeded = rows.filter((r) => r.status === "succeeded").length;
-    const failed = rows.filter((r) => r.status === "failed").length;
+    const succeeded = rows.filter((r) => r.status === "succeeded" || r.status === "succeeded_empty").length;
+    const failed = rows.filter((r) => r.status === "failed" || r.status === "quota_exceeded").length;
     const running = rows.filter((r) => r.status === "running").length;
     const queued = rows.filter((r) => r.status === "queued").length;
     const completed = succeeded + failed;
@@ -106,8 +106,11 @@ function aggregate(jobs: JobRow[]): ActorStat[] {
 
     const errorBuckets = new Map<string, { count: number; sample: string }>();
     for (const r of rows) {
-      if (r.status !== "failed" || !r.error) continue;
-      const { reason, sample } = classifyError(r.error);
+      if (!(r.status === "failed" || r.status === "quota_exceeded") || !r.error) continue;
+      const { reason, sample } =
+        r.status === "quota_exceeded"
+          ? { reason: "Apify monthly quota exhausted (403)", sample: r.error.slice(0, 220) }
+          : classifyError(r.error);
       const cur = errorBuckets.get(reason);
       if (cur) cur.count++;
       else errorBuckets.set(reason, { count: 1, sample });
