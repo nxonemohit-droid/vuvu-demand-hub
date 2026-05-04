@@ -30,6 +30,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Calendar as CalendarUI } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import {
   Popover,
   PopoverContent,
@@ -70,6 +73,7 @@ import {
   SECTOR_OPTIONS,
   TARGET_COUNTRIES,
   WORKER_ORIGINS,
+  COMPANY_SIZE_OPTIONS,
   SORT_OPTIONS,
   BUILTIN_PRESETS,
   RECRUITER_MODE_FILTERS,
