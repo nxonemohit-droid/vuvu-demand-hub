@@ -12,6 +12,7 @@ import KeywordAudit from "./pages/KeywordAudit.tsx";
 import Leads from "./pages/Leads.tsx";
 import LeadDetail from "./pages/LeadDetail.tsx";
 import Candidates from "./pages/Candidates.tsx";
+import DiscoveryRuns from "./pages/DiscoveryRuns.tsx";
 import Settings from "./pages/Settings.tsx";
 
 const queryClient = new QueryClient();
