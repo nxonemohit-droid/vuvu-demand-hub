@@ -48,6 +48,37 @@ import {
 import { buildOutreachTemplate } from "@/lib/lead-outreach";
 import { LeadCrmCard } from "@/components/leads/LeadCrmCard";
 
+type ContactLogEntry = {
+  id: string;
+  channel: string;
+  note: string;
+  created_at: string;
+  user_id: string | null;
+};
+
+const CHANNEL_OPTIONS: { value: string; label: string }[] = [
+  { value: "note", label: "Note" },
+  { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "meeting", label: "Meeting" },
+];
+
+function channelIcon(channel: string) {
+  switch (channel) {
+    case "email":
+      return <Mail className="h-3.5 w-3.5" />;
+    case "phone":
+      return <Phone className="h-3.5 w-3.5" />;
+    case "linkedin":
+      return <Linkedin className="h-3.5 w-3.5" />;
+    case "meeting":
+      return <MessageCircle className="h-3.5 w-3.5" />;
+    default:
+      return <StickyNote className="h-3.5 w-3.5" />;
+  }
+}
+
 export default function LeadDetail() {
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
