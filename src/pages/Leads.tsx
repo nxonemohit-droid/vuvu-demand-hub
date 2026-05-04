@@ -304,7 +304,7 @@ const Leads = () => {
       setLoading(false);
       return;
     }
-    const enriched: Lead[] = (data ?? []).map((l) => {
+    const scored = (data ?? []).map((l) => {
       const raw = l as unknown as RawLead;
       const breakdown = computeLeadScore(raw);
       return {
@@ -316,7 +316,11 @@ const Leads = () => {
         score_breakdown: breakdown,
       };
     });
-    setAllLeads(enriched);
+    // Dedupe by domain + company name; fold contacts/emails from duplicates.
+    const deduped: Lead[] = dedupeAndEnrich(scored, (l) =>
+      collectEmails(l.raw_signals?.payload ?? null),
+    );
+    setAllLeads(deduped);
     setTotalCount(countRes.count ?? 0);
     setLoading(false);
   };
