@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
+import { QuotaBanner } from "@/components/QuotaBanner";
 
 type JobRow = {
   id: string;
@@ -180,8 +181,8 @@ const ActorHealth = () => {
 
   const summary = useMemo(() => {
     const total = jobs?.length ?? 0;
-    const succeeded = jobs?.filter((j) => j.status === "succeeded").length ?? 0;
-    const failed = jobs?.filter((j) => j.status === "failed").length ?? 0;
+    const succeeded = jobs?.filter((j) => j.status === "succeeded" || j.status === "succeeded_empty").length ?? 0;
+    const failed = jobs?.filter((j) => j.status === "failed" || j.status === "quota_exceeded").length ?? 0;
     const completed = succeeded + failed;
     const rate = completed ? Math.round((succeeded / completed) * 100) : 0;
     const failingActors = stats.filter((s) => s.successRate < 40 && (s.succeeded + s.failed) > 0).length;
