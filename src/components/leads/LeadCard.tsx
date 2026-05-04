@@ -9,9 +9,22 @@ import {
   priorityScoreClass,
   type Lead,
 } from "@/lib/lead-shape";
+import {
+  classifyRoleType,
+  extractDomain,
+  FRESHNESS_CLASS,
+  FRESHNESS_LABEL,
+  getFreshness,
+  getTrustTier,
+  ROLE_TYPE_CLASS,
+  ROLE_TYPE_LABEL,
+  TRUST_DOT_CLASS,
+  TRUST_LABEL,
+} from "@/lib/lead-classifiers";
 
 interface LeadCardProps {
   lead: Lead;
+  blacklistedDomains?: Set<string>;
 }
 
 /**
@@ -19,12 +32,17 @@ interface LeadCardProps {
  * (eventually) the dashboard. Whole card is keyboard + mouse navigable
  * and routes to /leads/:id.
  */
-export function LeadCard({ lead }: LeadCardProps) {
+export function LeadCard({ lead, blacklistedDomains }: LeadCardProps) {
   const navigate = useNavigate();
   const score = lead.computed_score ?? lead.urgency_score ?? 0;
   const audience = audienceLabel(lead.target_audience_type);
   const flag = countryFlag(lead.country);
   const company = lead.employer_name ?? "Unknown employer";
+  const freshness = getFreshness(lead.created_at);
+  const trust = getTrustTier((lead.raw_signals?.payload as Record<string, unknown> | null)?.source as string | undefined ?? lead.source_url);
+  const roleType = classifyRoleType(lead.role, lead.target_audience_type);
+  const domain = extractDomain(lead.website_url, lead.contact_email);
+  const isBlacklisted = !!(domain && blacklistedDomains?.has(domain));
 
   const go = () => navigate(`/leads/${lead.id}`);
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -45,9 +63,15 @@ export function LeadCard({ lead }: LeadCardProps) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-sm leading-tight truncate" title={company}>
-            {company}
-          </h3>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`inline-block h-2 w-2 rounded-full shrink-0 ${TRUST_DOT_CLASS[trust]}`}
+              title={TRUST_LABEL[trust]}
+            />
+            <h3 className="font-semibold text-sm leading-tight truncate" title={company}>
+              {company}
+            </h3>
+          </div>
           <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground truncate">
             <span aria-hidden>{flag}</span>
             <MapPin className="h-3 w-3 shrink-0" />
@@ -71,6 +95,17 @@ export function LeadCard({ lead }: LeadCardProps) {
       </p>
 
       <div className="flex flex-wrap gap-1 mt-3">
+        <Badge variant="outline" className={`text-[10px] py-0 px-1.5 h-5 ${FRESHNESS_CLASS[freshness]}`}>
+          {FRESHNESS_LABEL[freshness]}
+        </Badge>
+        <Badge variant="outline" className={`text-[10px] py-0 px-1.5 h-5 ${ROLE_TYPE_CLASS[roleType]}`}>
+          {ROLE_TYPE_LABEL[roleType]}
+        </Badge>
+        {isBlacklisted && (
+          <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-5 bg-destructive/10 text-destructive border-destructive/30">
+            Blacklisted
+          </Badge>
+        )}
         {lead.target_audience_type && (
           <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-5">
             {audience}
