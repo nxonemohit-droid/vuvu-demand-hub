@@ -167,7 +167,7 @@ const ActorHealth = () => {
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from("scrape_jobs")
-      .select("id,source,actor_id,status,items_found,items_structured,started_at,finished_at,error")
+      .select("id,source,actor_id,status,items_found,items_structured,cost_usd,started_at,finished_at,error")
       .gte("started_at", since)
       .order("started_at", { ascending: false })
       .limit(1000);
