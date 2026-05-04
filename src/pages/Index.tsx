@@ -33,7 +33,7 @@ const Index = () => {
   const [waveStatus, setWaveStatus] = useState<string>("");
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [allLeads, setAllLeads] = useState<Pick<LeadRow,"country"|"source"|"priority"|"created_at">[]>([]);
+  const [allLeads, setAllLeads] = useState<{country: string; source: string; priority: string; created_at: string}[]>([]);
 
   const loadAll = async () => {
     const [leadsCount, high, candidates, signals, runsRes, leadsRes, allLeadsRes] = await Promise.all([
