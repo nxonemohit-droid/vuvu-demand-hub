@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
+import { QuotaBanner } from "@/components/QuotaBanner";
 
 type JobRow = {
   id: string;
@@ -80,8 +81,8 @@ function aggregate(jobs: JobRow[]): ActorStat[] {
   for (const [key, rows] of byKey) {
     const [source, actorId] = key.split("::");
     const total = rows.length;
-    const succeeded = rows.filter((r) => r.status === "succeeded").length;
-    const failed = rows.filter((r) => r.status === "failed").length;
+    const succeeded = rows.filter((r) => r.status === "succeeded" || r.status === "succeeded_empty").length;
+    const failed = rows.filter((r) => r.status === "failed" || r.status === "quota_exceeded").length;
     const running = rows.filter((r) => r.status === "running").length;
     const queued = rows.filter((r) => r.status === "queued").length;
     const completed = succeeded + failed;
@@ -105,8 +106,11 @@ function aggregate(jobs: JobRow[]): ActorStat[] {
 
     const errorBuckets = new Map<string, { count: number; sample: string }>();
     for (const r of rows) {
-      if (r.status !== "failed" || !r.error) continue;
-      const { reason, sample } = classifyError(r.error);
+      if (!(r.status === "failed" || r.status === "quota_exceeded") || !r.error) continue;
+      const { reason, sample } =
+        r.status === "quota_exceeded"
+          ? { reason: "Apify monthly quota exhausted (403)", sample: r.error.slice(0, 220) }
+          : classifyError(r.error);
       const cur = errorBuckets.get(reason);
       if (cur) cur.count++;
       else errorBuckets.set(reason, { count: 1, sample });
@@ -180,8 +184,8 @@ const ActorHealth = () => {
 
   const summary = useMemo(() => {
     const total = jobs?.length ?? 0;
-    const succeeded = jobs?.filter((j) => j.status === "succeeded").length ?? 0;
-    const failed = jobs?.filter((j) => j.status === "failed").length ?? 0;
+    const succeeded = jobs?.filter((j) => j.status === "succeeded" || j.status === "succeeded_empty").length ?? 0;
+    const failed = jobs?.filter((j) => j.status === "failed" || j.status === "quota_exceeded").length ?? 0;
     const completed = succeeded + failed;
     const rate = completed ? Math.round((succeeded / completed) * 100) : 0;
     const failingActors = stats.filter((s) => s.successRate < 40 && (s.succeeded + s.failed) > 0).length;
@@ -191,6 +195,7 @@ const ActorHealth = () => {
   return (
     <div className="min-h-screen bg-muted/20 p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
+        <QuotaBanner />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <Link to="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2">

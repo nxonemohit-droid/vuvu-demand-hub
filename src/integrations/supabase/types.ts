@@ -680,6 +680,45 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_quota_state: {
+        Row: {
+          cycle_end_at: string | null
+          cycle_start_at: string | null
+          exhausted_at: string | null
+          last_checked_at: string
+          monthly_limit_usd: number | null
+          monthly_usage_usd: number | null
+          provider: string
+          raw: Json
+          updated_at: string
+          usage_pct: number | null
+        }
+        Insert: {
+          cycle_end_at?: string | null
+          cycle_start_at?: string | null
+          exhausted_at?: string | null
+          last_checked_at?: string
+          monthly_limit_usd?: number | null
+          monthly_usage_usd?: number | null
+          provider: string
+          raw?: Json
+          updated_at?: string
+          usage_pct?: number | null
+        }
+        Update: {
+          cycle_end_at?: string | null
+          cycle_start_at?: string | null
+          exhausted_at?: string | null
+          last_checked_at?: string
+          monthly_limit_usd?: number | null
+          monthly_usage_usd?: number | null
+          provider?: string
+          raw?: Json
+          updated_at?: string
+          usage_pct?: number | null
+        }
+        Relationships: []
+      }
       raw_signals: {
         Row: {
           company_domain: string | null
@@ -972,7 +1011,14 @@ export type Database = {
         | "google_jobs"
         | "company_site"
         | "directory"
-      job_status: "queued" | "running" | "succeeded" | "failed"
+      job_status:
+        | "queued"
+        | "running"
+        | "succeeded"
+        | "failed"
+        | "quota_exceeded"
+        | "succeeded_empty"
+        | "skipped_quota"
       lead_crm_status:
         | "new"
         | "contacted"
@@ -1119,7 +1165,15 @@ export const Constants = {
         "company_site",
         "directory",
       ],
-      job_status: ["queued", "running", "succeeded", "failed"],
+      job_status: [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "quota_exceeded",
+        "succeeded_empty",
+        "skipped_quota",
+      ],
       lead_crm_status: [
         "new",
         "contacted",

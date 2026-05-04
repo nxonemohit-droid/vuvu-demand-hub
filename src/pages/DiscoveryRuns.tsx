@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { QuotaBanner } from "@/components/QuotaBanner";
 
 type RunRow = {
   id: string;
@@ -94,6 +95,7 @@ const DiscoveryRuns = () => {
 
   return (
     <div className="p-6 md:p-8 space-y-6">
+      <QuotaBanner showRetry />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">Discovery Runs</h1>
