@@ -22,6 +22,7 @@ type JobRow = {
   status: string;
   items_found: number;
   items_structured: number;
+  cost_usd: number | null;
   started_at: string;
   finished_at: string | null;
   error: string | null;
@@ -43,6 +44,10 @@ type ActorStat = {
   lastRunAt: string | null;
   lastStatus: string | null;
   topErrors: { reason: string; count: number; sample: string }[];
+  totalCostUsd: number;
+  costRuns: number;
+  avgCostPerRun: number | null;
+  costPerLead: number | null;
 };
 
 /** Bucket raw Apify error strings into human-readable categories. */
