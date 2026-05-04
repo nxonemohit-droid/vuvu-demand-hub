@@ -1217,13 +1217,11 @@ const Leads = () => {
                 ))}
               </div>
             ) : filtered.length === 0 ? (
-              <Card className="p-12 text-center text-sm text-muted-foreground rounded-xl">
-                No leads match your filters. Try clearing some chips or turning off Recruiter Mode.
-              </Card>
+              <FilteredEmptyState onClear={clearAllFilters} />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {visibleLeads.map((l) => (
-                  <LeadCard key={l.id} lead={l} />
+                  <LeadCard key={l.id} lead={l} blacklistedDomains={blacklistedDomains} />
                 ))}
               </div>
             )}
