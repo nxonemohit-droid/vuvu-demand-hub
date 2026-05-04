@@ -1215,7 +1215,7 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
                       label="Worker source"
                       value={(lead.worker_origin_focus ?? []).join(", ") || "—"}
                     />
-                    <Field label="Score" value={lead.score?.toString() ?? "—"} />
+                    <Field label="Score" value={`${lead.computed_score} / 100`} />
                     <Field label="Urgency" value={lead.urgency_score?.toString() ?? "0"} />
                     <Field label="Contact name" value={lead.contact_name ?? "—"} />
                     <Field
@@ -1223,6 +1223,31 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
                       label="Created"
                       value={new Date(lead.created_at).toLocaleString("en-GB")}
                     />
+                  </div>
+                  <div className="mt-4 rounded-lg border border-border/60 bg-muted/30 p-3">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                      Score breakdown
+                    </div>
+                    <div className="space-y-1.5">
+                      {SCORE_DIMENSIONS.map((d) => {
+                        const val = lead.score_breakdown[d.key];
+                        const pct = Math.round((val / d.max) * 100);
+                        return (
+                          <div key={d.key} className="flex items-center gap-2 text-xs">
+                            <span className="w-44 shrink-0 text-muted-foreground">{d.label}</span>
+                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full bg-primary"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-12 text-right tabular-nums">
+                              {val}/{d.max}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </section>
 
