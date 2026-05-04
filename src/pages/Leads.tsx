@@ -312,6 +312,8 @@ const Leads = () => {
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(loadSavedPresets);
   const [saveOpen, setSaveOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
+  const PAGE_SIZE = 21;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const recruiterMode = useMemo(
     () =>
