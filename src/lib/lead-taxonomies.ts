@@ -53,13 +53,14 @@ export const COMPANY_SIZE_OPTIONS: { value: string; label: string }[] = [
   { value: "unknown", label: "Unknown size" },
 ];
 
-export type SortKey = "priority" | "recency" | "country" | "industry";
+export type SortKey = "priority" | "recency" | "country" | "industry" | "demand";
 
 export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "priority", label: "Priority (high → low)" },
   { value: "recency", label: "Most recent" },
   { value: "country", label: "Country (A → Z)" },
   { value: "industry", label: "Industry (A → Z)" },
+  { value: "demand", label: "Demand volume (high → low)" },
 ];
 
 export type ContactRequirement = "email" | "phone" | "website";
