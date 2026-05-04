@@ -294,6 +294,22 @@ const Leads = () => {
   });
   const [selected, setSelected] = useState<Lead | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"cards" | "table">(() => {
+    try {
+      const v = localStorage.getItem("voynova.leads.viewMode.v1");
+      return v === "table" ? "table" : "cards";
+    } catch {
+      return "cards";
+    }
+  });
+  const navigate = useNavigate();
+  useEffect(() => {
+    try {
+      localStorage.setItem("voynova.leads.viewMode.v1", viewMode);
+    } catch {
+      /* ignore */
+    }
+  }, [viewMode]);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(loadSavedPresets);
   const [saveOpen, setSaveOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
