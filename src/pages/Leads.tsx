@@ -1242,11 +1242,38 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
         {lead && (
           <>
             <SheetHeader className="p-6 pb-4 border-b">
-              <SheetTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-accent" />
-                {lead.employer_name ?? "Unknown employer"}
-              </SheetTitle>
-              <SheetDescription>{lead.role}</SheetDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <SheetTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-accent shrink-0" />
+                    <span className="truncate">{lead.employer_name ?? "Unknown employer"}</span>
+                  </SheetTitle>
+                  <SheetDescription>{lead.role}</SheetDescription>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline" className="shrink-0">
+                      <Download className="h-4 w-4 mr-2" /> Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        exportLeads([lead], "csv", `lead-${safeFileSlug(lead.employer_name)}`)
+                      }
+                    >
+                      <FileSpreadsheet className="h-4 w-4 mr-2" /> Export CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        exportLeads([lead], "json", `lead-${safeFileSlug(lead.employer_name)}`)
+                      }
+                    >
+                      <FileJson className="h-4 w-4 mr-2" /> Export JSON
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </SheetHeader>
             <ScrollArea className="flex-1">
               <div className="p-6 space-y-6">
