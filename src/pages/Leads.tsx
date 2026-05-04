@@ -1095,9 +1095,17 @@ const Leads = () => {
                           }}
                         />
                       </TableCell>
-                      <TableCell className="font-medium max-w-[200px] truncate" title={l.employer_name ?? ""}>
+                      <TableCell className="font-medium max-w-[220px] truncate" title={l.employer_name ?? ""}>
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate">{l.employer_name ?? "—"}</span>
+                          <Link
+                            to={`/leads/${l.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="truncate hover:underline text-primary inline-flex items-center gap-1 group/link"
+                            aria-label={`Open ${l.employer_name ?? "lead"} detail`}
+                          >
+                            <span className="truncate">{l.employer_name ?? "—"}</span>
+                            <ArrowUpRight className="h-3 w-3 opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
+                          </Link>
                           {l.enrichment.duplicate_count > 0 && (
                             <Badge
                               variant="outline"
