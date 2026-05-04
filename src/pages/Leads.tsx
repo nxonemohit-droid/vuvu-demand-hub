@@ -507,6 +507,60 @@ const Leads = () => {
     }
   };
 
+  // ---- Bulk actions ---------------------------------------------------------
+  const selectedLeads = useMemo(
+    () => filtered.filter((l) => selectedIds.has(l.id)),
+    [filtered, selectedIds],
+  );
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const bulkExportCsv = () => {
+    if (!selectedLeads.length) return;
+    exportLeads(selectedLeads, "csv", "voynova-leads-selected");
+    toast.success(`Exported ${selectedLeads.length} leads to CSV`);
+  };
+
+  const bulkExportPdf = () => {
+    if (!selectedLeads.length) return;
+    exportLeadsPdf(selectedLeads, "voynova-leads-selected");
+    toast.success(`Exported ${selectedLeads.length} leads to PDF`);
+  };
+
+  const bulkMarkHighPriority = async () => {
+    if (!selectedLeads.length) return;
+    const ids = selectedLeads.map((l) => l.id);
+    const { error } = await supabase
+      .from("demand_leads")
+      .update({ priority: "high" })
+      .in("id", ids);
+    if (error) {
+      toast.error("Failed to update priority");
+      console.error(error);
+      return;
+    }
+    setAllLeads((prev) =>
+      prev.map((l) => (selectedIds.has(l.id) ? { ...l, priority: "high" } : l)),
+    );
+    toast.success(`Marked ${ids.length} leads as High priority`);
+  };
+
+  const bulkAddToOutreach = async () => {
+    if (!selectedLeads.length) return;
+    const ids = selectedLeads.map((l) => l.id);
+    const { error } = await supabase
+      .from("demand_leads")
+      .update({ review_status: "outreach" })
+      .in("id", ids);
+    if (error) {
+      toast.error("Failed to add to Outreach");
+      console.error(error);
+      return;
+    }
+    toast.success(`Added ${ids.length} leads to Outreach`);
+    clearSelection();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       <div className="border-b bg-background/60 backdrop-blur sticky top-0 z-20">
