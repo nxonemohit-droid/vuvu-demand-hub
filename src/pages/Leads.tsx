@@ -304,11 +304,14 @@ const Leads = () => {
     }
     const enriched: Lead[] = (data ?? []).map((l) => {
       const raw = l as unknown as RawLead;
+      const breakdown = computeLeadScore(raw);
       return {
         ...raw,
         linkedin_url: pickLinkedIn(raw),
         website_url: pickWebsite(raw),
         company_size: inferCompanySize(raw.raw_signals?.payload ?? null),
+        computed_score: breakdown.total,
+        score_breakdown: breakdown,
       };
     });
     setAllLeads(enriched);
