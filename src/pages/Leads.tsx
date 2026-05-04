@@ -74,6 +74,10 @@ import {
   Filter,
   Save,
   Trash2,
+  FileText,
+  Flame,
+  Send,
+  CheckSquare,
 } from "lucide-react";
 import {
   TARGET_AUDIENCE_OPTIONS,
@@ -91,7 +95,7 @@ import {
 } from "@/lib/lead-taxonomies";
 import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/lead-scoring";
 import { dedupeAndEnrich, type Enrichment } from "@/lib/lead-enrichment";
-import { exportLeads, safeFileSlug } from "@/lib/lead-export";
+import { exportLeads, exportLeadsPdf, safeFileSlug } from "@/lib/lead-export";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -503,6 +507,60 @@ const Leads = () => {
     }
   };
 
+  // ---- Bulk actions ---------------------------------------------------------
+  const selectedLeads = useMemo(
+    () => filtered.filter((l) => selectedIds.has(l.id)),
+    [filtered, selectedIds],
+  );
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const bulkExportCsv = () => {
+    if (!selectedLeads.length) return;
+    exportLeads(selectedLeads, "csv", "voynova-leads-selected");
+    toast.success(`Exported ${selectedLeads.length} leads to CSV`);
+  };
+
+  const bulkExportPdf = () => {
+    if (!selectedLeads.length) return;
+    exportLeadsPdf(selectedLeads, "voynova-leads-selected");
+    toast.success(`Exported ${selectedLeads.length} leads to PDF`);
+  };
+
+  const bulkMarkHighPriority = async () => {
+    if (!selectedLeads.length) return;
+    const ids = selectedLeads.map((l) => l.id);
+    const { error } = await supabase
+      .from("demand_leads")
+      .update({ priority: "high" })
+      .in("id", ids);
+    if (error) {
+      toast.error("Failed to update priority");
+      console.error(error);
+      return;
+    }
+    setAllLeads((prev) =>
+      prev.map((l) => (selectedIds.has(l.id) ? { ...l, priority: "high" } : l)),
+    );
+    toast.success(`Marked ${ids.length} leads as High priority`);
+  };
+
+  const bulkAddToOutreach = async () => {
+    if (!selectedLeads.length) return;
+    const ids = selectedLeads.map((l) => l.id);
+    const { error } = await supabase
+      .from("demand_leads")
+      .update({ review_status: "outreach" })
+      .in("id", ids);
+    if (error) {
+      toast.error("Failed to add to Outreach");
+      console.error(error);
+      return;
+    }
+    toast.success(`Added ${ids.length} leads to Outreach`);
+    clearSelection();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       <div className="border-b bg-background/60 backdrop-blur sticky top-0 z-20">
@@ -859,6 +917,41 @@ const Leads = () => {
                 onClear={() => setFilters({ ...filters, dateTo: null })}
               />
             )}
+          </div>
+        )}
+
+        {/* Bulk actions toolbar */}
+        {selectedIds.size > 0 && (
+          <div className="sticky top-[88px] z-20 animate-in fade-in slide-in-from-top-2">
+            <Card className="rounded-xl border-primary/40 bg-primary/5 backdrop-blur p-3 flex flex-wrap items-center gap-2 shadow-md">
+              <div className="flex items-center gap-2 px-2 text-sm font-medium text-primary">
+                <CheckSquare className="h-4 w-4" />
+                {selectedIds.size} selected
+              </div>
+              <Separator orientation="vertical" className="h-6" />
+              <Button size="sm" variant="outline" onClick={bulkExportCsv}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Export CSV
+              </Button>
+              <Button size="sm" variant="outline" onClick={bulkExportPdf}>
+                <FileText className="h-4 w-4 mr-2" /> Export PDF
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={bulkMarkHighPriority}
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Flame className="h-4 w-4 mr-2" /> Mark High Priority
+              </Button>
+              <Button size="sm" onClick={bulkAddToOutreach}>
+                <Send className="h-4 w-4 mr-2" /> Add to Outreach
+              </Button>
+              <div className="ml-auto">
+                <Button size="sm" variant="ghost" onClick={clearSelection}>
+                  <X className="h-4 w-4 mr-1" /> Clear
+                </Button>
+              </div>
+            </Card>
           </div>
         )}
 
