@@ -504,7 +504,7 @@ const Leads = () => {
   // Reset pagination whenever filters/sort change.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [filters]);
+  }, [filters, bookmarkedOnly]);
 
   const visibleLeads = useMemo(
     () => filtered.slice(0, visibleCount),
