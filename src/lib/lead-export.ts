@@ -3,6 +3,8 @@
 // CRMs / spreadsheets always get a predictable shape.
 // JSON is the full enriched object so downstream tooling can use everything.
 import Papa from "papaparse";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 type AnyLead = Record<string, unknown> & {
   id: string;
@@ -96,6 +98,66 @@ export function exportLeads(leads: AnyLead[], format: "csv" | "json", baseName =
   } else {
     downloadFile(`${baseName}-${ts}.json`, leadsToJson(leads), "application/json");
   }
+}
+
+/**
+ * Generate a quick PDF summary table of the given leads.
+ * Brand colors: Voynova blue (#0052CC) header, green (#36B37E) accent.
+ */
+export function exportLeadsPdf(leads: AnyLead[], baseName = "voynova-leads") {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const ts = timestamp();
+
+  // Header
+  doc.setFillColor(0, 82, 204);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 56, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Voynova — Lead Export", 32, 26);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`${leads.length} leads · generated ${new Date().toLocaleString("en-GB")}`, 32, 44);
+
+  autoTable(doc, {
+    startY: 72,
+    styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
+    headStyles: { fillColor: [0, 82, 204], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [244, 245, 247] },
+    margin: { left: 24, right: 24 },
+    head: [[
+      "Company", "Contact", "Role", "Country", "Industry",
+      "Priority", "Score", "Email", "Phone",
+    ]],
+    body: leads.map((l) => [
+      l.employer_name ?? "—",
+      l.contact_name ?? "—",
+      l.role ?? "—",
+      [l.country, l.city].filter(Boolean).join(", "),
+      (l.sector_tags ?? []).slice(0, 2).join(", "),
+      l.priority ?? "—",
+      String(l.computed_score ?? l.urgency_score ?? 0),
+      l.contact_email ?? "—",
+      l.contact_phone ?? "—",
+    ]),
+    columnStyles: { 0: { fontStyle: "bold" } },
+  });
+
+  // Footer
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text(
+      `Voynova Global Solutions · page ${i}/${pages}`,
+      doc.internal.pageSize.getWidth() - 32,
+      doc.internal.pageSize.getHeight() - 16,
+      { align: "right" },
+    );
+  }
+
+  doc.save(`${baseName}-${ts}.pdf`);
 }
 
 export function safeFileSlug(s: string | null | undefined, fallback = "lead"): string {
