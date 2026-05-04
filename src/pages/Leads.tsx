@@ -851,7 +851,23 @@ const Leads = () => {
                       onClick={() => setSelected(l)}
                     >
                       <TableCell className="font-medium max-w-[200px] truncate" title={l.employer_name ?? ""}>
-                        {l.employer_name ?? "—"}
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate">{l.employer_name ?? "—"}</span>
+                          {l.enrichment.duplicate_count > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] py-0 px-1.5 h-5 shrink-0"
+                              title={`Merged with ${l.enrichment.duplicate_count} duplicate lead(s)`}
+                            >
+                              +{l.enrichment.duplicate_count}
+                            </Badge>
+                          )}
+                        </div>
+                        {l.enrichment.domain && (
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {l.enrichment.domain}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="max-w-[220px] truncate" title={l.role}>
                         {l.role}
