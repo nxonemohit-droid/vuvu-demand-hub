@@ -36,6 +36,11 @@ const ADAPTER_PROVIDER: Record<string, string> = {
 
 // Hard pause when provider is over this % of monthly budget.
 const PROVIDER_PAUSE_PCT = 95;
+// Hard pause for a single source over this % of its own slice.
+const SOURCE_PAUSE_PCT = 95;
+// Skip queueing a (source, country, keyword) triple if it ran successfully
+// in the last DEDUP_HOURS hours.
+const DEDUP_HOURS = 72;
 // Delay between consecutive adapter invocations within a drain wave (ms).
 const PER_JOB_DELAY_MS = 1500;
 
@@ -53,6 +58,34 @@ async function getQuotaMap(supa: ReturnType<typeof adminClient>) {
     m.set((r as any).provider, { paused, reason });
   }
   return m;
+}
+
+/** Returns true if a recent successful (or empty-success) run already covered
+ *  this triple. Used at plan time to prevent burning credits on duplicates. */
+async function recentlyRan(
+  supa: ReturnType<typeof adminClient>,
+  source_id: string,
+  country: string | null,
+  keyword: string | null,
+): Promise<boolean> {
+  const sinceIso = new Date(Date.now() - DEDUP_HOURS * 3_600_000).toISOString();
+  let q = supa.from("scrape_jobs")
+    .select("id", { head: true, count: "exact" })
+    .eq("source_id", source_id)
+    .in("status", ["succeeded", "succeeded_empty", "running", "queued"])
+    .gte("started_at", sinceIso);
+  q = country === null ? q.is("country", null) : q.eq("country", country);
+  q = keyword === null ? q.is("keyword", null) : q.eq("keyword", keyword);
+  const { count } = await q;
+  return (count ?? 0) > 0;
+}
+
+/** Returns true if the source has burned its monthly slice. */
+function sourceOverBudget(s: SourceRow): boolean {
+  const budget = Number(s.monthly_budget_usd ?? 0);
+  if (!budget || budget <= 0) return false;
+  const spend = Number(s.monthly_spend_usd ?? 0);
+  return (spend / budget) * 100 >= SOURCE_PAUSE_PCT;
 }
 
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -158,19 +191,33 @@ Deno.serve(async (req) => {
 
       const { data: sources, error: srcErr } = await supa
         .from("source_registry")
-        .select("id, source_family, adapter, actor_or_endpoint, default_input, trust_tier, confidence_weight, enabled")
+        .select("id, source_family, adapter, actor_or_endpoint, default_input, trust_tier, confidence_weight, enabled, priority, monthly_budget_usd, monthly_spend_usd, max_items_per_run")
         .eq("enabled", true)
-        .order("trust_tier", { ascending: true });
+        .order("trust_tier", { ascending: true })
+        .order("priority", { ascending: true });
       if (srcErr) throw srcErr;
-      const enabledSources = (sources ?? []) as SourceRow[];
+      const allSources = (sources ?? []) as SourceRow[];
+      // Drop sources over their per-source monthly budget.
+      const enabledSources = allSources.filter((s) => !sourceOverBudget(s));
+      // Group by family and keep only the lowest-priority (= primary) source per
+      // family at plan time. Fallbacks kick in at drain time when the primary
+      // returns empty/quota-exceeded.
+      const primaryByFamily = new Map<string, SourceRow>();
+      for (const s of enabledSources) {
+        const cur = primaryByFamily.get(s.source_family);
+        if (!cur || (s.priority ?? 1) < (cur.priority ?? 1)) {
+          primaryByFamily.set(s.source_family, s);
+        }
+      }
+      const primarySources = Array.from(primaryByFamily.values());
 
       // Round-robin so no single source drowns out others.
       const planRows: Array<{ source: SourceRow; country: string; keyword: string }> = [];
       const seen = new Set<string>();
       outer: for (let k = 0; k < keywords.length; k++) {
         for (let c = 0; c < countries.length; c++) {
-          for (let s = 0; s < enabledSources.length; s++) {
-            const src = enabledSources[(s + k) % enabledSources.length];
+          for (let s = 0; s < primarySources.length; s++) {
+            const src = primarySources[(s + k) % primarySources.length];
             const country = countries[(c + s) % countries.length];
             const keyword = keywords[k];
             if (shouldSkip(src, country)) continue;
@@ -187,7 +234,12 @@ Deno.serve(async (req) => {
       }
 
       let queued = 0;
+      let dedupSkipped = 0;
       for (const row of planRows) {
+        if (await recentlyRan(supa, row.source.id, row.country, row.keyword)) {
+          dedupSkipped++;
+          continue;
+        }
         const { error } = await supa.from("scrape_jobs").insert({
           source: legacySourceForRegistryId(row.source.id),
           source_id: row.source.id,
@@ -201,7 +253,10 @@ Deno.serve(async (req) => {
 
       return jsonResponse({
         ok: true, mode: "plan", queued,
-        sources: enabledSources.length, countries: countries.length, keywords: keywords.length,
+        dedup_skipped: dedupSkipped,
+        sources: primarySources.length,
+        sources_over_budget: allSources.length - enabledSources.length,
+        countries: countries.length, keywords: keywords.length,
       });
     }
 
@@ -224,7 +279,7 @@ Deno.serve(async (req) => {
     const sourceIds = Array.from(new Set(candidates.map((c) => c.source_id).filter(Boolean))) as string[];
     const { data: srcRows } = await supa
       .from("source_registry")
-      .select("id, adapter, trust_tier")
+      .select("id, adapter, trust_tier, monthly_budget_usd, monthly_spend_usd")
       .in("id", sourceIds.length ? sourceIds : ["__none__"]);
     const srcByid = new Map((srcRows ?? []).map((s: any) => [s.id, s]));
 
@@ -259,6 +314,19 @@ Deno.serve(async (req) => {
           finished_at: new Date().toISOString(),
         }).eq("id", job.id);
         await logRunEvent(supa, job.id, "dispatch.skipped_quota", q.reason ?? "paused", { provider }, "warn");
+        skippedQuota++;
+        results.push({ id: job.id, ok: false, status: "skipped_quota" });
+        continue;
+      }
+      // Per-source budget gate.
+      if (src && sourceOverBudget(src as any)) {
+        const reason = `source ${src.id} over monthly budget`;
+        await supa.from("scrape_jobs").update({
+          status: "skipped_quota",
+          error: reason,
+          finished_at: new Date().toISOString(),
+        }).eq("id", job.id);
+        await logRunEvent(supa, job.id, "dispatch.skipped_budget", reason, { source_id: src.id }, "warn");
         skippedQuota++;
         results.push({ id: job.id, ok: false, status: "skipped_quota" });
         continue;

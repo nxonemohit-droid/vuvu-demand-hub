@@ -26,6 +26,7 @@ type RunRow = {
   status: string;
   items_found: number;
   items_structured: number;
+  cost_usd: number | null;
   started_at: string;
   finished_at: string | null;
   error: string | null;
@@ -45,7 +46,7 @@ const DiscoveryRuns = () => {
   const fetchPage = async (from: number, append = false) => {
     const { data, error } = await supabase
       .from("scrape_jobs")
-      .select("id,source,country,keyword,status,items_found,items_structured,started_at,finished_at,error")
+      .select("id,source,country,keyword,status,items_found,items_structured,cost_usd,started_at,finished_at,error")
       .order("started_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
     if (error) {
@@ -81,17 +82,24 @@ const DiscoveryRuns = () => {
   }, [rows, sourceFilter, statusFilter, countryQuery]);
 
   const counts = useMemo(() => {
-    const c = { total: rows.length, succeeded: 0, failed: 0, running: 0, queued: 0, found: 0, kept: 0 };
+    const c = {
+      total: rows.length, succeeded: 0, failed: 0, running: 0, queued: 0,
+      found: 0, kept: 0, cost: 0, costRuns: 0,
+    };
     for (const r of rows) {
-      if (r.status === "succeeded") c.succeeded++;
-      else if (r.status === "failed") c.failed++;
+      if (r.status === "succeeded" || r.status === "succeeded_empty") c.succeeded++;
+      else if (r.status === "failed" || r.status === "quota_exceeded") c.failed++;
       else if (r.status === "running") c.running++;
       else if (r.status === "queued") c.queued++;
       c.found += r.items_found ?? 0;
       c.kept += r.items_structured ?? 0;
+      if (typeof r.cost_usd === "number") { c.cost += r.cost_usd; c.costRuns++; }
     }
     return c;
   }, [rows]);
+
+  const costPerLead = counts.kept > 0 ? counts.cost / counts.kept : null;
+  const avgCostRun = counts.costRuns > 0 ? counts.cost / counts.costRuns : null;
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -120,8 +128,18 @@ const DiscoveryRuns = () => {
         <StatCard label="Total" value={counts.total} icon={PlayCircle} tone="bg-primary/10 text-primary border-primary/30" />
         <StatCard label="Succeeded" value={counts.succeeded} icon={CheckCircle2} tone="bg-emerald-500/10 text-emerald-600 border-emerald-500/30" />
         <StatCard label="Failed" value={counts.failed} icon={XCircle} tone="bg-destructive/10 text-destructive border-destructive/30" />
-        <StatCard label="Running / Queued" value={counts.running + counts.queued} icon={Clock} tone="bg-amber-500/10 text-amber-600 border-amber-500/30" />
-        <StatCard label="Items kept / found" value={`${counts.kept} / ${counts.found}`} icon={Activity} tone="bg-accent/10 text-accent border-accent/30" />
+        <StatCard
+          label="Cost / lead"
+          value={costPerLead !== null ? `$${costPerLead.toFixed(3)}` : "—"}
+          icon={Activity}
+          tone="bg-accent/10 text-accent border-accent/30"
+        />
+        <StatCard
+          label={avgCostRun !== null ? `Avg $${avgCostRun.toFixed(3)}/run` : "Items kept/found"}
+          value={`${counts.kept} / ${counts.found}`}
+          icon={Clock}
+          tone="bg-amber-500/10 text-amber-600 border-amber-500/30"
+        />
       </div>
 
       <Card className="rounded-xl">
@@ -184,6 +202,7 @@ const DiscoveryRuns = () => {
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Found</TableHead>
                   <TableHead className="text-right">Kept</TableHead>
+                  <TableHead className="text-right">Cost</TableHead>
                   <TableHead className="text-right">Duration</TableHead>
                   <TableHead>Error</TableHead>
                 </TableRow>
@@ -202,6 +221,9 @@ const DiscoveryRuns = () => {
                     <TableCell><StatusBadge status={r.status} /></TableCell>
                     <TableCell className="text-right tabular-nums">{r.items_found ?? 0}</TableCell>
                     <TableCell className="text-right tabular-nums">{r.items_structured ?? 0}</TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {typeof r.cost_usd === "number" ? `$${r.cost_usd.toFixed(3)}` : "—"}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                       {formatDuration(r.started_at, r.finished_at)}
                     </TableCell>

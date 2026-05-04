@@ -22,6 +22,7 @@ type JobRow = {
   status: string;
   items_found: number;
   items_structured: number;
+  cost_usd: number | null;
   started_at: string;
   finished_at: string | null;
   error: string | null;
@@ -43,6 +44,10 @@ type ActorStat = {
   lastRunAt: string | null;
   lastStatus: string | null;
   topErrors: { reason: string; count: number; sample: string }[];
+  totalCostUsd: number;
+  costRuns: number;
+  avgCostPerRun: number | null;
+  costPerLead: number | null;
 };
 
 /** Bucket raw Apify error strings into human-readable categories. */
@@ -120,12 +125,21 @@ function aggregate(jobs: JobRow[]): ActorStat[] {
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
 
+    const costRows = rows.filter((r) => typeof r.cost_usd === "number");
+    const totalCostUsd = costRows.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
+    const costRuns = costRows.length;
+    const avgCostPerRun = costRuns > 0 ? totalCostUsd / costRuns : null;
+    const costPerLead = itemsStructured > 0 && totalCostUsd > 0
+      ? totalCostUsd / itemsStructured
+      : null;
+
     stats.push({
       key, source, actorId, total, succeeded, failed, running, queued,
       successRate, itemsFound, itemsStructured, avgDurationSec,
       lastRunAt: last?.started_at ?? null,
       lastStatus: last?.status ?? null,
       topErrors,
+      totalCostUsd, costRuns, avgCostPerRun, costPerLead,
     });
   }
 
@@ -162,7 +176,7 @@ const ActorHealth = () => {
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from("scrape_jobs")
-      .select("id,source,actor_id,status,items_found,items_structured,started_at,finished_at,error")
+      .select("id,source,actor_id,status,items_found,items_structured,cost_usd,started_at,finished_at,error")
       .gte("started_at", since)
       .order("started_at", { ascending: false })
       .limit(1000);
@@ -278,6 +292,8 @@ const ActorHealth = () => {
                     <TableHead className="text-right">Success</TableHead>
                     <TableHead className="text-right">Avg duration</TableHead>
                     <TableHead className="text-right">Items found</TableHead>
+                    <TableHead className="text-right">Avg $/run</TableHead>
+                    <TableHead className="text-right">$/lead</TableHead>
                     <TableHead>Last run</TableHead>
                     <TableHead>Top failure reasons</TableHead>
                   </TableRow>
@@ -322,6 +338,15 @@ const ActorHealth = () => {
                           <div className="text-xs text-muted-foreground">
                             {s.itemsStructured} kept
                           </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {s.avgCostPerRun !== null ? `$${s.avgCostPerRun.toFixed(3)}` : "—"}
+                          <div className="text-[11px] text-muted-foreground">
+                            ${s.totalCostUsd.toFixed(2)} total
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {s.costPerLead !== null ? `$${s.costPerLead.toFixed(3)}` : "—"}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
