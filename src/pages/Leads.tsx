@@ -458,6 +458,17 @@ const Leads = () => {
       .map((a) => a.slice("employer:".length));
     const out = allLeads.filter((l) => {
       if (bookmarkedOnly && !bookmarkedIds.has(l.id)) return false;
+      if (hideStale && getFreshness(l.created_at) === "stale") return false;
+      if (minTrust !== "all") {
+        const t = getTrustTier(
+          ((l.raw_signals?.payload as Record<string, unknown> | null)?.source as string | undefined) ??
+            l.source_url,
+        );
+        if (TRUST_RANK[t] < TRUST_RANK[minTrust]) return false;
+      }
+      if (roleTypeFilter !== "all") {
+        if (classifyRoleType(l.role, l.target_audience_type) !== roleTypeFilter) return false;
+      }
       if (filters.countries.length && !filters.countries.includes(l.country)) return false;
       if (audPeople.length || audEmployerSectors.length) {
         const matchesPeople =
