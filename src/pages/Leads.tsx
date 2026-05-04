@@ -195,6 +195,47 @@ function sectorLabel(value: string): string {
   return SECTOR_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
+function sizeLabel(value: string): string {
+  return COMPANY_SIZE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+/** Infer company size bucket from headcount/employees fields in raw payload. */
+function inferCompanySize(payload: Record<string, unknown> | null | undefined): string {
+  if (!payload) return "unknown";
+  const candidateKeys = [
+    "company_size","companySize","employees","employee_count","employeeCount",
+    "headcount","staff_count","size","company_employees",
+  ];
+  let n: number | null = null;
+  for (const key of candidateKeys) {
+    const v = payload[key];
+    if (typeof v === "number" && Number.isFinite(v)) { n = v; break; }
+    if (typeof v === "string") {
+      const m = v.match(/(\d[\d,\.]*)/);
+      if (m) {
+        const parsed = parseInt(m[1].replace(/[,\.]/g, ""), 10);
+        if (Number.isFinite(parsed)) { n = parsed; break; }
+      }
+      const lower = v.toLowerCase();
+      if (/1\s*-\s*50|small|<\s*50/.test(lower)) return "small";
+      if (/51\s*-\s*250|medium|mid/.test(lower)) return "medium";
+      if (/251\s*-\s*1000|large/.test(lower)) return "large";
+      if (/1000\+|enterprise|10000?\+/.test(lower)) return "enterprise";
+    }
+  }
+  if (n == null) return "unknown";
+  if (n <= 50) return "small";
+  if (n <= 250) return "medium";
+  if (n <= 1000) return "large";
+  return "enterprise";
+}
+
+function isoDay(d: string | null): number | null {
+  if (!d) return null;
+  const t = new Date(d).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
 type SavedPreset = { id: string; name: string; filters: LeadFilters };
 
 function loadSavedPresets(): SavedPreset[] {
