@@ -10,6 +10,7 @@ import {
   Briefcase, Users, Radar, AlertTriangle, Mail, Loader2, PlayCircle,
   RefreshCw, TrendingUp, Globe2, Sparkles, Activity, MapPin,
   Zap, Search, X,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useRoles } from "@/lib/auth";
 import { toast } from "sonner";
@@ -186,6 +187,9 @@ const Index = () => {
             ))}
             <Button size="sm" variant="ghost" onClick={loadAll} title="Refresh">
               <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="ghost" asChild title="Settings">
+              <Link to="/settings"><SettingsIcon className="h-4 w-4" /></Link>
             </Button>
             <Button size="sm" variant="outline" onClick={runHunter} disabled={enriching}>
               {enriching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
