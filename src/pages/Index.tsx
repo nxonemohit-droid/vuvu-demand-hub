@@ -4,11 +4,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Briefcase, Users, Radar, AlertTriangle, Mail, Loader2, PlayCircle,
-  RefreshCw, TrendingUp, Globe2, Phone, ExternalLink, Sparkles, Activity, MapPin,
+  RefreshCw, TrendingUp, Globe2, Sparkles, Activity, MapPin,
   Zap,
 } from "lucide-react";
 import { useRoles } from "@/lib/auth";
@@ -17,25 +16,14 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, Cell,
 } from "recharts";
+import { LeadCard } from "@/components/leads/LeadCard";
+import { enrichMany, LEAD_SELECT_COLUMNS, type RawLead, type Lead } from "@/lib/lead-shape";
 
 type Stats = { leads: number; highPriority: number; candidates: number; signals: number };
 type RunRow = {
   id: string; source: string; country: string | null; keyword: string | null;
   status: string; items_found: number; items_structured: number; started_at: string; error: string | null;
 };
-type LeadRow = {
-  id: string; employer_name: string | null; role: string; country: string; city: string | null;
-  source: string; priority: string; urgency_score: number;
-  contact_email: string | null; contact_phone: string | null; source_url: string | null;
-  demand_size: number | null; visa_sponsorship: boolean; created_at: string;
-};
-
-const PRIORITY_STYLES: Record<string, string> = {
-  high: "bg-destructive/10 text-destructive border-destructive/30",
-  medium: "bg-primary/10 text-primary border-primary/30",
-  low: "bg-muted text-muted-foreground border-border",
-};
-
 const Index = () => {
   const { roles, user } = useRoles();
   const [stats, setStats] = useState<Stats | null>(null);
@@ -44,7 +32,7 @@ const Index = () => {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [waveStatus, setWaveStatus] = useState<string>("");
   const [runs, setRuns] = useState<RunRow[]>([]);
-  const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [allLeads, setAllLeads] = useState<Pick<LeadRow,"country"|"source"|"priority"|"created_at">[]>([]);
 
   const loadAll = async () => {
@@ -54,7 +42,7 @@ const Index = () => {
       supabase.from("candidates").select("id", { count: "exact", head: true }),
       supabase.from("raw_signals").select("id", { count: "exact", head: true }),
       supabase.from("scrape_jobs").select("id,source,country,keyword,status,items_found,items_structured,started_at,error").order("started_at", { ascending: false }).limit(6),
-      supabase.from("demand_leads").select("id,employer_name,role,country,city,source,priority,urgency_score,contact_email,contact_phone,source_url,demand_size,visa_sponsorship,created_at").order("urgency_score", { ascending: false }).limit(6),
+      supabase.from("demand_leads").select(LEAD_SELECT_COLUMNS).order("urgency_score", { ascending: false }).limit(6),
       supabase.from("demand_leads").select("country,source,priority,created_at").order("created_at", { ascending: false }).limit(500),
     ]);
     setStats({
@@ -62,7 +50,7 @@ const Index = () => {
       candidates: candidates.count ?? 0, signals: signals.count ?? 0,
     });
     setRuns((runsRes.data ?? []) as RunRow[]);
-    setLeads((leadsRes.data ?? []) as LeadRow[]);
+    setLeads(enrichMany(((leadsRes.data ?? []) as unknown) as RawLead[]));
     setAllLeads((allLeadsRes.data ?? []) as any);
   };
 
