@@ -151,13 +151,16 @@ export type Database = {
           salary_min: number | null
           score: number | null
           score_breakdown: Json
+          sector_tags: string[]
           snoozed_until: string | null
           source: Database["public"]["Enums"]["demand_source"]
           source_url: string | null
+          target_audience_type: string | null
           tier: string | null
           updated_at: string
           urgency_score: number
           visa_sponsorship: boolean
+          worker_origin_focus: string[]
         }
         Insert: {
           ai_rationale?: string | null
@@ -184,13 +187,16 @@ export type Database = {
           salary_min?: number | null
           score?: number | null
           score_breakdown?: Json
+          sector_tags?: string[]
           snoozed_until?: string | null
           source: Database["public"]["Enums"]["demand_source"]
           source_url?: string | null
+          target_audience_type?: string | null
           tier?: string | null
           updated_at?: string
           urgency_score?: number
           visa_sponsorship?: boolean
+          worker_origin_focus?: string[]
         }
         Update: {
           ai_rationale?: string | null
@@ -217,13 +223,16 @@ export type Database = {
           salary_min?: number | null
           score?: number | null
           score_breakdown?: Json
+          sector_tags?: string[]
           snoozed_until?: string | null
           source?: Database["public"]["Enums"]["demand_source"]
           source_url?: string | null
+          target_audience_type?: string | null
           tier?: string | null
           updated_at?: string
           urgency_score?: number
           visa_sponsorship?: boolean
+          worker_origin_focus?: string[]
         }
         Relationships: [
           {
@@ -820,6 +829,15 @@ export type Database = {
       }
     }
     Functions: {
+      _lead_haystack: {
+        Args: {
+          _employer: string
+          _notes: string
+          _role: string
+          _source_url: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
