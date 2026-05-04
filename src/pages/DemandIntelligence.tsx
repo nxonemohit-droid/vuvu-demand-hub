@@ -362,7 +362,7 @@ function FilterSelect({
 
 function AlertCard({ lead }: { lead: Lead }) {
   return (
-    <Link to={`/leads/${lead.id}`}>
+    <Link to={`/demand/${lead.id}`}>
       <Card className="p-4 hover:border-primary/50 hover:shadow-md transition-all h-full flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -401,7 +401,7 @@ function AlertCard({ lead }: { lead: Lead }) {
 function FeedRow({ lead }: { lead: Lead }) {
   return (
     <Link
-      to={`/leads/${lead.id}`}
+      to={`/demand/${lead.id}`}
       className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors"
     >
       <div className="min-w-0 flex-1">
