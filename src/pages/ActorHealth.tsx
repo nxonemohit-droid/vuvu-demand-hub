@@ -125,12 +125,21 @@ function aggregate(jobs: JobRow[]): ActorStat[] {
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
 
+    const costRows = rows.filter((r) => typeof r.cost_usd === "number");
+    const totalCostUsd = costRows.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
+    const costRuns = costRows.length;
+    const avgCostPerRun = costRuns > 0 ? totalCostUsd / costRuns : null;
+    const costPerLead = itemsStructured > 0 && totalCostUsd > 0
+      ? totalCostUsd / itemsStructured
+      : null;
+
     stats.push({
       key, source, actorId, total, succeeded, failed, running, queued,
       successRate, itemsFound, itemsStructured, avgDurationSec,
       lastRunAt: last?.started_at ?? null,
       lastStatus: last?.status ?? null,
       topErrors,
+      totalCostUsd, costRuns, avgCostPerRun, costPerLead,
     });
   }
 
