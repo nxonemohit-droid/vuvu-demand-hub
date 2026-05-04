@@ -29,6 +29,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Calendar as CalendarUI } from "@/components/ui/calendar";
@@ -283,6 +284,7 @@ const Leads = () => {
     }
   });
   const [selected, setSelected] = useState<Lead | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(loadSavedPresets);
   const [saveOpen, setSaveOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
@@ -540,6 +542,16 @@ const Leads = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => {
+                    const picked = filtered.filter((l) => selectedIds.has(l.id));
+                    exportLeads(picked, "csv", "voynova-leads-selected");
+                  }}
+                  disabled={selectedIds.size === 0}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Download CSV — Selected ({selectedIds.size})
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => exportLeads(filtered, "csv", "voynova-leads-filtered")}
                   disabled={!filtered.length}
@@ -867,6 +879,23 @@ const Leads = () => {
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        aria-label="Select all filtered leads"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((l) => selectedIds.has(l.id))
+                        }
+                        onCheckedChange={(v) => {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (v) filtered.forEach((l) => next.add(l.id));
+                            else filtered.forEach((l) => next.delete(l.id));
+                            return next;
+                          });
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Employer</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Location</TableHead>
@@ -884,6 +913,23 @@ const Leads = () => {
                       className={`cursor-pointer hover:bg-muted/50 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
                       onClick={() => setSelected(l)}
                     >
+                      <TableCell
+                        className="w-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          aria-label={`Select ${l.employer_name ?? "lead"}`}
+                          checked={selectedIds.has(l.id)}
+                          onCheckedChange={(v) => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (v) next.add(l.id);
+                              else next.delete(l.id);
+                              return next;
+                            });
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium max-w-[200px] truncate" title={l.employer_name ?? ""}>
                         <div className="flex items-center gap-1.5">
                           <span className="truncate">{l.employer_name ?? "—"}</span>
