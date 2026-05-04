@@ -78,6 +78,8 @@ import {
   Flame,
   Send,
   CheckSquare,
+  Copy,
+  Sparkle,
 } from "lucide-react";
 import {
   TARGET_AUDIENCE_OPTIONS,
@@ -1174,6 +1176,67 @@ const Leads = () => {
 
 export default Leads;
 
+/**
+ * Build a recommended outreach email tailored for Voynova's blue-collar
+ * recruitment pitch (S. Asia → EU/Balkans). Picks angle based on sectors,
+ * worker-origin focus, and audience type (employer vs agent vs platform).
+ */
+function buildOutreachTemplate(lead: Lead): { subject: string; body: string } {
+  const company = lead.employer_name?.trim() || "your team";
+  const contactFirst = (lead.contact_name ?? "").trim().split(/\s+/)[0] || "";
+  const greeting = contactFirst ? `Hi ${contactFirst},` : `Hello ${company} team,`;
+  const country = lead.country || "your market";
+  const role = (lead.role || "blue-collar roles").toLowerCase();
+
+  const sectors = (lead.sector_tags ?? [])
+    .map(sectorLabel)
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" and ");
+  const sectorLine = sectors ? ` in ${sectors}` : "";
+
+  const origins = (lead.worker_origin_focus ?? []).filter(Boolean);
+  const originLine = origins.length
+    ? origins.join(", ")
+    : "India, Nepal and Bangladesh";
+
+  const audience = lead.target_audience_type ?? "";
+  let pitch = "";
+  if (audience === "employer_direct") {
+    pitch =
+      `I noticed ${company} is hiring for ${role}${sectorLine} in ${country}. ` +
+      `At Voynova Global Solutions we place vetted, work-ready blue-collar workers from ${originLine} ` +
+      `with EU and Balkan employers — including full visa, permit and onboarding support.`;
+  } else if (audience === "recruitment_agency" || audience === "agent") {
+    pitch =
+      `I saw ${company} works on ${role} placements${sectorLine} in ${country}. ` +
+      `Voynova Global Solutions can be your supply partner from ${originLine}: pre-screened blue-collar candidates, ` +
+      `language-ready, with documentation and visa workflow handled end-to-end.`;
+  } else {
+    pitch =
+      `I came across your post about ${role}${sectorLine} in ${country}. ` +
+      `Voynova Global Solutions specialises in connecting employers in Europe with vetted blue-collar workers ` +
+      `from ${originLine}, including full compliance and visa sponsorship support.`;
+  }
+
+  const demand = lead.demand_size && lead.demand_size > 1
+    ? `\n\nIf the requirement is around ${lead.demand_size} workers, we can typically present a shortlist within 7–10 days.`
+    : "\n\nWe can usually present a first shortlist within 7–10 days of a brief.";
+
+  const subject = lead.employer_name
+    ? `Vetted blue-collar workers for ${lead.employer_name} — ${country}`
+    : `Vetted blue-collar workers for ${country} (${role})`;
+
+  const body =
+    `${greeting}\n\n${pitch}${demand}\n\n` +
+    `Would a 15-minute call this week make sense to share profiles and rates?\n\n` +
+    `Best regards,\n` +
+    `Voynova Global Solutions\n` +
+    `International blue-collar recruitment · India · Nepal · Bangladesh → EU & Balkans`;
+
+  return { subject, body };
+}
+
 function ContactIcon({
   href,
   external,
@@ -1381,6 +1444,20 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
   const allUrls = lead ? collectUrls(payload) : [];
   const linkedinUrls = allUrls.filter((u) => /linkedin\.com\//i.test(u));
   const otherUrls = allUrls.filter((u) => !/linkedin\.com\//i.test(u));
+  const outreach = lead ? buildOutreachTemplate(lead) : null;
+  const primaryEmail = allEmails[0] ?? lead?.enrichment?.email_patterns?.[0] ?? "";
+  const mailtoHref = lead && outreach
+    ? `mailto:${primaryEmail}?subject=${encodeURIComponent(outreach.subject)}&body=${encodeURIComponent(outreach.body)}`
+    : "";
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error("Could not copy to clipboard");
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -1611,6 +1688,71 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
                     )}
                   </div>
                 </section>
+
+                {outreach && (
+                  <>
+                    <Separator />
+                    <section>
+                      <div className="flex items-center justify-between mb-3 gap-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Sparkle className="h-3.5 w-3.5 text-accent" />
+                          Recommended outreach
+                        </h3>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copy(`${outreach.subject}\n\n${outreach.body}`, "Email")}
+                          >
+                            <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy email
+                          </Button>
+                          <Button size="sm" asChild disabled={!primaryEmail}>
+                            <a href={mailtoHref || "#"}>
+                              <Mail className="h-3.5 w-3.5 mr-1.5" />
+                              {primaryEmail ? "Open mailto" : "No email"}
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                            <span>Subject</span>
+                            <button
+                              type="button"
+                              onClick={() => copy(outreach.subject, "Subject")}
+                              className="hover:text-foreground inline-flex items-center gap-1"
+                            >
+                              <Copy className="h-3 w-3" /> copy
+                            </button>
+                          </div>
+                          <p className="text-sm font-medium">{outreach.subject}</p>
+                        </div>
+                        <Separator />
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                            <span>Body</span>
+                            <button
+                              type="button"
+                              onClick={() => copy(outreach.body, "Body")}
+                              className="hover:text-foreground inline-flex items-center gap-1"
+                            >
+                              <Copy className="h-3 w-3" /> copy
+                            </button>
+                          </div>
+                          <pre className="text-xs whitespace-pre-wrap font-sans leading-relaxed text-foreground">
+                            {outreach.body}
+                          </pre>
+                        </div>
+                        {!primaryEmail && (
+                          <p className="text-[11px] text-muted-foreground">
+                            No verified email — copy the message and paste it into LinkedIn or your CRM.
+                          </p>
+                        )}
+                      </div>
+                    </section>
+                  </>
+                )}
 
                 {otherUrls.length > 0 && (
                   <>
