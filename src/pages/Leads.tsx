@@ -682,6 +682,22 @@ const Leads = () => {
 
   const clearSelection = () => setSelectedIds(new Set());
 
+  const clearAllFilters = () => {
+    setFilters(EMPTY_FILTERS);
+    setBookmarkedOnly(false);
+    setHideStale(false);
+    setMinTrust("all");
+    setRoleTypeFilter("all");
+  };
+
+  useHotkeys({
+    "/": (e) => {
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    },
+    Escape: () => clearAllFilters(),
+  });
+
   const bulkExportCsv = () => {
     if (!selectedLeads.length) return;
     exportLeads(selectedLeads, "csv", "voynova-leads-selected");
