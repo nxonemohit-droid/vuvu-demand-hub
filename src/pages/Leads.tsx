@@ -543,6 +543,16 @@ const Leads = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
+                  onClick={() => {
+                    const picked = filtered.filter((l) => selectedIds.has(l.id));
+                    exportLeads(picked, "csv", "voynova-leads-selected");
+                  }}
+                  disabled={selectedIds.size === 0}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Download CSV — Selected ({selectedIds.size})
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={() => exportLeads(filtered, "csv", "voynova-leads-filtered")}
                   disabled={!filtered.length}
                 >
