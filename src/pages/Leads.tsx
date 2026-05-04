@@ -1034,9 +1034,22 @@ const Leads = () => {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filtered.map((l) => (
+                {visibleLeads.map((l) => (
                   <LeadCard key={l.id} lead={l} />
                 ))}
+              </div>
+            )}
+            {!loading && filtered.length > visibleLeads.length && (
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Showing {visibleLeads.length} of {filtered.length} leads
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                >
+                  Load more
+                </Button>
               </div>
             )}
           </div>
