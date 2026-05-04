@@ -614,6 +614,36 @@ const Leads = () => {
             <Button size="sm" variant="outline" onClick={load}>
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
+            <div
+              className="inline-flex rounded-md border bg-card overflow-hidden"
+              role="group"
+              aria-label="View mode"
+            >
+              <button
+                type="button"
+                aria-pressed={viewMode === "cards"}
+                onClick={() => setViewMode("cards")}
+                className={`px-2.5 py-1.5 text-xs inline-flex items-center gap-1.5 ${
+                  viewMode === "cards"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Cards
+              </button>
+              <button
+                type="button"
+                aria-pressed={viewMode === "table"}
+                onClick={() => setViewMode("table")}
+                className={`px-2.5 py-1.5 text-xs inline-flex items-center gap-1.5 border-l ${
+                  viewMode === "table"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <List className="h-3.5 w-3.5" /> Table
+              </button>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" disabled={!allLeads.length}>
