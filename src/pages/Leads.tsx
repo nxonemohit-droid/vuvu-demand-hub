@@ -405,6 +405,7 @@ const Leads = () => {
       .filter((a) => a.startsWith("employer:"))
       .map((a) => a.slice("employer:".length));
     const out = allLeads.filter((l) => {
+      if (bookmarkedOnly && !bookmarkedIds.has(l.id)) return false;
       if (filters.countries.length && !filters.countries.includes(l.country)) return false;
       if (audPeople.length || audEmployerSectors.length) {
         const matchesPeople =
@@ -498,7 +499,7 @@ const Leads = () => {
       }
     });
     return sorted;
-  }, [allLeads, filters]);
+  }, [allLeads, filters, bookmarkedOnly, bookmarkedIds]);
 
   // Reset pagination whenever filters/sort change.
   useEffect(() => {
