@@ -57,11 +57,11 @@ type ContactLogEntry = {
 };
 
 const CHANNEL_OPTIONS: { value: string; label: string }[] = [
-  { value: "note", label: "Note" },
   { value: "email", label: "Email" },
-  { value: "phone", label: "Phone" },
   { value: "linkedin", label: "LinkedIn" },
-  { value: "meeting", label: "Meeting" },
+  { value: "phone", label: "Phone" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "note", label: "Note" },
 ];
 
 function channelIcon(channel: string) {
@@ -72,6 +72,8 @@ function channelIcon(channel: string) {
       return <Phone className="h-3.5 w-3.5" />;
     case "linkedin":
       return <Linkedin className="h-3.5 w-3.5" />;
+    case "whatsapp":
+      return <MessageCircle className="h-3.5 w-3.5" />;
     case "meeting":
       return <MessageCircle className="h-3.5 w-3.5" />;
     default:
