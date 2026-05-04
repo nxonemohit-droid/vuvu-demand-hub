@@ -315,6 +315,8 @@ const Leads = () => {
   const [presetName, setPresetName] = useState("");
   const PAGE_SIZE = 21;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const [bookmarkedOnly, setBookmarkedOnly] = useState(false);
 
   const recruiterMode = useMemo(
     () =>
@@ -366,6 +368,22 @@ const Leads = () => {
 
   useEffect(() => {
     load();
+  }, []);
+
+  // Load the set of bookmarked lead ids from the CRM table.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("lead_crm")
+        .select("lead_id")
+        .eq("bookmarked", true);
+      if (cancelled || error) return;
+      setBookmarkedIds(new Set((data ?? []).map((r) => r.lead_id as string)));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // persist recruiter mode
