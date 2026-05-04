@@ -312,6 +312,8 @@ const Leads = () => {
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(loadSavedPresets);
   const [saveOpen, setSaveOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
+  const PAGE_SIZE = 21;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const recruiterMode = useMemo(
     () =>
@@ -449,6 +451,8 @@ const Leads = () => {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         case "country":
           return (a.country ?? "").localeCompare(b.country ?? "");
+        case "employer":
+          return (a.employer_name ?? "").localeCompare(b.employer_name ?? "");
         case "industry": {
           const ai = (a.sector_tags ?? [])[0] ?? "";
           const bi = (b.sector_tags ?? [])[0] ?? "";
@@ -476,6 +480,16 @@ const Leads = () => {
     });
     return sorted;
   }, [allLeads, filters]);
+
+  // Reset pagination whenever filters/sort change.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filters]);
+
+  const visibleLeads = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
 
   const activeChipCount =
     filters.countries.length +
@@ -1020,9 +1034,22 @@ const Leads = () => {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filtered.map((l) => (
+                {visibleLeads.map((l) => (
                   <LeadCard key={l.id} lead={l} />
                 ))}
+              </div>
+            )}
+            {!loading && filtered.length > visibleLeads.length && (
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Showing {visibleLeads.length} of {filtered.length} leads
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                >
+                  Load more
+                </Button>
               </div>
             )}
           </div>
@@ -1071,7 +1098,7 @@ const Leads = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((l, i) => (
+                  {visibleLeads.map((l, i) => (
                     <TableRow
                       key={l.id}
                       className={`cursor-pointer hover:bg-muted/50 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
@@ -1222,6 +1249,19 @@ const Leads = () => {
             </div>
           )}
         </Card>
+        )}
+        {viewMode === "table" && !loading && filtered.length > visibleLeads.length && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <p className="text-xs text-muted-foreground">
+              Showing {visibleLeads.length} of {filtered.length} leads
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            >
+              Load more
+            </Button>
+          </div>
         )}
       </div>
 
