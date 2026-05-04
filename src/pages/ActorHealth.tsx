@@ -292,6 +292,8 @@ const ActorHealth = () => {
                     <TableHead className="text-right">Success</TableHead>
                     <TableHead className="text-right">Avg duration</TableHead>
                     <TableHead className="text-right">Items found</TableHead>
+                    <TableHead className="text-right">Avg $/run</TableHead>
+                    <TableHead className="text-right">$/lead</TableHead>
                     <TableHead>Last run</TableHead>
                     <TableHead>Top failure reasons</TableHead>
                   </TableRow>
@@ -336,6 +338,15 @@ const ActorHealth = () => {
                           <div className="text-xs text-muted-foreground">
                             {s.itemsStructured} kept
                           </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {s.avgCostPerRun !== null ? `$${s.avgCostPerRun.toFixed(3)}` : "—"}
+                          <div className="text-[11px] text-muted-foreground">
+                            ${s.totalCostUsd.toFixed(2)} total
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {s.costPerLead !== null ? `$${s.costPerLead.toFixed(3)}` : "—"}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
