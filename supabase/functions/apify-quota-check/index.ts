@@ -31,9 +31,22 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supa
       .from("provider_quota_state")
-      .select("exhausted_at")
+      .select("exhausted_at, cycle_start_at")
       .eq("provider", "apify")
       .maybeSingle();
+
+    // Detect cycle rollover and reset per-source monthly_spend_usd.
+    const newCycleStart = cycle.startAt ?? null;
+    if (
+      newCycleStart &&
+      existing?.cycle_start_at &&
+      new Date(newCycleStart).getTime() > new Date(existing.cycle_start_at).getTime()
+    ) {
+      await supa.from("source_registry").update({
+        monthly_spend_usd: 0,
+        spend_cycle_start: newCycleStart,
+      }).gt("monthly_spend_usd", -1); // touch every row
+    }
 
     await supa.from("provider_quota_state").upsert({
       provider: "apify",
