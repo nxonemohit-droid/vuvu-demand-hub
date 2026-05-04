@@ -540,9 +540,16 @@ const Leads = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => exportLeads(allLeads, "csv")}>
+                <DropdownMenuItem
+                  onClick={() => exportLeads(filtered, "csv", "voynova-leads-filtered")}
+                  disabled={!filtered.length}
+                >
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Export CSV ({allLeads.length})
+                  Download CSV — Filtered ({filtered.length})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportLeads(allLeads, "csv", "voynova-leads-all")}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Download CSV — All ({allLeads.length})
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => exportLeads(allLeads, "json")}>
                   <FileJson className="h-4 w-4 mr-2" />
