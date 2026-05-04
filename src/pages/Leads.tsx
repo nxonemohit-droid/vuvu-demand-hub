@@ -747,6 +747,17 @@ const Leads = () => {
               <Save className="h-4 w-4 mr-2" /> Save preset
             </Button>
             <Button
+              variant={bookmarkedOnly ? "default" : "outline"}
+              onClick={() => setBookmarkedOnly((v) => !v)}
+              aria-pressed={bookmarkedOnly}
+              title="Show only bookmarked leads"
+            >
+              <Star
+                className={`h-4 w-4 mr-2 ${bookmarkedOnly ? "fill-current" : ""}`}
+              />
+              Bookmarked{bookmarkedOnly ? ` (${bookmarkedIds.size})` : ""}
+            </Button>
+            <Button
               variant="ghost"
               onClick={() => setFilters(EMPTY_FILTERS)}
               disabled={!activeChipCount}
