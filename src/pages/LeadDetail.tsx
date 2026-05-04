@@ -7,6 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowLeft,
   Building2,
@@ -22,6 +30,8 @@ import {
   ChevronRight,
   ChevronDown,
   Activity,
+  StickyNote,
+  MessageCircle,
 } from "lucide-react";
 import { countryFlag } from "@/lib/country-flags";
 import {
