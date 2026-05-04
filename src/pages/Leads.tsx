@@ -54,6 +54,9 @@ import {
   Mail,
   Phone,
   RefreshCw,
+  Download,
+  FileJson,
+  FileSpreadsheet,
   Search,
   Globe,
   MapPin,
@@ -87,6 +90,13 @@ import {
 } from "@/lib/lead-taxonomies";
 import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/lead-scoring";
 import { dedupeAndEnrich, type Enrichment } from "@/lib/lead-enrichment";
+import { exportLeads, safeFileSlug } from "@/lib/lead-export";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type RawLead = {
   id: string;
@@ -523,6 +533,23 @@ const Leads = () => {
             <Button size="sm" variant="outline" onClick={load}>
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" disabled={!allLeads.length}>
+                  <Download className="h-4 w-4 mr-2" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportLeads(allLeads, "csv")}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Export CSV ({allLeads.length})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportLeads(allLeads, "json")}>
+                  <FileJson className="h-4 w-4 mr-2" />
+                  Export JSON ({allLeads.length})
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -951,6 +978,16 @@ const Leads = () => {
                           >
                             <Globe className="h-3.5 w-3.5" />
                           </ContactIcon>
+                          <button
+                            type="button"
+                            title="Export this lead as JSON"
+                            onClick={() =>
+                              exportLeads([l], "json", `lead-${safeFileSlug(l.employer_name)}`)
+                            }
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1205,11 +1242,38 @@ function LeadDetailDrawer({ lead, onClose }: { lead: Lead | null; onClose: () =>
         {lead && (
           <>
             <SheetHeader className="p-6 pb-4 border-b">
-              <SheetTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-accent" />
-                {lead.employer_name ?? "Unknown employer"}
-              </SheetTitle>
-              <SheetDescription>{lead.role}</SheetDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <SheetTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-accent shrink-0" />
+                    <span className="truncate">{lead.employer_name ?? "Unknown employer"}</span>
+                  </SheetTitle>
+                  <SheetDescription>{lead.role}</SheetDescription>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline" className="shrink-0">
+                      <Download className="h-4 w-4 mr-2" /> Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        exportLeads([lead], "csv", `lead-${safeFileSlug(lead.employer_name)}`)
+                      }
+                    >
+                      <FileSpreadsheet className="h-4 w-4 mr-2" /> Export CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        exportLeads([lead], "json", `lead-${safeFileSlug(lead.employer_name)}`)
+                      }
+                    >
+                      <FileJson className="h-4 w-4 mr-2" /> Export JSON
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </SheetHeader>
             <ScrollArea className="flex-1">
               <div className="p-6 space-y-6">
