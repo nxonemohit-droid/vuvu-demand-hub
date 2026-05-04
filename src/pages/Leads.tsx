@@ -1260,6 +1260,19 @@ const Leads = () => {
           </div>
         )}
 
+        {/* Data quality bar */}
+        {!loading && filtered.length > 0 && (
+          <Card className="rounded-xl p-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-muted-foreground uppercase tracking-wider mr-1">Data quality</span>
+            <QualityPill label="Email" pct={dataQuality.email} />
+            <QualityPill label="Phone" pct={dataQuality.phone} />
+            <QualityPill label="LinkedIn" pct={dataQuality.linkedin} />
+            <QualityPill label="Fresh" pct={dataQuality.fresh} />
+            <QualityPill label="High trust" pct={dataQuality.highTrust} />
+            <span className="ml-auto text-muted-foreground">{filtered.length} leads</span>
+          </Card>
+        )}
+
         {/* Table */}
         {viewMode === "cards" ? (
           <div>
