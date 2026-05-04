@@ -347,6 +347,13 @@ const Leads = () => {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [bookmarkedOnly, setBookmarkedOnly] = useState(false);
+  const [hideStale, setHideStale] = useState(false);
+  const [minTrust, setMinTrust] = useState<TrustTier | "all">("all");
+  const [roleTypeFilter, setRoleTypeFilter] = useState<RoleType | "all">("all");
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [blacklistedDomains, setBlacklistedDomains] = useState<Set<string>>(new Set());
+  const searchInputRef = useState<HTMLInputElement | null>(null);
 
   const recruiterMode = useMemo(
     () =>
