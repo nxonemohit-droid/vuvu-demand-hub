@@ -76,7 +76,10 @@ async function runApifyActor(actorId: string, input: unknown, timeoutMs: number)
     });
     if (!r.ok) {
       const t = await r.text();
-      throw new Error(`APIFY ${r.status}: ${t.slice(0, 400)}`);
+      const err: any = new Error(`APIFY ${r.status}: ${t.slice(0, 400)}`);
+      err.status = r.status;
+      err.body = t;
+      throw err;
     }
     const items = await r.json();
     const apifyRunId = r.headers.get("x-apify-actor-run-id") ?? null;
@@ -169,8 +172,9 @@ Deno.serve(async (req) => {
       if (!insErr) inserted++;
     }
 
+    const finalStatus = items.length === 0 ? "succeeded_empty" : "succeeded";
     await supa.from("scrape_jobs").update({
-      status: "succeeded",
+      status: finalStatus,
       apify_run_id: apifyRunId,
       items_found: items.length,
       items_structured: inserted,
@@ -181,14 +185,37 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: true, items: items.length, inserted });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    const status = (e as any)?.status as number | undefined;
+    const body = ((e as any)?.body as string | undefined) ?? "";
+    // Classify Apify monthly quota exhaustion as quota_exceeded, not failed.
+    const isQuota =
+      status === 403 &&
+      /monthly|usage|limit|quota|exceeded|reached/i.test(body + " " + msg);
+    const isRateLimit = status === 429;
+    const jobStatus = isQuota ? "quota_exceeded" : "failed";
     try {
       const supa = adminClient();
       const body = await req.clone().json().catch(() => ({}));
       if (body?.scrape_job_id) {
         await supa.from("scrape_jobs").update({
-          status: "failed", error: msg.slice(0, 500), finished_at: new Date().toISOString(),
+          status: jobStatus, error: msg.slice(0, 500), finished_at: new Date().toISOString(),
         }).eq("id", body.scrape_job_id);
-        await logRunEvent(supa, body.scrape_job_id, "actor.error", msg, {}, "error");
+        await logRunEvent(
+          supa, body.scrape_job_id,
+          isQuota ? "actor.quota_exceeded" : (isRateLimit ? "actor.rate_limited" : "actor.error"),
+          msg, { status }, isQuota ? "warn" : "error",
+        );
+        if (isQuota) {
+          // Mark provider as exhausted so dispatcher pauses immediately.
+          const { data: existing } = await supa
+            .from("provider_quota_state").select("exhausted_at").eq("provider", "apify").maybeSingle();
+          await supa.from("provider_quota_state").upsert({
+            provider: "apify",
+            exhausted_at: existing?.exhausted_at ?? new Date().toISOString(),
+            last_checked_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
       }
     } catch (_) { /* swallow */ }
     return jsonResponse({ ok: false, error: msg }, 500);
