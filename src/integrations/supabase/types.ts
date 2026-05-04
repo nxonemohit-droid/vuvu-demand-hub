@@ -461,6 +461,30 @@ export type Database = {
           },
         ]
       }
+      lead_blacklist: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          domain: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          domain: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          domain?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       lead_contact_log: {
         Row: {
           channel: string
@@ -515,6 +539,33 @@ export type Database = {
           notes?: string | null
           status?: Database["public"]["Enums"]["lead_crm_status"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      lead_outreach_log: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          lead_id: string
+          note: string
+          user_id: string | null
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          note: string
+          user_id?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          note?: string
+          user_id?: string | null
         }
         Relationships: []
       }

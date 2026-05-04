@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -116,6 +116,28 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LayoutGrid, List, ArrowUpRight, ArrowLeft } from "lucide-react";
 import { LeadCard } from "@/components/leads/LeadCard";
+import {
+  classifyRoleType,
+  extractDomain,
+  getFreshness,
+  getTrustTier,
+  TRUST_RANK,
+  type TrustTier,
+  type RoleType,
+} from "@/lib/lead-classifiers";
+import { useHotkeys } from "@/hooks/use-hotkeys";
+import {
+  BarChart as RBarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { BarChart3, GitCompareArrows, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 type RawLead = {
   id: string;
@@ -325,6 +347,13 @@ const Leads = () => {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [bookmarkedOnly, setBookmarkedOnly] = useState(false);
+  const [hideStale, setHideStale] = useState(false);
+  const [minTrust, setMinTrust] = useState<TrustTier | "all">("all");
+  const [roleTypeFilter, setRoleTypeFilter] = useState<RoleType | "all">("all");
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [blacklistedDomains, setBlacklistedDomains] = useState<Set<string>>(new Set());
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const recruiterMode = useMemo(
     () =>
@@ -394,6 +423,21 @@ const Leads = () => {
     };
   }, []);
 
+  // Load blacklisted domains.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.from("lead_blacklist").select("domain");
+      if (cancelled || error) return;
+      setBlacklistedDomains(
+        new Set(((data ?? []) as Array<{ domain: string }>).map((r) => r.domain.toLowerCase())),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // persist recruiter mode
   useEffect(() => {
     try {
@@ -414,6 +458,17 @@ const Leads = () => {
       .map((a) => a.slice("employer:".length));
     const out = allLeads.filter((l) => {
       if (bookmarkedOnly && !bookmarkedIds.has(l.id)) return false;
+      if (hideStale && getFreshness(l.created_at) === "stale") return false;
+      if (minTrust !== "all") {
+        const t = getTrustTier(
+          ((l.raw_signals?.payload as Record<string, unknown> | null)?.source as string | undefined) ??
+            l.source_url,
+        );
+        if (TRUST_RANK[t] < TRUST_RANK[minTrust]) return false;
+      }
+      if (roleTypeFilter !== "all") {
+        if (classifyRoleType(l.role, l.target_audience_type) !== roleTypeFilter) return false;
+      }
       if (filters.countries.length && !filters.countries.includes(l.country)) return false;
       if (audPeople.length || audEmployerSectors.length) {
         const matchesPeople =
@@ -507,12 +562,62 @@ const Leads = () => {
       }
     });
     return sorted;
-  }, [allLeads, filters, bookmarkedOnly, bookmarkedIds]);
+  }, [allLeads, filters, bookmarkedOnly, bookmarkedIds, hideStale, minTrust, roleTypeFilter]);
 
   // Reset pagination whenever filters/sort change.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [filters, bookmarkedOnly]);
+  }, [filters, bookmarkedOnly, hideStale, minTrust, roleTypeFilter]);
+
+  // ---- Data quality + stats -------------------------------------------------
+  const dataQuality = useMemo(() => {
+    const n = filtered.length || 1;
+    const stat = (pred: (l: Lead) => boolean) =>
+      Math.round((filtered.filter(pred).length / n) * 100);
+    return {
+      total: filtered.length,
+      email: stat((l) => !!l.contact_email),
+      phone: stat((l) => !!l.contact_phone),
+      linkedin: stat((l) => !!l.linkedin_url),
+      fresh: stat((l) => getFreshness(l.created_at) === "fresh"),
+      highTrust: stat((l) =>
+        getTrustTier(
+          ((l.raw_signals?.payload as Record<string, unknown> | null)?.source as string | undefined) ??
+            l.source_url,
+        ) === "high",
+      ),
+    };
+  }, [filtered]);
+
+  const stats = useMemo(() => {
+    const countries = new Map<string, number>();
+    const industries = new Map<string, number>();
+    const sources = new Map<string, number>();
+    let scoreSum = 0;
+    for (const l of filtered) {
+      countries.set(l.country, (countries.get(l.country) ?? 0) + 1);
+      for (const t of l.sector_tags ?? []) {
+        industries.set(t, (industries.get(t) ?? 0) + 1);
+      }
+      const src = getTrustTier(
+        ((l.raw_signals?.payload as Record<string, unknown> | null)?.source as string | undefined) ??
+          l.source_url,
+      );
+      sources.set(src, (sources.get(src) ?? 0) + 1);
+      scoreSum += l.computed_score ?? 0;
+    }
+    const top = (m: Map<string, number>, n = 5) =>
+      Array.from(m.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, n)
+        .map(([name, value]) => ({ name, value }));
+    return {
+      countries: top(countries),
+      industries: top(industries),
+      sources: Array.from(sources.entries()).map(([name, value]) => ({ name, value })),
+      avgScore: filtered.length ? Math.round(scoreSum / filtered.length) : 0,
+    };
+  }, [filtered]);
 
   const visibleLeads = useMemo(
     () => filtered.slice(0, visibleCount),
@@ -576,6 +681,22 @@ const Leads = () => {
   );
 
   const clearSelection = () => setSelectedIds(new Set());
+
+  const clearAllFilters = () => {
+    setFilters(EMPTY_FILTERS);
+    setBookmarkedOnly(false);
+    setHideStale(false);
+    setMinTrust("all");
+    setRoleTypeFilter("all");
+  };
+
+  useHotkeys({
+    "/": (e) => {
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    },
+    Escape: () => clearAllFilters(),
+  });
 
   const bulkExportCsv = () => {
     if (!selectedLeads.length) return;
@@ -757,6 +878,7 @@ const Leads = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                ref={searchInputRef}
                 placeholder="Search employer, role, city, sector, contact…"
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
@@ -838,6 +960,53 @@ const Leads = () => {
               selected={filters.sizes}
               onChange={(v) => setFilters({ ...filters, sizes: v })}
             />
+          </div>
+
+          {/* Trust / role / stale row */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Trust tier</Label>
+              <Select value={minTrust} onValueChange={(v) => setMinTrust(v as TrustTier | "all")}>
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All sources</SelectItem>
+                  <SelectItem value="high">High (Company / LinkedIn)</SelectItem>
+                  <SelectItem value="medium">Medium (Indeed / Directory)</SelectItem>
+                  <SelectItem value="low">Low (Facebook / Classifieds)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Role type</Label>
+              <Select value={roleTypeFilter} onValueChange={(v) => setRoleTypeFilter(v as RoleType | "all")}>
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All roles</SelectItem>
+                  <SelectItem value="decision_maker">Decision Maker</SelectItem>
+                  <SelectItem value="recruiter">Recruiter</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <Label htmlFor="hide-stale" className="text-xs text-muted-foreground cursor-pointer">
+                Hide stale (&gt;45d)
+              </Label>
+              <Switch id="hide-stale" checked={hideStale} onCheckedChange={setHideStale} />
+            </div>
+            <Button
+              size="sm"
+              variant={statsOpen ? "default" : "outline"}
+              onClick={() => setStatsOpen((v) => !v)}
+              aria-pressed={statsOpen}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              {statsOpen ? "Hide stats" : "Stats"}
+            </Button>
           </div>
 
           {/* Score slider + date range */}
@@ -1076,6 +1245,12 @@ const Leads = () => {
               <Button size="sm" onClick={bulkAddToOutreach}>
                 <Send className="h-4 w-4 mr-2" /> Add to Outreach
               </Button>
+              {selectedIds.size >= 2 && (
+                <Button size="sm" variant="secondary" onClick={() => setCompareOpen(true)}>
+                  <GitCompareArrows className="h-4 w-4 mr-2" />
+                  Compare ({selectedIds.size})
+                </Button>
+              )}
               <div className="ml-auto">
                 <Button size="sm" variant="ghost" onClick={clearSelection}>
                   <X className="h-4 w-4 mr-1" /> Clear
@@ -1083,6 +1258,19 @@ const Leads = () => {
               </div>
             </Card>
           </div>
+        )}
+
+        {/* Data quality bar */}
+        {!loading && filtered.length > 0 && (
+          <Card className="rounded-xl p-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-muted-foreground uppercase tracking-wider mr-1">Data quality</span>
+            <QualityPill label="Email" pct={dataQuality.email} />
+            <QualityPill label="Phone" pct={dataQuality.phone} />
+            <QualityPill label="LinkedIn" pct={dataQuality.linkedin} />
+            <QualityPill label="Fresh" pct={dataQuality.fresh} />
+            <QualityPill label="High trust" pct={dataQuality.highTrust} />
+            <span className="ml-auto text-muted-foreground">{filtered.length} leads</span>
+          </Card>
         )}
 
         {/* Table */}
@@ -1095,13 +1283,11 @@ const Leads = () => {
                 ))}
               </div>
             ) : filtered.length === 0 ? (
-              <Card className="p-12 text-center text-sm text-muted-foreground rounded-xl">
-                No leads match your filters. Try clearing some chips or turning off Recruiter Mode.
-              </Card>
+              <FilteredEmptyState onClear={clearAllFilters} />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {visibleLeads.map((l) => (
-                  <LeadCard key={l.id} lead={l} />
+                  <LeadCard key={l.id} lead={l} blacklistedDomains={blacklistedDomains} />
                 ))}
               </div>
             )}
@@ -1128,8 +1314,8 @@ const Leads = () => {
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-12 text-center text-sm text-muted-foreground">
-              No leads match your filters. Try clearing some chips or turning off Recruiter Mode.
+            <div className="p-12">
+              <FilteredEmptyState onClear={clearAllFilters} />
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1354,6 +1540,73 @@ const Leads = () => {
       </Dialog>
 
       <LeadDetailDrawer lead={selected} onClose={() => setSelected(null)} />
+
+      {/* Stats sidebar */}
+      <Sheet open={statsOpen} onOpenChange={setStatsOpen}>
+        <SheetContent side="right" className="w-[380px] sm:w-[420px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Stats</SheetTitle>
+            <SheetDescription>{filtered.length} leads in current filter</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-6">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Average score</div>
+              <div className="text-3xl font-bold">{stats.avgScore}<span className="text-base text-muted-foreground"> / 100</span></div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Top countries</div>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RBarChart data={stats.countries} layout="vertical" margin={{ left: 10 }}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                    <RTooltip cursor={{ fill: "hsl(var(--muted))" }} />
+                    <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  </RBarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Top industries</div>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RBarChart data={stats.industries} layout="vertical" margin={{ left: 10 }}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                    <RTooltip cursor={{ fill: "hsl(var(--muted))" }} />
+                    <Bar dataKey="value" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
+                  </RBarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Source trust</div>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={stats.sources} dataKey="value" nameKey="name" innerRadius={36} outerRadius={64}>
+                      {stats.sources.map((s) => (
+                        <Cell key={s.name} fill={s.name === "high" ? "hsl(142 71% 45%)" : s.name === "medium" ? "hsl(38 92% 50%)" : "hsl(var(--destructive))"} />
+                      ))}
+                    </Pie>
+                    <RTooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Compare modal */}
+      <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Compare leads ({selectedLeads.length})</DialogTitle>
+          </DialogHeader>
+          <CompareTable leads={selectedLeads} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -1998,6 +2251,85 @@ function Field({
         {label}
       </div>
       <div className="font-medium break-words">{value}</div>
+    </div>
+  );
+}
+
+function QualityPill({ label, pct }: { label: string; pct: number }) {
+  const tone =
+    pct >= 70
+      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+      : pct >= 40
+        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+        : "bg-destructive/10 text-destructive border-destructive/30";
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[11px] ${tone}`}>
+      <span className="font-medium">{label}</span>
+      <span className="tabular-nums">{pct}%</span>
+    </span>
+  );
+}
+
+function FilteredEmptyState({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center py-8">
+      <Search className="h-10 w-10 text-muted-foreground mb-3" />
+      <h3 className="text-base font-semibold">No leads match these filters</h3>
+      <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+        Try removing a filter, broadening your search, or clearing all filters to start over.
+      </p>
+      <Button className="mt-4" onClick={onClear}>
+        <X className="h-4 w-4 mr-2" /> Clear all filters
+      </Button>
+    </div>
+  );
+}
+
+function CompareTable({ leads }: { leads: Lead[] }) {
+  if (leads.length < 2) {
+    return <p className="text-sm text-muted-foreground">Select 2 or more leads to compare.</p>;
+  }
+  const bestScore = Math.max(...leads.map((l) => l.computed_score ?? 0));
+  const newest = Math.max(...leads.map((l) => new Date(l.created_at).getTime()));
+  const rows: { label: string; render: (l: Lead) => React.ReactNode; isBest: (l: Lead) => boolean }[] = [
+    { label: "Score", render: (l) => Math.round(l.computed_score ?? 0), isBest: (l) => (l.computed_score ?? 0) === bestScore },
+    { label: "Country", render: (l) => l.country, isBest: () => false },
+    { label: "Role", render: (l) => l.role, isBest: () => false },
+    { label: "Email", render: (l) => l.contact_email ?? "—", isBest: (l) => !!l.contact_email },
+    { label: "Phone", render: (l) => l.contact_phone ?? "—", isBest: (l) => !!l.contact_phone },
+    { label: "LinkedIn", render: (l) => (l.linkedin_url ? "Yes" : "—"), isBest: (l) => !!l.linkedin_url },
+    { label: "Website", render: (l) => (l.website_url ? "Yes" : "—"), isBest: (l) => !!l.website_url },
+    { label: "Created", render: (l) => new Date(l.created_at).toLocaleDateString("en-GB"), isBest: (l) => new Date(l.created_at).getTime() === newest },
+  ];
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left py-2 pr-3 text-xs uppercase tracking-wider text-muted-foreground">Field</th>
+            {leads.map((l) => (
+              <th key={l.id} className="text-left py-2 px-3 font-semibold">
+                {l.employer_name ?? "Unknown"}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label} className="border-b last:border-0">
+              <td className="py-2 pr-3 text-xs text-muted-foreground">{row.label}</td>
+              {leads.map((l) => (
+                <td
+                  key={l.id}
+                  className={`py-2 px-3 ${row.isBest(l) ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-medium" : ""}`}
+                >
+                  {row.render(l)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

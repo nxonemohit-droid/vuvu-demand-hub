@@ -57,11 +57,11 @@ type ContactLogEntry = {
 };
 
 const CHANNEL_OPTIONS: { value: string; label: string }[] = [
-  { value: "note", label: "Note" },
   { value: "email", label: "Email" },
-  { value: "phone", label: "Phone" },
   { value: "linkedin", label: "LinkedIn" },
-  { value: "meeting", label: "Meeting" },
+  { value: "phone", label: "Phone" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "note", label: "Note" },
 ];
 
 function channelIcon(channel: string) {
@@ -72,6 +72,8 @@ function channelIcon(channel: string) {
       return <Phone className="h-3.5 w-3.5" />;
     case "linkedin":
       return <Linkedin className="h-3.5 w-3.5" />;
+    case "whatsapp":
+      return <MessageCircle className="h-3.5 w-3.5" />;
     case "meeting":
       return <MessageCircle className="h-3.5 w-3.5" />;
     default:
@@ -96,7 +98,7 @@ export default function LeadDetail() {
     if (!id) return;
     setLogLoading(true);
     const { data, error } = await supabase
-      .from("lead_contact_log")
+      .from("lead_outreach_log")
       .select("id, channel, note, created_at, user_id")
       .eq("lead_id", id)
       .order("created_at", { ascending: false });
@@ -117,7 +119,7 @@ export default function LeadDetail() {
     }
     setSavingLog(true);
     const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase.from("lead_contact_log").insert({
+    const { error } = await supabase.from("lead_outreach_log").insert({
       lead_id: id,
       channel: newChannel,
       note,
