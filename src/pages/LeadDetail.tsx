@@ -98,7 +98,7 @@ export default function LeadDetail() {
     if (!id) return;
     setLogLoading(true);
     const { data, error } = await supabase
-      .from("lead_contact_log")
+      .from("lead_outreach_log")
       .select("id, channel, note, created_at, user_id")
       .eq("lead_id", id)
       .order("created_at", { ascending: false });
@@ -119,7 +119,7 @@ export default function LeadDetail() {
     }
     setSavingLog(true);
     const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase.from("lead_contact_log").insert({
+    const { error } = await supabase.from("lead_outreach_log").insert({
       lead_id: id,
       channel: newChannel,
       note,
