@@ -327,11 +327,25 @@ const Leads = () => {
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
+    const fromMs = isoDay(filters.dateFrom);
+    const toMs = isoDay(filters.dateTo);
+    // Split audience filter into "people" types and "employer:<sector>" tags.
+    const audPeople = filters.audiences.filter((a) => !a.startsWith("employer:"));
+    const audEmployerSectors = filters.audiences
+      .filter((a) => a.startsWith("employer:"))
+      .map((a) => a.slice("employer:".length));
     const out = allLeads.filter((l) => {
       if (filters.countries.length && !filters.countries.includes(l.country)) return false;
-      if (filters.audiences.length) {
-        if (!l.target_audience_type || !filters.audiences.includes(l.target_audience_type))
-          return false;
+      if (audPeople.length || audEmployerSectors.length) {
+        const matchesPeople =
+          audPeople.length > 0 &&
+          l.target_audience_type != null &&
+          audPeople.includes(l.target_audience_type);
+        const matchesEmployer =
+          audEmployerSectors.length > 0 &&
+          l.target_audience_type === "employer_direct" &&
+          (l.sector_tags ?? []).some((t) => audEmployerSectors.includes(t));
+        if (!matchesPeople && !matchesEmployer) return false;
       }
       if (filters.workerOrigins.length) {
         const focus = l.worker_origin_focus ?? [];
@@ -340,6 +354,20 @@ const Leads = () => {
       if (filters.sectors.length) {
         const tags = l.sector_tags ?? [];
         if (!tags.some((t) => filters.sectors.includes(t))) return false;
+      }
+      if (filters.sizes.length && !filters.sizes.includes(l.company_size)) return false;
+      if (filters.minScore > 0) {
+        const s = l.score ?? l.urgency_score ?? 0;
+        if (s < filters.minScore) return false;
+      }
+      if (fromMs != null) {
+        const t = new Date(l.created_at).getTime();
+        if (t < fromMs) return false;
+      }
+      if (toMs != null) {
+        const t = new Date(l.created_at).getTime();
+        // include the whole "to" day
+        if (t > toMs + 24 * 3600 * 1000 - 1) return false;
       }
       for (const req of filters.contactReq) {
         if (req === "email" && !l.contact_email) return false;
@@ -394,7 +422,11 @@ const Leads = () => {
     filters.audiences.length +
     filters.workerOrigins.length +
     filters.sectors.length +
+    filters.sizes.length +
     filters.contactReq.length +
+    (filters.minScore > 0 ? 1 : 0) +
+    (filters.dateFrom ? 1 : 0) +
+    (filters.dateTo ? 1 : 0) +
     (filters.search ? 1 : 0);
 
   const toggleRecruiterMode = (on: boolean) => {
