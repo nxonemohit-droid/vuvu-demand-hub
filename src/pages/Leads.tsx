@@ -978,6 +978,16 @@ const Leads = () => {
                           >
                             <Globe className="h-3.5 w-3.5" />
                           </ContactIcon>
+                          <button
+                            type="button"
+                            title="Export this lead as JSON"
+                            onClick={() =>
+                              exportLeads([l], "json", `lead-${safeFileSlug(l.employer_name)}`)
+                            }
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </TableCell>
                     </TableRow>
