@@ -377,6 +377,18 @@ const Index = () => {
               </ul>
             )}
           </Card>
+
+          {/* PIPELINE FUNNEL */}
+          <Card className="p-5 rounded-xl lg:col-span-3">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-semibold">Pipeline funnel</h2>
+                <p className="text-xs text-muted-foreground">Lead progression through CRM stages</p>
+              </div>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <FunnelStrip funnel={funnel} />
+          </Card>
         </div>
           </div>
 
