@@ -818,6 +818,16 @@ const Leads = () => {
             <Button size="sm" variant="outline" onClick={load}>
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                onClick={() => setCleanupOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" /> Clean up
+              </Button>
+            )}
             <div
               className="inline-flex rounded-md border bg-card overflow-hidden"
               role="group"
