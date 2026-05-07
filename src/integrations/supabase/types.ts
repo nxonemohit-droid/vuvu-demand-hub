@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      archived_leads: {
+        Row: {
+          archived_at: string
+          archived_by: string
+          archived_reason: string | null
+          id: string
+          original_id: string | null
+          payload: Json | null
+        }
+        Insert: {
+          archived_at?: string
+          archived_by?: string
+          archived_reason?: string | null
+          id?: string
+          original_id?: string | null
+          payload?: Json | null
+        }
+        Update: {
+          archived_at?: string
+          archived_by?: string
+          archived_reason?: string | null
+          id?: string
+          original_id?: string | null
+          payload?: Json | null
+        }
+        Relationships: []
+      }
       candidates: {
         Row: {
           available_from: string | null
@@ -731,6 +758,7 @@ export type Database = {
           job_id: string | null
           last_seen_at: string
           payload: Json
+          quality_score: number
           raw_text: string | null
           seen_count: number
           source: Database["public"]["Enums"]["demand_source"]
@@ -746,6 +774,7 @@ export type Database = {
           job_id?: string | null
           last_seen_at?: string
           payload?: Json
+          quality_score?: number
           raw_text?: string | null
           seen_count?: number
           source: Database["public"]["Enums"]["demand_source"]
@@ -761,6 +790,7 @@ export type Database = {
           job_id?: string | null
           last_seen_at?: string
           payload?: Json
+          quality_score?: number
           raw_text?: string | null
           seen_count?: number
           source?: Database["public"]["Enums"]["demand_source"]
@@ -1009,6 +1039,10 @@ export type Database = {
         }
         Returns: string
       }
+      archive_and_delete_raw_signal: {
+        Args: { _by?: string; _id: string; _reason: string }
+        Returns: string
+      }
       compute_quality_score: {
         Args: {
           _contact_email: string
@@ -1016,6 +1050,10 @@ export type Database = {
           _employer_name: string
           _role: string
         }
+        Returns: number
+      }
+      compute_raw_signal_quality_score: {
+        Args: { _payload: Json; _source: string }
         Returns: number
       }
       has_role: {
