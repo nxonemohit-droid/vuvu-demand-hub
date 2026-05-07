@@ -21,6 +21,40 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
+const VArrowLogo = ({ className }: { className?: string }) => {
+  const gid = useId().replace(/:/g, "");
+  return (
+    <svg viewBox="0 0 32 32" fill="none" className={className}>
+      <path
+        d="M4 24 L16 8 L28 24"
+        stroke={`url(#${gid})`}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16 8 L16 3"
+        stroke={`url(#${gid})`}
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12.5 6 L16 2 L19.5 6"
+        stroke={`url(#${gid})`}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="32" y2="0">
+          <stop offset="0%" stopColor="#C9A84C" />
+          <stop offset="100%" stopColor="#8B6914" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+};
+
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/demand", label: "Demand Intelligence", icon: Radar },
