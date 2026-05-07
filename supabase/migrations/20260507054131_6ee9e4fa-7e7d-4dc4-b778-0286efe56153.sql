@@ -1,0 +1,2 @@
+REVOKE EXECUTE ON FUNCTION public.archive_and_delete_raw_signal(uuid, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.archive_and_delete_raw_signal(uuid, text, text) TO service_role;
