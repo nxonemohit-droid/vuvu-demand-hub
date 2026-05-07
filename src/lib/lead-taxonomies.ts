@@ -53,7 +53,7 @@ export const COMPANY_SIZE_OPTIONS: { value: string; label: string }[] = [
   { value: "unknown", label: "Unknown size" },
 ];
 
-export type SortKey = "priority" | "recency" | "country" | "industry" | "demand" | "employer";
+export type SortKey = "priority" | "recency" | "country" | "industry" | "demand" | "employer" | "quality_desc" | "quality_asc";
 
 export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "priority", label: "Priority (high → low)" },
@@ -75,6 +75,7 @@ export type LeadFilters = {
   sizes: string[];
   contactReq: ContactRequirement[];
   minScore: number;            // 0..100
+  minQuality: number;          // 0..100 data quality
   dateFrom: string | null;     // ISO yyyy-mm-dd
   dateTo: string | null;       // ISO yyyy-mm-dd
   sort: SortKey;
@@ -89,6 +90,7 @@ export const EMPTY_FILTERS: LeadFilters = {
   sizes: [],
   contactReq: [],
   minScore: 0,
+  minQuality: 0,
   dateFrom: null,
   dateTo: null,
   sort: "priority",
