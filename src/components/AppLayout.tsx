@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import {
   LayoutDashboard,
   Radar,
@@ -20,6 +20,40 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+
+const VArrowLogo = ({ className }: { className?: string }) => {
+  const gid = useId().replace(/:/g, "");
+  return (
+    <svg viewBox="0 0 32 32" fill="none" className={className}>
+      <path
+        d="M4 24 L16 8 L28 24"
+        stroke={`url(#${gid})`}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16 8 L16 3"
+        stroke={`url(#${gid})`}
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12.5 6 L16 2 L19.5 6"
+        stroke={`url(#${gid})`}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="32" y2="0">
+          <stop offset="0%" stopColor="#C9A84C" />
+          <stop offset="100%" stopColor="#8B6914" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+};
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -53,9 +87,16 @@ export const AppLayout = () => {
   return (
     <div className="min-h-screen flex bg-muted/20">
       <aside className="w-64 shrink-0 border-r bg-background flex flex-col">
-        <div className="px-6 py-5 border-b">
-          <div className="font-bold text-primary text-lg leading-tight">Voynova</div>
-          <div className="text-xs text-muted-foreground">VUva OS</div>
+        <div className="px-5 py-5 border-b flex items-center gap-2.5">
+          <VArrowLogo className="h-9 w-9 shrink-0" />
+          <div className="leading-tight">
+            <div className="font-extrabold text-[15px] bg-gradient-to-r from-[#C9A84C] to-[#8B6914] bg-clip-text text-transparent tracking-wide">
+              VOYNOVA
+            </div>
+            <div className="font-bold text-[10px] bg-gradient-to-r from-[#C9A84C] to-[#8B6914] bg-clip-text text-transparent tracking-[0.15em] uppercase">
+              Global Solutions
+            </div>
+          </div>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems
