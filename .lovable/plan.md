@@ -1,64 +1,117 @@
-## Scope verification
+## Current state (verified against the database)
 
-I checked the database before planning. A few key findings drive the plan:
+- `demand_leads`: **1,012 rows total**
+  - 737 with `quality_score < 40`
+  - 822 with **no email AND no phone**
+  - 923 with no phone, 828 with no email
+  - Only 2 with no employer at all
+- Infrastructure already in place from prior turns:
+  - `compute_quality_score(employer, role, email, phone)` + trigger on `demand_leads`
+  - `archived_leads` table + `archive_and_delete_raw_signal()` helper (raw_signals only)
+  - `qualityTier()` UI badge + Min-quality filter on the Leads page
 
-**Schema realities:**
-- `scrape_jobs` already has an `error` column (text). DiscoveryRuns.tsx already renders it via an `ErrorTooltip`. Task 1 is mostly polish (truncation length, copy button, row border).
-- `quality_score` already exists on **`demand_leads`** (added in the previous turn) with a trigger and backfill. The Leads page reads from `demand_leads`, not `raw_signals`. Task 2's spec says to add it to `raw_signals` — but the UI portion of Task 2 (badge, filter, sort on the Leads page) operates on `demand_leads` rows. **I'll mirror the same column + trigger onto `raw_signals` as requested, and reuse the existing `demand_leads.quality_score` for the UI** so we don't double-store or rewrite the Leads query pipeline.
-- `archived_leads` does not exist. Will create it.
-- `raw_signals` columns: `id, job_id, source, source_url, source_id, raw_text, payload, fingerprint, structured, created_at, last_seen_at, seen_count, company_domain` — no `employer_name`/`role`/`contact_*` columns; those live in `payload` JSON or in `demand_leads`. So `compute_quality_score` for `raw_signals` must read from `payload` keys.
-- I searched `src/` and `supabase/functions/` for `.delete()` calls on `raw_signals` — there are **none** today. Task 3's "replace hard-deletes with soft-archive" therefore creates the table + helper now, and we wire it in when/if a delete UI is added.
+So the cleanup is essentially: apply the existing quality gate to `demand_leads` and route the losers to `archived_leads` instead of hard-deleting.
 
-## Task 1 — Failed-run error UX (DiscoveryRuns.tsx)
+---
 
-- Replace `ErrorTooltip` with: truncated text (120 chars) + `ClipboardCopy` icon button. Tooltip max-w 400px, `whitespace-pre-wrap`. Click copies full error, `toast.success("Copied!")`.
-- Add a `getRowBorderClass(status)` helper applied to each `<TableRow>`:
-  - `succeeded`/`succeeded_empty` → `border-l-4 border-green-500`
-  - `failed`/`quota_exceeded` → `border-l-4 border-red-500`
-  - `running` → `border-l-4 border-yellow-400`
-  - else → no border.
+## Part A — Clean up "leads with no information"
 
-## Task 2 — Quality score
+### A1. Define the gate
+Use the existing `quality_score` (already computed by trigger):
+- **Archive** any `demand_leads` row where `quality_score < 40` **AND** (no email AND no phone). This protects employer-only or role-only signals that may still be valuable.
+- Threshold and rule are admin-configurable via the cleanup dialog (default 40 / require-no-contact = on).
 
-**DB migration** (additive only — does not touch existing `demand_leads.quality_score`):
-- `ALTER TABLE raw_signals ADD COLUMN IF NOT EXISTS quality_score integer NOT NULL DEFAULT 0;`
-- New SQL function `compute_raw_signal_quality_score(_payload jsonb, _source text)` returning int. Reads payload keys: `employer_name`/`employer`/`company`, `email`/`contact_email`, `phone`/`contact_phone`, `role`/`title`/`job_title`, `website`/`company_website`/`url`. Scoring rules per spec, capped 0–100.
-- New trigger function `raw_signals_set_quality_score()` → `BEFORE INSERT OR UPDATE OF payload, source ON raw_signals`.
-- Backfill: `UPDATE raw_signals SET quality_score = compute_raw_signal_quality_score(payload, source::text);`
-- Index `idx_raw_signals_quality_score` on `quality_score DESC`.
+### A2. Soft-archive, never hard-delete
+Extend the existing soft-archive pattern from `raw_signals` to `demand_leads`:
 
-**UI on Leads page** (uses existing `demand_leads.quality_score`):
-- Add `quality_score` to the SELECT in `load()`.
-- Add badge component `QualityBadge`: 70+ green ★, 40-69 yellow ◑, 0-39 red ✕. Render in card + table views.
-- Add "Min Score" number input to the filter bar; default 0; filters list client-side.
-- Add `quality_score` as a sortable column header in the table view (asc/desc toggle).
+- New SQL helper `archive_and_delete_demand_lead(_id uuid, _reason text, _by text)`:
+  1. `INSERT INTO archived_leads (original_id, archived_reason, archived_by, payload) SELECT id, _reason, _by, to_jsonb(dl.*) FROM demand_leads dl WHERE id = _id`
+  2. `DELETE FROM demand_leads WHERE id = _id`
+  Atomic, `SECURITY DEFINER`, admin-only via RLS check inside the function.
+- Bulk variant `archive_low_quality_demand_leads(_min_score int, _require_no_contact bool, _by text) RETURNS int` returning the count archived.
 
-## Task 3 — Soft archive
+### A3. UI: "Clean up low-quality leads" action (admin only)
+On `src/pages/Leads.tsx`, add a destructive button next to the existing filter bar:
+- Opens a confirm dialog showing: threshold input (default 40), "also require missing email & phone" toggle (default on), and a **live preview count** (client-side filter of already-loaded rows + a quick `head: count` Supabase query for accuracy).
+- On confirm, call the bulk RPC, toast `Archived N leads`, refresh list.
+- Single-row archive button on each card / detail page using `archive_and_delete_demand_lead`.
+- All archive actions write to `lead_contact_log` so we have an audit trail.
 
-**DB migration:**
-```
-CREATE TABLE public.archived_leads (
-  id uuid PK default gen_random_uuid(),
-  original_id uuid,
-  archived_at timestamptz default now(),
-  archived_reason text check (archived_reason in
-    ('missing_contact','duplicate','low_quality','wrong_trade','manual')),
-  archived_by text default 'system',
-  payload jsonb
-);
-```
-RLS enabled; team SELECT/INSERT policies (matching existing project pattern using `private.is_team_member`); admin DELETE.
+### A4. Restore path
+Small `/archived` route (admin-only) listing `archived_leads` with a "Restore" button that re-inserts the JSONB payload back into `demand_leads` and removes the archive row.
 
-**Helper SQL function** `archive_and_delete_raw_signal(_id uuid, _reason text, _by text)` that copies the row to `archived_leads` then deletes it — single call, atomic.
+---
 
-**Code wiring:** since no delete-on-raw_signals call sites exist yet, I won't invent UI. The helper is ready for the future quality-gate (score < 40) auto-archive job and any upcoming bulk-delete buttons. I'll note this in the migration comment.
+## Part B — Increase lead quality going forward
 
-## Files touched
+The cleanup is a one-shot fix. Quality has to be improved **upstream** so we don't refill the bucket with junk next week.
 
-- `supabase/migrations/<new>.sql` — raw_signals.quality_score + trigger + backfill, archived_leads table + RLS + helper fn.
-- `src/pages/DiscoveryRuns.tsx` — copy button, tooltip styling, row border colors.
-- `src/pages/Leads.tsx` — select quality_score, QualityBadge in card/table, Min Score filter, sortable column.
+### B1. Quality at ingestion (block junk before it lands)
+In `supabase/functions/structure-leads` (and any other writer into `demand_leads`):
+- Compute `quality_score` in the edge function before insert.
+- If score `< 25` → write straight to `archived_leads` with reason `low_quality_at_ingest` instead of `demand_leads`.
+- If `25 ≤ score < 40` → insert into `demand_leads` but mark `review_status = 'needs_enrichment'` (new enum value) so the UI can surface them in a separate queue.
+- Score `≥ 40` → normal insert.
 
-## Open question
+### B2. Stronger scoring signals
+Extend `compute_quality_score` (additive, backwards-compatible):
+- `+10` if employer has a resolvable website domain (`raw_signals.company_domain` not null).
+- `+10` if `country` and `city` both present.
+- `+10` if `source` is in a trusted set (`linkedin`, `indeed`, `bebity`).
+- `+5` if `salary_min` or `demand_size` is populated.
+- Cap at 100. Re-backfill via UPDATE after migration.
 
-Task 2 explicitly says `ALTER TABLE raw_signals`, but Task 3's "future quality gate auto-archiving (score < 40)" implies the score that gates archiving lives where deletes happen — on `raw_signals`. The previous turn already added the same column to `demand_leads`. **I'm proceeding with: add to `raw_signals` (per spec) AND keep the existing `demand_leads.quality_score` for the Leads UI.** If you'd rather I drop one of them, say which.
+### B3. Auto-enrichment pass (cheap wins first)
+Nightly cron edge function `enrich-low-quality-leads`:
+1. Pick `demand_leads` where `quality_score BETWEEN 25 AND 60` and `last_enriched_at IS NULL OR > 7d`.
+2. If employer has a website → run a Firecrawl single-page scrape of `/contact` / `/about` to extract email + phone (regex), populate `contact_email` / `contact_phone`.
+3. If still no email and we have an employer + domain → call existing `hunter-enrich` function.
+4. Trigger re-scores the row automatically.
+
+Add a `last_enriched_at timestamptz` and `enrichment_attempts int` column to `demand_leads` so we don't loop on the same dead-end leads.
+
+### B4. Source-quality feedback loop
+- New view `source_quality_stats` aggregating, per `source`: total leads, % `quality_score ≥ 40`, % archived, avg score over last 30 days.
+- Surface on `ActorHealth.tsx` as a "Source quality" panel.
+- Auto-action: if a source's 30-day "% archived" exceeds 70%, flip `source_registry.enabled = false` and log a `scrape_run_event` so the team can review before re-enabling.
+
+### B5. Dedupe hardening
+Today `dedupeAndEnrich` runs client-side. Promote it to the DB:
+- Add a generated column `dedupe_fingerprint` on `demand_leads` = lower(employer_name) || '|' || lower(role) || '|' || country.
+- Unique partial index where `dedupe_fingerprint IS NOT NULL`.
+- `structure-leads` does an `ON CONFLICT (dedupe_fingerprint) DO UPDATE` that bumps `seen_count` and merges contact fields (COALESCE) — this naturally upgrades a low-quality lead when a richer duplicate arrives instead of creating a second junk row.
+
+### B6. Discovery-time keyword tightening
+The discovery prompts/keywords feeding Firecrawl/Apify are the root cause of garbage. Add to `KeywordAudit.tsx`:
+- Per-keyword "yield" metric = leads with `quality_score ≥ 40` / total leads produced.
+- Sort keywords by yield ascending; flag bottom-quartile for review or removal.
+
+---
+
+## Technical details
+
+### Migrations
+1. `archive_and_delete_demand_lead(uuid, text, text)` + `archive_low_quality_demand_leads(int, bool, text)`.
+2. Extend `compute_quality_score` with the new signals; re-run backfill `UPDATE demand_leads SET quality_score = compute_quality_score(...)`.
+3. `ALTER TABLE demand_leads ADD COLUMN last_enriched_at timestamptz, ADD COLUMN enrichment_attempts int NOT NULL DEFAULT 0`.
+4. `dedupe_fingerprint` generated column + partial unique index.
+5. `source_quality_stats` view.
+6. New enum value `'needs_enrichment'` for `review_status` (it's a text column today — just a CHECK / constant).
+
+### Edge functions
+- New: `enrich-low-quality-leads` (cron, daily 03:00 UTC).
+- Modify: `structure-leads` (compute score before insert, route by tier, ON CONFLICT merge).
+
+### Frontend
+- `Leads.tsx`: Clean-up dialog, single-row archive button, "Needs enrichment" tab/filter.
+- New `ArchivedLeads.tsx` page + nav entry (admin only).
+- `ActorHealth.tsx`: Source quality panel.
+- `KeywordAudit.tsx`: Yield column.
+
+---
+
+## Open questions before I start
+
+1. **Cleanup gate** — go with `quality_score < 40 AND no email AND no phone` (strict, ~600 leads), or just `quality_score < 40` (737 leads)?
+2. **Auto-archive at ingest threshold** — is `< 25` the right cutoff for hard rejection, or do you want everything below 40 to be reviewable?
+3. **Scope of this build** — implement everything (A + B), or land Part A (cleanup + soft-archive UI) first and Part B (upstream quality) in a follow-up?
