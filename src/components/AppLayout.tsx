@@ -87,9 +87,16 @@ export const AppLayout = () => {
   return (
     <div className="min-h-screen flex bg-muted/20">
       <aside className="w-64 shrink-0 border-r bg-background flex flex-col">
-        <div className="px-6 py-5 border-b">
-          <div className="font-bold text-primary text-lg leading-tight">Voynova</div>
-          <div className="text-xs text-muted-foreground">VUva OS</div>
+        <div className="px-5 py-5 border-b flex items-center gap-2.5">
+          <VArrowLogo className="h-9 w-9 shrink-0" />
+          <div className="leading-tight">
+            <div className="font-extrabold text-[15px] bg-gradient-to-r from-[#C9A84C] to-[#8B6914] bg-clip-text text-transparent tracking-wide">
+              VOYNOVA
+            </div>
+            <div className="font-bold text-[10px] bg-gradient-to-r from-[#C9A84C] to-[#8B6914] bg-clip-text text-transparent tracking-[0.15em] uppercase">
+              Global Solutions
+            </div>
+          </div>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems
