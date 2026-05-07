@@ -17,6 +17,7 @@ import DemandIntelligence from "./pages/DemandIntelligence.tsx";
 import DemandLeadDetail from "./pages/DemandLeadDetail.tsx";
 import Settings from "./pages/Settings.tsx";
 import ArchivedLeads from "./pages/ArchivedLeads.tsx";
+import Recruiters from "./pages/Recruiters.tsx";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/leads" element={<Leads />} />
             <Route path="/leads/archived" element={<ArchivedLeads />} />
             <Route path="/leads/:id" element={<LeadDetail />} />
+            <Route path="/recruiters" element={<Recruiters />} />
             <Route path="/candidates" element={<Candidates />} />
             <Route path="/runs" element={<DiscoveryRuns />} />
             <Route path="/demand" element={<DemandIntelligence />} />
