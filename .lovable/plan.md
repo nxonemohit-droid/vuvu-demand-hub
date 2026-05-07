@@ -1,117 +1,206 @@
-## Current state (verified against the database)
+## Goal
 
-- `demand_leads`: **1,012 rows total**
-  - 737 with `quality_score < 40`
-  - 822 with **no email AND no phone**
-  - 923 with no phone, 828 with no email
-  - Only 2 with no employer at all
-- Infrastructure already in place from prior turns:
-  - `compute_quality_score(employer, role, email, phone)` + trigger on `demand_leads`
-  - `archived_leads` table + `archive_and_delete_raw_signal()` helper (raw_signals only)
-  - `qualityTier()` UI badge + Min-quality filter on the Leads page
+Add a **Recruiter Discovery** flow that finds active recruiters / labour-supply agencies / freelance HR consultants headquartered in your Balkan + wider EU target list who hire blue-collar workers from Nepal / India / Bangladesh, classifies them by recruitment-model tag, and surfaces them in a sortable UI.
 
-So the cleanup is essentially: apply the existing quality gate to `demand_leads` and route the losers to `archived_leads` instead of hard-deleting.
+The pipeline is:
 
----
+```
+[ Recruiter Discovery edge fn ]
+        │  Firecrawl /search + /scrape (json schema extraction)
+        ▼
+[ raw_signals (source='recruiter_directory') ]
+        │  structure-leads (already classifies by quality + dedupes)
+        ▼
+[ recruiter_leads (new table) ]   ──►   [ /recruiters page ]
+```
 
-## Part A — Clean up "leads with no information"
-
-### A1. Define the gate
-Use the existing `quality_score` (already computed by trigger):
-- **Archive** any `demand_leads` row where `quality_score < 40` **AND** (no email AND no phone). This protects employer-only or role-only signals that may still be valuable.
-- Threshold and rule are admin-configurable via the cleanup dialog (default 40 / require-no-contact = on).
-
-### A2. Soft-archive, never hard-delete
-Extend the existing soft-archive pattern from `raw_signals` to `demand_leads`:
-
-- New SQL helper `archive_and_delete_demand_lead(_id uuid, _reason text, _by text)`:
-  1. `INSERT INTO archived_leads (original_id, archived_reason, archived_by, payload) SELECT id, _reason, _by, to_jsonb(dl.*) FROM demand_leads dl WHERE id = _id`
-  2. `DELETE FROM demand_leads WHERE id = _id`
-  Atomic, `SECURITY DEFINER`, admin-only via RLS check inside the function.
-- Bulk variant `archive_low_quality_demand_leads(_min_score int, _require_no_contact bool, _by text) RETURNS int` returning the count archived.
-
-### A3. UI: "Clean up low-quality leads" action (admin only)
-On `src/pages/Leads.tsx`, add a destructive button next to the existing filter bar:
-- Opens a confirm dialog showing: threshold input (default 40), "also require missing email & phone" toggle (default on), and a **live preview count** (client-side filter of already-loaded rows + a quick `head: count` Supabase query for accuracy).
-- On confirm, call the bulk RPC, toast `Archived N leads`, refresh list.
-- Single-row archive button on each card / detail page using `archive_and_delete_demand_lead`.
-- All archive actions write to `lead_contact_log` so we have an audit trail.
-
-### A4. Restore path
-Small `/archived` route (admin-only) listing `archived_leads` with a "Restore" button that re-inserts the JSONB payload back into `demand_leads` and removes the archive row.
+Existing infra reused: Firecrawl is already wired (`firecrawl-search`, `firecrawl-webhook`), Lovable AI is available for tag classification, `archived_leads` for soft-archive, country meta lives in `_shared/constants.ts`.
 
 ---
 
-## Part B — Increase lead quality going forward
+## Data model (one new table, one enum)
 
-The cleanup is a one-shot fix. Quality has to be improved **upstream** so we don't refill the bucket with junk next week.
+```
+recruitment_model_tag enum:
+  'no_advance_after_visa'
+  'no_advance_after_deployment'
+  'free_recruitment'
+  'company_recruitment'
+  'unknown'
 
-### B1. Quality at ingestion (block junk before it lands)
-In `supabase/functions/structure-leads` (and any other writer into `demand_leads`):
-- Compute `quality_score` in the edge function before insert.
-- If score `< 25` → write straight to `archived_leads` with reason `low_quality_at_ingest` instead of `demand_leads`.
-- If `25 ≤ score < 40` → insert into `demand_leads` but mark `review_status = 'needs_enrichment'` (new enum value) so the UI can surface them in a separate queue.
-- Score `≥ 40` → normal insert.
+recruiter_leads
+  id uuid pk
+  agency_name text not null
+  hq_country text          -- Serbia, Germany, …
+  hq_city text
+  operating_eu_country text
+  contact_name text
+  contact_email text
+  contact_phone text        -- WhatsApp/phone
+  contact_linkedin text
+  recruitment_model recruitment_model_tag[]   -- multi-tag, must contain ≥1 of the 4 valid tags
+  license_number text
+  license_verified bool default false
+  active_orders jsonb       -- [{role, country, headcount, salary_min, salary_max, currency, posted_at}]
+  worker_origin_focus text[] default '{}'     -- 'NP','IN','BD'
+  source_url text
+  source_posted_at timestamptz   -- the date on the source page (if extracted)
+  discovered_at timestamptz default now()
+  last_seen_at timestamptz default now()
+  raw_signal_id uuid
+  excluded_reason text       -- 'upfront_fee','sub_agent','training_institute','stale','unknown_model'
+  status text default 'active'   -- 'active' | 'excluded' | 'archived'
+  quality_score int default 0
+```
 
-### B2. Stronger scoring signals
-Extend `compute_quality_score` (additive, backwards-compatible):
-- `+10` if employer has a resolvable website domain (`raw_signals.company_domain` not null).
-- `+10` if `country` and `city` both present.
-- `+10` if `source` is in a trusted set (`linkedin`, `indeed`, `bebity`).
-- `+5` if `salary_min` or `demand_size` is populated.
-- Cap at 100. Re-backfill via UPDATE after migration.
-
-### B3. Auto-enrichment pass (cheap wins first)
-Nightly cron edge function `enrich-low-quality-leads`:
-1. Pick `demand_leads` where `quality_score BETWEEN 25 AND 60` and `last_enriched_at IS NULL OR > 7d`.
-2. If employer has a website → run a Firecrawl single-page scrape of `/contact` / `/about` to extract email + phone (regex), populate `contact_email` / `contact_phone`.
-3. If still no email and we have an employer + domain → call existing `hunter-enrich` function.
-4. Trigger re-scores the row automatically.
-
-Add a `last_enriched_at timestamptz` and `enrichment_attempts int` column to `demand_leads` so we don't loop on the same dead-end leads.
-
-### B4. Source-quality feedback loop
-- New view `source_quality_stats` aggregating, per `source`: total leads, % `quality_score ≥ 40`, % archived, avg score over last 30 days.
-- Surface on `ActorHealth.tsx` as a "Source quality" panel.
-- Auto-action: if a source's 30-day "% archived" exceeds 70%, flip `source_registry.enabled = false` and log a `scrape_run_event` so the team can review before re-enabling.
-
-### B5. Dedupe hardening
-Today `dedupeAndEnrich` runs client-side. Promote it to the DB:
-- Add a generated column `dedupe_fingerprint` on `demand_leads` = lower(employer_name) || '|' || lower(role) || '|' || country.
-- Unique partial index where `dedupe_fingerprint IS NOT NULL`.
-- `structure-leads` does an `ON CONFLICT (dedupe_fingerprint) DO UPDATE` that bumps `seen_count` and merges contact fields (COALESCE) — this naturally upgrades a low-quality lead when a richer duplicate arrives instead of creating a second junk row.
-
-### B6. Discovery-time keyword tightening
-The discovery prompts/keywords feeding Firecrawl/Apify are the root cause of garbage. Add to `KeywordAudit.tsx`:
-- Per-keyword "yield" metric = leads with `quality_score ≥ 40` / total leads produced.
-- Sort keywords by yield ascending; flag bottom-quartile for review or removal.
+RLS mirrors `demand_leads` (team read/insert/update, admin delete). Triggers:
+- `set_updated_at`
+- `recruiter_leads_set_quality_score` (similar to demand_leads scorer + bonus for verified license, NP/IN/BD focus, ≥1 active order).
 
 ---
 
-## Technical details
+## Edge function: `recruiter-discover`
 
-### Migrations
-1. `archive_and_delete_demand_lead(uuid, text, text)` + `archive_low_quality_demand_leads(int, bool, text)`.
-2. Extend `compute_quality_score` with the new signals; re-run backfill `UPDATE demand_leads SET quality_score = compute_quality_score(...)`.
-3. `ALTER TABLE demand_leads ADD COLUMN last_enriched_at timestamptz, ADD COLUMN enrichment_attempts int NOT NULL DEFAULT 0`.
-4. `dedupe_fingerprint` generated column + partial unique index.
-5. `source_quality_stats` view.
-6. New enum value `'needs_enrichment'` for `review_status` (it's a text column today — just a CHECK / constant).
+Inputs (all optional):
+```
+{
+  countries?: string[],         // default: Balkan + wider EU lists from spec
+  origins?: ('NP'|'IN'|'BD')[], // default: all three
+  trades?: string[],            // default: full blue-collar list from spec
+  recencyDays?: number,         // default: 90 (matches "exclude older than 90 days")
+  maxQueries?: number,          // default 30, cap 60
+  maxResultsPerQuery?: number   // default 15, cap 25
+}
+```
 
-### Edge functions
-- New: `enrich-low-quality-leads` (cron, daily 03:00 UTC).
-- Modify: `structure-leads` (compute score before insert, route by tier, ON CONFLICT merge).
+Pipeline per run:
 
-### Frontend
-- `Leads.tsx`: Clean-up dialog, single-row archive button, "Needs enrichment" tab/filter.
-- New `ArchivedLeads.tsx` page + nav entry (admin only).
-- `ActorHealth.tsx`: Source quality panel.
-- `KeywordAudit.tsx`: Yield column.
+1. **Build queries** — one per (country × trade × origin) sample, e.g.:
+   ```
+   ("recruitment agency" OR "manpower agency" OR "labour supply" OR "HR consultant")
+   ("Nepal" OR "India" OR "Bangladesh") workers
+   <trade> "<country>"
+   ("free recruitment" OR "no advance" OR "company paid")
+   -site:linkedin.com -site:indeed.com
+   ```
+   Use Firecrawl `tbs: "qdr:m"` (last month), then filter by extracted date for the 90-day rule.
+
+2. **Search** via Firecrawl `/v2/search` with `country` hint and `limit: maxResultsPerQuery`.
+   Drop aggregator domains (existing `AGGREGATOR_DOMAINS` set), drop already-excluded domains (lookup in `lead_blacklist`), de-dupe by domain within the run.
+
+3. **Scrape & extract** each survivor with Firecrawl `/v2/scrape` using `formats: [{type:'json', schema}]` where schema asks for:
+   ```
+   agency_name, hq_country, hq_city, operating_country,
+   contact_name, contact_email, contact_phone, contact_linkedin,
+   license_number, posted_at,
+   recruitment_model: enum (the 4 valid tags + 'upfront_fee','sub_agent','training_institute','unknown'),
+   charges_upfront_candidate_fee: boolean,
+   active_orders: [{role, country, headcount, salary_min, salary_max, currency}],
+   worker_origin_focus: array<'NP'|'IN'|'BD'>
+   ```
+
+4. **Apply exclusions** in code (cheaper than re-prompting):
+   - `charges_upfront_candidate_fee === true` → `excluded_reason = 'upfront_fee'`
+   - model in {`sub_agent`,`training_institute`,`unknown`} or empty → `excluded_reason = 'unknown_model'` / matching value
+   - `posted_at` older than `recencyDays` → `excluded_reason = 'stale'`
+   - Drop entries that don't mention NP/IN/BD anywhere in the page text or origin focus.
+
+5. **Persist**:
+   - Insert raw page payload into `raw_signals (source='recruiter_directory', payload=…)` so we keep provenance.
+   - Insert eligible rows into `recruiter_leads` with `status='active'`; excluded rows go in with `status='excluded'` + `excluded_reason` so we can audit and don't re-discover.
+   - Upsert by `(agency_name, hq_country)` to refresh `last_seen_at` + merge new `active_orders`.
+
+6. **License verification (best-effort, async)** — if `license_number` extracted and country is one of (RS, RO, PL, HR), enqueue a follow-up `verify-recruiter-license` job (separate edge fn, optional Phase 2) that hits the public registry URL pattern for that country and flips `license_verified=true` on match. Stub for now; structure leaves room.
+
+7. Returns `{ ok, searched, discovered, inserted, excluded, breakdown_by_country }`.
 
 ---
 
-## Open questions before I start
+## Edge function: `verify-recruiter-license` (Phase 2 stub)
 
-1. **Cleanup gate** — go with `quality_score < 40 AND no email AND no phone` (strict, ~600 leads), or just `quality_score < 40` (737 leads)?
-2. **Auto-archive at ingest threshold** — is `< 25` the right cutoff for hard rejection, or do you want everything below 40 to be reviewable?
-3. **Scope of this build** — implement everything (A + B), or land Part A (cleanup + soft-archive UI) first and Part B (upstream quality) in a follow-up?
+Per-country registry URL templates (none of these need an API key — Firecrawl scrape):
+- Serbia: `nszna.gov.rs` agency search
+- Romania: `anofm.ro/agentii-de-plasare`
+- Poland: `stor.praca.gov.pl/portal/#/kraz/wyszukiwarka` (KRAZ)
+- Croatia: `mrosp.gov.hr` agency list
+
+Implementation: Firecrawl `/scrape` with a search query → string-match the license number / agency name → flip flag. Build only after Phase 1 produces real data.
+
+---
+
+## UI: `/recruiters` page
+
+New page in left nav (under "Demand Intelligence"). Mirrors the Leads page layout but with recruiter-specific columns:
+
+| Agency | HQ | Operating EU | Contact | Active orders | Model tag | License | Source | Posted |
+
+Features:
+- **Default sort**: most recent `last_seen_at` → highest `sum(active_orders.headcount)` → `license_verified DESC`. Sort is user-toggleable.
+- **Filters** (left rail):
+  - HQ country (multi-select, default = full target list)
+  - Operating EU country
+  - Recruitment model (multi-select, defaults to the 4 allowed tags)
+  - Worker origin focus (NP/IN/BD)
+  - Trade (chips)
+  - Min headcount
+  - "License verified only" toggle
+  - "Posted within 90/30/7 days"
+- **Row details**: drawer with full active-orders table, raw extracted JSON, source URL preview, copy-to-clipboard for email/phone/LinkedIn.
+- **Bulk actions** (admin): Mark excluded, send to outreach (writes to `lead_outreach_log`), soft-archive via `archive_and_delete_*` pattern.
+- **"Run discovery" button** (admin) calls `recruiter-discover` with current filter set as overrides. Shows toast + auto-refresh on completion.
+
+CSV / PDF export reuses `lib/lead-export.ts` with a recruiter-specific column map.
+
+---
+
+## Defaults baked into the edge fn
+
+```ts
+HQ_COUNTRIES = [
+  // Balkan
+  "Serbia","Croatia","Bosnia and Herzegovina","Slovenia","Montenegro",
+  "North Macedonia","Albania","Kosovo","Bulgaria","Romania",
+  // Wider EU
+  "Germany","Poland","Czechia","Slovakia","Hungary","Portugal",
+  "Malta","Cyprus","Greece","Netherlands","Austria",
+];
+TRADES = [
+  "construction","welding","masonry","carpentry","steel fixing","plumbing",
+  "warehouse","logistics","hospitality","cleaning","agriculture",
+  "factory operator","driver",
+];
+ORIGINS = ["Nepal","India","Bangladesh"];
+ALLOWED_MODELS = [
+  "no_advance_after_visa","no_advance_after_deployment",
+  "free_recruitment","company_recruitment",
+];
+```
+
+(Kosovo isn't in `COUNTRY_META` today — I'll add it: `XK`, langs `["en","sq","sr"]`.)
+
+---
+
+## Files to add / change
+
+### New
+- `supabase/migrations/<ts>__recruiter_leads.sql` — enum + table + RLS + triggers + indexes (`hq_country`, `last_seen_at`, GIN on `recruitment_model`).
+- `supabase/functions/recruiter-discover/index.ts` — orchestrator described above.
+- `supabase/functions/verify-recruiter-license/index.ts` — Phase 2 stub (returns `{ok:true, queued:0}` until implemented).
+- `src/pages/Recruiters.tsx` — page + filters + table + drawer.
+- `src/components/recruiters/RecruiterCard.tsx`, `RunDiscoveryDialog.tsx`.
+- `src/lib/recruiter-shape.ts` — shared types + scoring helpers.
+
+### Edit
+- `supabase/functions/_shared/constants.ts` — add Kosovo, add `RECRUITER_TRADES` + `WORKER_ORIGINS` + `RECRUITMENT_MODEL_VALUES` constants.
+- `src/App.tsx` — `/recruiters` route.
+- `src/components/AppLayout.tsx` — nav link.
+- `src/integrations/supabase/types.ts` — auto-regenerated after migration.
+
+---
+
+## Open questions before building
+
+1. **Schedule**: Run `recruiter-discover` nightly via pg_cron (like the enrichment job), or only on-demand from the UI button? I'd default to **on-demand + a weekly Sunday 04:00 UTC cron**.
+2. **Default trade list**: spec lists 13 trades. Searching all (13 trades × 21 countries × 3 origins) would blow Firecrawl credits. I propose **sampling**: rotate through a different (country × origin) × top-3-trade set each run, and capping at `maxQueries = 30` per invocation. OK?
+3. **Model classification**: if Firecrawl JSON extraction returns ambiguous text instead of one of the 4 enum values, do you want a follow-up Lovable AI call (`google/gemini-2.5-flash`) to re-classify, or just flag it `excluded_reason = 'unknown_model'`? AI call adds quality but ~2× cost.
+4. **License verification**: build the Phase 2 verifier in this build, or ship discovery + UI first and add it once we have real recruiter data to test the registry scrapers against?
