@@ -551,6 +551,10 @@ const Leads = () => {
           if (ad !== bd) return bd - ad;
           return (b.computed_score ?? 0) - (a.computed_score ?? 0);
         }
+        case "quality_desc":
+          return (b.quality_score ?? 0) - (a.quality_score ?? 0);
+        case "quality_asc":
+          return (a.quality_score ?? 0) - (b.quality_score ?? 0);
         case "priority":
         default: {
           // Composite Voynova score is the primary sort signal; priority tier
