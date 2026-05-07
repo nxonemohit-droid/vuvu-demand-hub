@@ -143,6 +143,7 @@ export type Database = {
           normalized_demand_id: string | null
           notes: string | null
           priority: Database["public"]["Enums"]["priority_tag"]
+          quality_score: number
           raw_signal_id: string | null
           review_status: string
           role: string
@@ -180,6 +181,7 @@ export type Database = {
           normalized_demand_id?: string | null
           notes?: string | null
           priority?: Database["public"]["Enums"]["priority_tag"]
+          quality_score?: number
           raw_signal_id?: string | null
           review_status?: string
           role: string
@@ -217,6 +219,7 @@ export type Database = {
           normalized_demand_id?: string | null
           notes?: string | null
           priority?: Database["public"]["Enums"]["priority_tag"]
+          quality_score?: number
           raw_signal_id?: string | null
           review_status?: string
           role?: string
@@ -1005,6 +1008,15 @@ export type Database = {
           _source_url: string
         }
         Returns: string
+      }
+      compute_quality_score: {
+        Args: {
+          _contact_email: string
+          _contact_phone: string
+          _employer_name: string
+          _role: string
+        }
+        Returns: number
       }
       has_role: {
         Args: {
