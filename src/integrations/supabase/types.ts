@@ -405,6 +405,36 @@ export type Database = {
           },
         ]
       }
+      discovery_query_stats: {
+        Row: {
+          created_at: string
+          hit_count: number
+          id: string
+          kind: string
+          last_seen_at: string
+          token: string
+          zero_result_count: number
+        }
+        Insert: {
+          created_at?: string
+          hit_count?: number
+          id?: string
+          kind: string
+          last_seen_at?: string
+          token: string
+          zero_result_count?: number
+        }
+        Update: {
+          created_at?: string
+          hit_count?: number
+          id?: string
+          kind?: string
+          last_seen_at?: string
+          token?: string
+          zero_result_count?: number
+        }
+        Relationships: []
+      }
       firecrawl_jobs: {
         Row: {
           company_id: string | null
