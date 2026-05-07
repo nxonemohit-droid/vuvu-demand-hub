@@ -17,6 +17,88 @@ import { formatDistanceToNow } from "date-fns";
 import { QuotaBanner } from "@/components/QuotaBanner";
 import { toast } from "sonner";
 
+type SourceQuality = {
+  source: string;
+  total_leads: number;
+  avg_quality: number | null;
+  good_leads: number;
+  good_pct: number | null;
+};
+
+function SourceQualityPanel() {
+  const [rows, setRows] = useState<SourceQuality[] | null>(null);
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await (supabase as unknown as {
+        from: (t: string) => { select: (c: string) => Promise<{ data: SourceQuality[] | null; error: unknown }> };
+      })
+        .from("source_quality_stats")
+        .select("source,total_leads,avg_quality,good_leads,good_pct");
+      if (error) {
+        console.error(error);
+        setRows([]);
+        return;
+      }
+      setRows(
+        (data ?? []).slice().sort(
+          (a, b) => (a.good_pct ?? 0) - (b.good_pct ?? 0),
+        ),
+      );
+    })();
+  }, []);
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="p-4 border-b">
+        <h2 className="font-semibold">Source quality (last 30 days)</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Share of leads from each source with quality score ≥ 40. Worst sources first.
+        </p>
+      </div>
+      {rows == null ? (
+        <div className="p-6"><Skeleton className="h-12 w-full" /></div>
+      ) : rows.length === 0 ? (
+        <div className="p-6 text-sm text-muted-foreground">No leads in the last 30 days.</div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Source</TableHead>
+              <TableHead className="text-right">Total leads</TableHead>
+              <TableHead className="text-right">Good (≥40)</TableHead>
+              <TableHead className="text-right">Avg quality</TableHead>
+              <TableHead className="w-[180px]">Good %</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => {
+              const pct = Number(r.good_pct ?? 0);
+              const tone =
+                pct < 30 ? "text-destructive" : pct < 60 ? "text-amber-600" : "text-emerald-600";
+              return (
+                <TableRow key={r.source}>
+                  <TableCell className="font-medium">{r.source}</TableCell>
+                  <TableCell className="text-right">{r.total_leads}</TableCell>
+                  <TableCell className="text-right">{r.good_leads}</TableCell>
+                  <TableCell className="text-right">{r.avg_quality ?? "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Progress value={pct} className="h-1.5 flex-1" />
+                      <span className={`text-xs font-medium tabular-nums w-10 text-right ${tone}`}>
+                        {pct}%
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+    </Card>
+  );
+}
+
 type JobRow = {
   id: string;
   source: string;
@@ -296,6 +378,8 @@ const ActorHealth = () => {
             <div className="text-xs text-muted-foreground mt-1">success rate &lt; 40%</div>
           </Card>
         </div>
+
+        <SourceQualityPanel />
 
         <Card className="overflow-hidden">
           <div className="p-4 border-b">
