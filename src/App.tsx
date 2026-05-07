@@ -16,6 +16,7 @@ import DiscoveryRuns from "./pages/DiscoveryRuns.tsx";
 import DemandIntelligence from "./pages/DemandIntelligence.tsx";
 import DemandLeadDetail from "./pages/DemandLeadDetail.tsx";
 import Settings from "./pages/Settings.tsx";
+import ArchivedLeads from "./pages/ArchivedLeads.tsx";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/keyword-audit" element={<KeywordAudit />} />
             <Route path="/leads" element={<Leads />} />
             <Route path="/leads/:id" element={<LeadDetail />} />
+            <Route path="/leads/archived" element={<ArchivedLeads />} />
             <Route path="/candidates" element={<Candidates />} />
             <Route path="/runs" element={<DiscoveryRuns />} />
             <Route path="/demand" element={<DemandIntelligence />} />
