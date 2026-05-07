@@ -92,7 +92,15 @@ async function fcSearch(query: string, country?: string): Promise<FcSearchResult
   });
   if (!r.ok) throw new Error(`fc search ${r.status}: ${(await r.text()).slice(0,200)}`);
   const j = await r.json();
-  return (j?.data ?? j?.results ?? j?.web ?? []) as FcSearchResult[];
+  // Firecrawl v2 returns { success, data: { web: [...], news: [...], images: [...] } }
+  // Older shapes may return data as an array directly.
+  const d = j?.data;
+  let arr: unknown = [];
+  if (Array.isArray(d)) arr = d;
+  else if (Array.isArray(d?.web)) arr = d.web;
+  else if (Array.isArray(j?.web)) arr = j.web;
+  else if (Array.isArray(j?.results)) arr = j.results;
+  return (arr as FcSearchResult[]) ?? [];
 }
 
 async function fcScrapeJson(url: string): Promise<Record<string, unknown> | null> {
