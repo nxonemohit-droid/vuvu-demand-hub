@@ -814,6 +814,93 @@ export type Database = {
           },
         ]
       }
+      recruiter_leads: {
+        Row: {
+          active_orders: Json
+          agency_name: string
+          contact_email: string | null
+          contact_linkedin: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          discovered_at: string
+          excluded_reason: string | null
+          hq_city: string | null
+          hq_country: string | null
+          id: string
+          last_seen_at: string
+          license_number: string | null
+          license_verified: boolean
+          notes: string | null
+          operating_eu_country: string | null
+          quality_score: number
+          raw_signal_id: string | null
+          recruitment_model: Database["public"]["Enums"]["recruitment_model_tag"][]
+          source_posted_at: string | null
+          source_url: string | null
+          status: string
+          trades: string[]
+          updated_at: string
+          worker_origin_focus: string[]
+        }
+        Insert: {
+          active_orders?: Json
+          agency_name: string
+          contact_email?: string | null
+          contact_linkedin?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          discovered_at?: string
+          excluded_reason?: string | null
+          hq_city?: string | null
+          hq_country?: string | null
+          id?: string
+          last_seen_at?: string
+          license_number?: string | null
+          license_verified?: boolean
+          notes?: string | null
+          operating_eu_country?: string | null
+          quality_score?: number
+          raw_signal_id?: string | null
+          recruitment_model?: Database["public"]["Enums"]["recruitment_model_tag"][]
+          source_posted_at?: string | null
+          source_url?: string | null
+          status?: string
+          trades?: string[]
+          updated_at?: string
+          worker_origin_focus?: string[]
+        }
+        Update: {
+          active_orders?: Json
+          agency_name?: string
+          contact_email?: string | null
+          contact_linkedin?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          discovered_at?: string
+          excluded_reason?: string | null
+          hq_city?: string | null
+          hq_country?: string | null
+          id?: string
+          last_seen_at?: string
+          license_number?: string | null
+          license_verified?: boolean
+          notes?: string | null
+          operating_eu_country?: string | null
+          quality_score?: number
+          raw_signal_id?: string | null
+          recruitment_model?: Database["public"]["Enums"]["recruitment_model_tag"][]
+          source_posted_at?: string | null
+          source_url?: string | null
+          status?: string
+          trades?: string[]
+          updated_at?: string
+          worker_origin_focus?: string[]
+        }
+        Relationships: []
+      }
       scrape_jobs: {
         Row: {
           actor_id: string | null
@@ -1088,6 +1175,10 @@ export type Database = {
         Args: { _payload: Json; _source: string }
         Returns: number
       }
+      compute_recruiter_quality_score: {
+        Args: { _lead: Database["public"]["Tables"]["recruiter_leads"]["Row"] }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1127,6 +1218,12 @@ export type Database = {
         | "converted"
         | "rejected"
       priority_tag: "high" | "medium" | "low"
+      recruitment_model_tag:
+        | "no_advance_after_visa"
+        | "no_advance_after_deployment"
+        | "free_recruitment"
+        | "company_recruitment"
+        | "unknown"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1283,6 +1380,13 @@ export const Constants = {
         "rejected",
       ],
       priority_tag: ["high", "medium", "low"],
+      recruitment_model_tag: [
+        "no_advance_after_visa",
+        "no_advance_after_deployment",
+        "free_recruitment",
+        "company_recruitment",
+        "unknown",
+      ],
     },
   },
 } as const
