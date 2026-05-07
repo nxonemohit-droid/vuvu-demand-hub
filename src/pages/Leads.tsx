@@ -109,6 +109,7 @@ import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/l
 import { dedupeAndEnrich, type Enrichment } from "@/lib/lead-enrichment";
 import { exportLeads, exportLeadsPdf, safeFileSlug } from "@/lib/lead-export";
 import { qualityTier } from "@/lib/lead-shape";
+import { useRoles } from "@/lib/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
