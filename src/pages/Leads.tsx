@@ -158,6 +158,7 @@ type RawLead = {
   target_audience_type: string | null;
   sector_tags: string[] | null;
   raw_signals: { payload: Record<string, unknown> | null } | null;
+  quality_score: number | null;
 };
 
 type Lead = RawLead & {
@@ -370,7 +371,7 @@ const Leads = () => {
       supabase
         .from("demand_leads")
         .select(
-          "id,employer_name,role,country,city,priority,score,urgency_score,contact_email,contact_name,contact_phone,source_url,created_at,demand_size,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)",
+          "id,employer_name,role,country,city,priority,score,urgency_score,quality_score,contact_email,contact_name,contact_phone,source_url,created_at,demand_size,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)",
         )
         .order("urgency_score", { ascending: false })
         .limit(2000),
@@ -493,6 +494,9 @@ const Leads = () => {
       if (filters.minScore > 0) {
         const s = l.computed_score ?? l.score ?? l.urgency_score ?? 0;
         if (s < filters.minScore) return false;
+      }
+      if (filters.minQuality > 0) {
+        if ((l.quality_score ?? 0) < filters.minQuality) return false;
       }
       if (fromMs != null) {
         const t = new Date(l.created_at).getTime();
