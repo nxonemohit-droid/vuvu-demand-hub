@@ -62,6 +62,8 @@ export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "industry", label: "Industry (A → Z)" },
   { value: "demand", label: "Demand volume (high → low)" },
   { value: "employer", label: "Employer name (A → Z)" },
+  { value: "quality_desc", label: "Data quality (high → low)" },
+  { value: "quality_asc", label: "Data quality (low → high)" },
 ];
 
 export type ContactRequirement = "email" | "phone" | "website";
