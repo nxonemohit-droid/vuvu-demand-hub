@@ -379,6 +379,8 @@ const ActorHealth = () => {
           </Card>
         </div>
 
+        <SourceQualityPanel />
+
         <Card className="overflow-hidden">
           <div className="p-4 border-b">
             <h2 className="font-semibold">Actors</h2>
