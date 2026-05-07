@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
@@ -227,8 +230,8 @@ const DiscoveryRuns = () => {
                     <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                       {formatDuration(r.started_at, r.finished_at)}
                     </TableCell>
-                    <TableCell className="max-w-[260px] truncate text-xs text-destructive" title={r.error ?? ""}>
-                      {r.error ?? ""}
+                    <TableCell>
+                      <ErrorTooltip error={r.error} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -282,6 +285,24 @@ const StatusBadge = ({ status }: { status: string }) => {
   };
   const m = map[status] ?? { v: "outline", label: status };
   return <Badge variant={m.v}>{m.label}</Badge>;
+};
+
+const ErrorTooltip = ({ error }: { error: string | null }) => {
+  if (!error) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-block max-w-[200px] truncate text-xs text-destructive cursor-help">
+            {error}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="max-w-md">
+          <p className="text-xs whitespace-pre-wrap">{error}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 };
 
 function formatDate(iso: string) {
