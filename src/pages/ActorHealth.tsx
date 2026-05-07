@@ -10,10 +10,12 @@ import {
 } from "@/components/ui/table";
 import {
   Activity, ArrowLeft, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle,
+  PlayCircle, Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { QuotaBanner } from "@/components/QuotaBanner";
+import { toast } from "sonner";
 
 type JobRow = {
   id: string;
@@ -170,6 +172,38 @@ const ActorHealth = () => {
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [windowDays, setWindowDays] = useState<number>(7);
+  const [testing, setTesting] = useState<Record<string, boolean>>({});
+  const [testResult, setTestResult] = useState<Record<string, { ok: boolean; found: number; kept: number; error?: string }>>({});
+
+  const runTest = async (sourceId: string, actorId: string) => {
+    const key = `${sourceId}::${actorId}`;
+    setTesting((p) => ({ ...p, [key]: true }));
+    setTestResult((p) => {
+      const n = { ...p }; delete n[key]; return n;
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke("actor-test-run", {
+        body: { source_id: sourceId, actor_id: actorId, cap: 5 },
+      });
+      if (error) throw error;
+      const job = (data as any)?.job;
+      const ok = job?.status === "succeeded" || job?.status === "succeeded_empty";
+      const found = job?.items_found ?? 0;
+      const kept = job?.items_structured ?? 0;
+      const errMsg = job?.error ?? (data as any)?.error ?? null;
+      setTestResult((p) => ({ ...p, [key]: { ok, found, kept, error: errMsg ?? undefined } }));
+      if (ok) toast.success(`${sourceId}: ${found} found, ${kept} kept`);
+      else toast.error(`${sourceId} test failed`, { description: errMsg ?? "Unknown error" });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setTestResult((p) => ({ ...p, [key]: { ok: false, found: 0, kept: 0, error: msg } }));
+      toast.error("Test run failed", { description: msg });
+    } finally {
+      setTesting((p) => {
+        const n = { ...p }; delete n[key]; return n;
+      });
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -296,12 +330,16 @@ const ActorHealth = () => {
                     <TableHead className="text-right">$/lead</TableHead>
                     <TableHead>Last run</TableHead>
                     <TableHead>Top failure reasons</TableHead>
+                    <TableHead className="w-[160px]">Test</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {stats.map((s) => {
                     const completed = s.succeeded + s.failed;
                     const badge = healthBadge(s.successRate, completed);
+                    const testKey = `${s.source}::${s.actorId}`;
+                    const isTesting = !!testing[testKey];
+                    const result = testResult[testKey];
                     return (
                       <TableRow key={s.key} className="align-top">
                         <TableCell>
@@ -380,6 +418,29 @@ const ActorHealth = () => {
                                 </li>
                               ))}
                             </ul>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 w-full"
+                            disabled={isTesting || !s.actorId || s.actorId === "(no actor)"}
+                            onClick={() => runTest(s.source, s.actorId)}
+                          >
+                            {isTesting ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            ) : (
+                              <PlayCircle className="h-3.5 w-3.5 mr-1.5" />
+                            )}
+                            {isTesting ? "Testing…" : "Test run (5)"}
+                          </Button>
+                          {result && (
+                            <div className={`text-[11px] mt-1.5 ${result.ok ? "text-emerald-600" : "text-destructive"}`}>
+                              {result.ok
+                                ? `✓ ${result.found} found · ${result.kept} kept`
+                                : `✗ ${(result.error ?? "failed").slice(0, 60)}`}
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
