@@ -1675,6 +1675,88 @@ const Leads = () => {
           <CompareTable leads={selectedLeads} />
         </DialogContent>
       </Dialog>
+
+      {/* Cleanup low-quality leads (admin) */}
+      <Dialog open={cleanupOpen} onOpenChange={setCleanupOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archive low-quality leads</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <p className="text-muted-foreground">
+              Move leads that don't have enough information into the archive.
+              They are not deleted — admins can restore them later.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="cleanup-threshold">Quality score below</Label>
+              <Input
+                id="cleanup-threshold"
+                type="number"
+                min={0}
+                max={100}
+                value={cleanupThreshold}
+                onChange={(e) => setCleanupThreshold(Number(e.target.value) || 0)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="cleanup-no-contact"
+                checked={cleanupRequireNoContact}
+                onCheckedChange={setCleanupRequireNoContact}
+              />
+              <Label htmlFor="cleanup-no-contact">
+                Only if no email and no phone
+              </Label>
+            </div>
+            <div className="rounded-md border bg-muted/40 p-3 text-xs">
+              Currently loaded:{" "}
+              <span className="font-medium text-foreground">
+                {
+                  allLeads.filter((l) => {
+                    const q = l.quality_score ?? 0;
+                    if (q >= cleanupThreshold) return false;
+                    if (!cleanupRequireNoContact) return true;
+                    const noEmail = !l.contact_email || !l.contact_email.trim();
+                    const noPhone = !l.contact_phone || !l.contact_phone.trim();
+                    return noEmail && noPhone;
+                  }).length
+                }
+              </span>{" "}
+              of {allLeads.length} loaded leads match. Total in DB may differ.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCleanupOpen(false)} disabled={cleanupBusy}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={cleanupBusy}
+              onClick={async () => {
+                setCleanupBusy(true);
+                const { data, error } = await supabase.rpc(
+                  "archive_low_quality_demand_leads",
+                  {
+                    _min_score: cleanupThreshold,
+                    _require_no_contact: cleanupRequireNoContact,
+                    _by: "user",
+                  },
+                );
+                setCleanupBusy(false);
+                if (error) {
+                  toast.error(error.message || "Cleanup failed");
+                  return;
+                }
+                toast.success(`Archived ${data ?? 0} leads`);
+                setCleanupOpen(false);
+                load();
+              }}
+            >
+              {cleanupBusy ? "Archiving…" : "Archive matching leads"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
