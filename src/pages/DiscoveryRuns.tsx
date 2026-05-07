@@ -287,6 +287,24 @@ const StatusBadge = ({ status }: { status: string }) => {
   return <Badge variant={m.v}>{m.label}</Badge>;
 };
 
+const ErrorTooltip = ({ error }: { error: string | null }) => {
+  if (!error) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-block max-w-[200px] truncate text-xs text-destructive cursor-help">
+            {error}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="max-w-md">
+          <p className="text-xs whitespace-pre-wrap">{error}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
 function formatDate(iso: string) {
   const d = new Date(iso);
   const dd = String(d.getDate()).padStart(2, "0");
