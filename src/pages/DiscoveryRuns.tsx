@@ -230,8 +230,8 @@ const DiscoveryRuns = () => {
                     <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                       {formatDuration(r.started_at, r.finished_at)}
                     </TableCell>
-                    <TableCell className="max-w-[260px] truncate text-xs text-destructive" title={r.error ?? ""}>
-                      {r.error ?? ""}
+                    <TableCell>
+                      <ErrorTooltip error={r.error} />
                     </TableCell>
                   </TableRow>
                 ))}
