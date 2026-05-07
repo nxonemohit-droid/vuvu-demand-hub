@@ -1037,6 +1037,26 @@ const Leads = () => {
                 step={5}
                 onValueChange={(v) => setFilters({ ...filters, minScore: v[0] ?? 0 })}
               />
+              <div className="flex items-center gap-2 pt-1">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Min quality
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={filters.minQuality}
+                  onChange={(e) =>
+                    setFilters({
+                      ...filters,
+                      minQuality: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                    })
+                  }
+                  className="h-8 w-20"
+                  aria-label="Minimum quality score"
+                />
+              </div>
             </div>
 
             <DateRangeFilter
