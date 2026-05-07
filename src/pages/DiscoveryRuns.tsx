@@ -15,7 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  PlayCircle, RefreshCw, Activity, CheckCircle2, XCircle, Clock, Loader2,
+  PlayCircle, RefreshCw, Activity, CheckCircle2, XCircle, Clock, Loader2, ClipboardCopy,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -212,7 +212,10 @@ const DiscoveryRuns = () => {
               </TableHeader>
               <TableBody>
                 {filtered.map((r, i) => (
-                  <TableRow key={r.id} className={i % 2 ? "bg-muted/30" : undefined}>
+                  <TableRow
+                    key={r.id}
+                    className={`${i % 2 ? "bg-muted/30 " : ""}${rowBorderClass(r.status)}`}
+                  >
                     <TableCell className="whitespace-nowrap text-xs">
                       {formatDate(r.started_at)}
                     </TableCell>
