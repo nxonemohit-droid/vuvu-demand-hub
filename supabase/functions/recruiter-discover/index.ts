@@ -166,25 +166,64 @@ Deno.serve(async (req) => {
     const maxScrapes: number = Math.min(body.maxScrapes ?? 25, 60);
     const scrapeConcurrency: number = Math.min(body.scrapeConcurrency ?? 5, 10);
     const recencyCutoff = Date.now() - recencyDays * 86400_000;
+    // Threshold of consecutive zero-result occurrences before a token is auto-skipped.
+    const ZERO_SKIP_THRESHOLD = 3;
 
-    // Tiered query builder — auto-tune by progressively dropping filters when
-    // narrower searches return no candidates.
-    const buildQueries = (tier: 0 | 1 | 2): { q: string; country: string }[] => {
+    // Load learned exclusions: keywords, domains, and country/trade combos that
+    // have repeatedly produced zero usable results in past runs.
+    const { data: statRows } = await supa
+      .from("discovery_query_stats")
+      .select("kind, token, zero_result_count, hit_count")
+      .gte("zero_result_count", ZERO_SKIP_THRESHOLD);
+    const learnedSkipKeywords = new Set<string>();
+    const learnedSkipDomains = new Set<string>();
+    const learnedSkipCT = new Set<string>(); // "country|trade"
+    for (const r of statRows ?? []) {
+      // If the token has ever produced hits, don't permanently skip it.
+      if ((r.hit_count ?? 0) > 0) continue;
+      const t = String(r.token).toLowerCase();
+      if (r.kind === "keyword") learnedSkipKeywords.add(t);
+      else if (r.kind === "domain") learnedSkipDomains.add(t);
+      else if (r.kind === "country_trade") learnedSkipCT.add(t);
+    }
+    console.log(`learned skips: ${learnedSkipKeywords.size} kw, ${learnedSkipDomains.size} dom, ${learnedSkipCT.size} c×t`);
+
+    // Per-run accounting → flushed to discovery_query_stats at the end.
+    const ctZero = new Map<string, number>();   // country|trade → 0 if no hits
+    const ctHit  = new Map<string, number>();
+    const kwZero = new Map<string, number>();
+    const kwHit  = new Map<string, number>();
+    const domZero = new Map<string, number>();
+    const domHit  = new Map<string, number>();
+    const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
+
+    // Filter out learned-bad inputs.
+    const filteredTrades = trades.filter((t) => !learnedSkipKeywords.has(t.toLowerCase()));
+    const tradePool = filteredTrades.length ? filteredTrades : trades;
+
+    // Build extra `-site:` exclusions from learned-bad domains (cap to keep query short).
+    const learnedSiteExclusions = [...learnedSkipDomains].slice(0, 10)
+      .map((d) => `-site:${d}`).join(" ");
+
+    // Tiered query builder — auto-tune by progressively dropping filters.
+    const buildQueries = (tier: 0 | 1 | 2): { q: string; country: string; trade: string }[] => {
       const sampleCountries = pickSample(countries, Math.min(countries.length, 12));
-      const out: { q: string; country: string }[] = [];
+      const out: { q: string; country: string; trade: string }[] = [];
       const originExpr = origins.map((o) => `"${o}"`).join(" OR ");
       outer: for (const country of sampleCountries) {
-        const tradeSample = pickSample(trades, tier === 0 ? 2 : 1);
+        const tradeSample = pickSample(tradePool, tier === 0 ? 2 : 1);
         for (const trade of tradeSample) {
+          // Skip combos that have repeatedly returned nothing.
+          if (learnedSkipCT.has(`${country.toLowerCase()}|${trade.toLowerCase()}`)) continue;
           let q: string;
           if (tier === 0) {
-            q = `("recruitment agency" OR "manpower agency" OR "labour supply" OR "HR consultant") (${originExpr}) workers ${trade} "${country}" ("free recruitment" OR "no advance" OR "company paid" OR "employer paid") -site:linkedin.com -site:indeed.com`;
+            q = `("recruitment agency" OR "manpower agency" OR "labour supply" OR "HR consultant") (${originExpr}) workers ${trade} "${country}" ("free recruitment" OR "no advance" OR "company paid" OR "employer paid") -site:linkedin.com -site:indeed.com ${learnedSiteExclusions}`;
           } else if (tier === 1) {
-            q = `("recruitment agency" OR "manpower agency" OR "labour supply") (${originExpr}) ${trade} workers "${country}" -site:linkedin.com -site:indeed.com`;
+            q = `("recruitment agency" OR "manpower agency" OR "labour supply") (${originExpr}) ${trade} workers "${country}" -site:linkedin.com -site:indeed.com ${learnedSiteExclusions}`;
           } else {
-            q = `("recruitment agency" OR "manpower agency") (Nepal OR India OR Bangladesh) workers "${country}"`;
+            q = `("recruitment agency" OR "manpower agency") (Nepal OR India OR Bangladesh) workers "${country}" ${learnedSiteExclusions}`;
           }
-          out.push({ country, q });
+          out.push({ country, q, trade });
           if (out.length >= maxQueries) break outer;
         }
       }
@@ -201,22 +240,66 @@ Deno.serve(async (req) => {
     for (const tier of [0, 1, 2] as const) {
       const queries = buildQueries(tier);
       tunedTiers.push(tier);
-      for (const { q, country } of queries) {
+      for (const { q, country, trade } of queries) {
         try {
           const iso = COUNTRY_ISO[country];
           const results = await fcSearch(q, iso);
           searched++;
+          const ctKey = `${country.toLowerCase()}|${trade.toLowerCase()}`;
+          const kwKey = trade.toLowerCase();
+          let usable = 0;
           for (const r of results) {
             const domain = extractDomain(r.url);
-            if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain)) continue;
+            if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain) || learnedSkipDomains.has(domain)) continue;
             if (candidates.has(domain)) continue;
             candidates.set(domain, { url: r.url!, country });
+            usable++;
+            bump(domHit, domain);
+          }
+          if (usable === 0) {
+            bump(ctZero, ctKey);
+            bump(kwZero, kwKey);
+            // Charge non-usable result domains as zero contributors.
+            for (const r of results) {
+              const domain = extractDomain(r.url);
+              if (domain) bump(domZero, domain);
+            }
+          } else {
+            bump(ctHit, ctKey);
+            bump(kwHit, kwKey);
           }
         } catch (e) { console.error("search err", q, e); }
       }
       console.log(`auto-tune tier ${tier}: ${candidates.size} unique candidates so far`);
       if (candidates.size >= 8) break;
     }
+
+    // Persist learning. Each token: increment zero_result_count or hit_count.
+    const upsertStat = async (kind: string, token: string, zeroDelta: number, hitDelta: number) => {
+      const { data: existing } = await supa
+        .from("discovery_query_stats")
+        .select("id, zero_result_count, hit_count")
+        .eq("kind", kind).eq("token", token).maybeSingle();
+      if (existing) {
+        await supa.from("discovery_query_stats").update({
+          zero_result_count: (existing.zero_result_count ?? 0) + zeroDelta,
+          hit_count: (existing.hit_count ?? 0) + hitDelta,
+          last_seen_at: new Date().toISOString(),
+        }).eq("id", existing.id);
+      } else {
+        await supa.from("discovery_query_stats").insert({
+          kind, token, zero_result_count: zeroDelta, hit_count: hitDelta,
+        });
+      }
+    };
+    const flushes: Promise<unknown>[] = [];
+    for (const [k, v] of ctZero) flushes.push(upsertStat("country_trade", k, v, 0));
+    for (const [k, v] of ctHit)  flushes.push(upsertStat("country_trade", k, 0, v));
+    for (const [k, v] of kwZero) flushes.push(upsertStat("keyword", k, v, 0));
+    for (const [k, v] of kwHit)  flushes.push(upsertStat("keyword", k, 0, v));
+    for (const [k, v] of domZero) flushes.push(upsertStat("domain", k, v, 0));
+    for (const [k, v] of domHit)  flushes.push(upsertStat("domain", k, 0, v));
+    await Promise.all(flushes);
 
     // Cap scrapes so we fit within the edge timeout.
     const candidateList = [...candidates.entries()].slice(0, maxScrapes);
