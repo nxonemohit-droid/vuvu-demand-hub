@@ -1375,6 +1375,19 @@ const Leads = () => {
                     <TableHead>Sectors</TableHead>
                     <TableHead>Worker source</TableHead>
                     <TableHead>Priority</TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap"
+                      onClick={() =>
+                        setFilters({
+                          ...filters,
+                          sort: filters.sort === "quality_desc" ? "quality_asc" : "quality_desc",
+                        })
+                      }
+                      title="Sort by quality"
+                    >
+                      Quality{" "}
+                      {filters.sort === "quality_desc" ? "↓" : filters.sort === "quality_asc" ? "↑" : ""}
+                    </TableHead>
                     <TableHead className="text-center">Contacts</TableHead>
                   </TableRow>
                 </TableHeader>
