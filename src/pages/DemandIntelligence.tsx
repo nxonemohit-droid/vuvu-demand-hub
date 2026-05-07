@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { computeLeadScore } from "@/lib/lead-scoring";
 
 type Lead = {
   id: string;
@@ -45,7 +46,16 @@ type Lead = {
   created_at: string;
   matched_keywords: string[] | null;
   sector_tags: string[] | null;
+  worker_origin_focus: string[] | null;
+  target_audience_type: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  contact_name: string | null;
+  notes: string | null;
+  raw_signals: { payload: Record<string, unknown> | null } | null;
 };
+
+type ScoredLead = Lead & { quality_score: number };
 
 const ALL = "__all__";
 
@@ -62,7 +72,7 @@ export default function DemandIntelligence() {
     const { data, error } = await supabase
       .from("demand_leads")
       .select(
-        "id, role, employer_name, country, city, source, source_url, priority, score, tier, visa_sponsorship, urgency_score, demand_size, created_at, matched_keywords, sector_tags"
+        "id, role, employer_name, country, city, source, source_url, priority, score, tier, visa_sponsorship, urgency_score, demand_size, created_at, matched_keywords, sector_tags, worker_origin_focus, target_audience_type, contact_email, contact_phone, contact_name, notes, raw_signals(payload)"
       )
       .order("created_at", { ascending: false })
       .limit(500);
@@ -111,9 +121,18 @@ export default function DemandIntelligence() {
     [leads]
   );
 
+  const scored = useMemo<ScoredLead[]>(
+    () =>
+      leads.map((l) => ({
+        ...l,
+        quality_score: computeLeadScore(l).total,
+      })),
+    [leads]
+  );
+
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
-    return leads.filter((l) => {
+    return scored.filter((l) => {
       if (country !== ALL && l.country !== country) return false;
       if (role !== ALL && l.role !== role) return false;
       if (source !== ALL && l.source !== source) return false;
@@ -126,7 +145,7 @@ export default function DemandIntelligence() {
         return false;
       return true;
     });
-  }, [leads, search, country, role, source]);
+  }, [scored, search, country, role, source]);
 
   const last24h = useMemo(() => {
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
@@ -135,11 +154,7 @@ export default function DemandIntelligence() {
 
   const topAlerts = useMemo(() => {
     return [...filtered]
-      .sort((a, b) => {
-        const sa = (a.score ?? 0) + a.urgency_score + (a.visa_sponsorship ? 10 : 0);
-        const sb = (b.score ?? 0) + b.urgency_score + (b.visa_sponsorship ? 10 : 0);
-        return sb - sa;
-      })
+      .sort((a, b) => b.quality_score - a.quality_score)
       .slice(0, 6);
   }, [filtered]);
 
@@ -360,7 +375,7 @@ function FilterSelect({
   );
 }
 
-function AlertCard({ lead }: { lead: Lead }) {
+function AlertCard({ lead }: { lead: ScoredLead }) {
   return (
     <Link to={`/demand/${lead.id}`}>
       <Card className="p-4 hover:border-primary/50 hover:shadow-md transition-all h-full flex flex-col gap-3">
@@ -371,7 +386,10 @@ function AlertCard({ lead }: { lead: Lead }) {
               {lead.employer_name ?? "Unknown employer"}
             </div>
           </div>
-          <PriorityBadge priority={lead.priority} />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <QualityScoreBadge score={lead.quality_score} />
+            <PriorityBadge priority={lead.priority} />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <Badge variant="outline" className="gap-1">
@@ -398,7 +416,7 @@ function AlertCard({ lead }: { lead: Lead }) {
   );
 }
 
-function FeedRow({ lead }: { lead: Lead }) {
+function FeedRow({ lead }: { lead: ScoredLead }) {
   return (
     <Link
       to={`/demand/${lead.id}`}
@@ -411,11 +429,32 @@ function FeedRow({ lead }: { lead: Lead }) {
           {lead.city ? `, ${lead.city}` : ""} · {lead.source}
         </div>
       </div>
+      <QualityScoreBadge score={lead.quality_score} />
       <PriorityBadge priority={lead.priority} />
       <span className="text-xs text-muted-foreground whitespace-nowrap w-20 text-right">
         {formatDistanceToNow(new Date(lead.created_at), { addSuffix: true })}
       </span>
     </Link>
+  );
+}
+
+function QualityScoreBadge({ score }: { score: number }) {
+  const cls =
+    score >= 75
+      ? "bg-green-500/15 text-green-700 border-green-500/30"
+      : score >= 50
+      ? "bg-blue-500/15 text-blue-700 border-blue-500/30"
+      : score >= 25
+      ? "bg-amber-500/15 text-amber-700 border-amber-500/30"
+      : "bg-muted text-muted-foreground border-transparent";
+  return (
+    <Badge
+      variant="outline"
+      className={cn("tabular-nums shrink-0 px-1.5 h-5 text-[10px]", cls)}
+      title={`Quality score ${score}/100`}
+    >
+      {score}
+    </Badge>
   );
 }
 
