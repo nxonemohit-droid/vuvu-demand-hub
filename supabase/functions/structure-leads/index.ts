@@ -130,6 +130,37 @@ Deno.serve(async (req) => {
       if (typeof extracted.fit_score === "number") noteParts.push(`Voynova fit: ${extracted.fit_score}/100.`);
       const aiNotes = noteParts.join(" ");
 
+      // ---- Quality gate at ingestion ----
+      // Mirrors public.compute_quality_score so we can route junk before insert.
+      const QUALITY_KEYWORDS = [
+        "welder","carpenter","driver","construction","nurse","electrician",
+        "plumber","mechanic","operator","fabricator","hospitality","factory",
+        "logistics","warehouse",
+      ];
+      const roleLower = (extracted.role || "").toLowerCase();
+      let preScore = 0;
+      if (extracted.contact_email && extracted.contact_email.includes("@")) preScore += 25;
+      if (extracted.contact_phone && String(extracted.contact_phone).trim()) preScore += 15;
+      if (extracted.employer_name && String(extracted.employer_name).trim()) preScore += 25;
+      if (QUALITY_KEYWORDS.some((k) => roleLower.includes(k))) preScore += 15;
+      if (extracted.country && extracted.city) preScore += 10;
+      if (["linkedin","indeed","bebity"].includes(String(s.source).toLowerCase())) preScore += 10;
+      if (extracted.salary_min || extracted.demand_size) preScore += 5;
+
+      if (preScore < 25) {
+        // Hard reject: park in archived_leads with a clear reason, mark signal done.
+        await supabase.from("archived_leads").insert({
+          original_id: s.id,
+          archived_reason: "low_quality",
+          archived_by: "structure-leads",
+          payload: { extracted, source: s.source, source_url: s.source_url, pre_score: preScore },
+        });
+        await supabase.from("raw_signals").update({ structured: true }).eq("id", s.id);
+        skipped++;
+        continue;
+      }
+      const reviewStatus = preScore < 40 ? "needs_enrichment" : "new";
+
       const { error: insErr } = await supabase.from("demand_leads").insert({
         raw_signal_id: s.id,
         source: s.source,
@@ -150,6 +181,7 @@ Deno.serve(async (req) => {
         priority: sc.priority,
         matched_keywords: sc.matched,
         notes: aiNotes || null,
+        review_status: reviewStatus,
       });
       if (!insErr) created++;
       await supabase.from("raw_signals").update({ structured: true }).eq("id", s.id);

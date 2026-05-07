@@ -828,6 +828,11 @@ const Leads = () => {
                 <Trash2 className="h-4 w-4 mr-2" /> Clean up
               </Button>
             )}
+            {isAdmin && (
+              <Button size="sm" variant="ghost" asChild>
+                <Link to="/leads/archived">Archived</Link>
+              </Button>
+            )}
             <div
               className="inline-flex rounded-md border bg-card overflow-hidden"
               role="group"
