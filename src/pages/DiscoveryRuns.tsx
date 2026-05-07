@@ -15,7 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  PlayCircle, RefreshCw, Activity, CheckCircle2, XCircle, Clock, Loader2,
+  PlayCircle, RefreshCw, Activity, CheckCircle2, XCircle, Clock, Loader2, ClipboardCopy,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -212,7 +212,10 @@ const DiscoveryRuns = () => {
               </TableHeader>
               <TableBody>
                 {filtered.map((r, i) => (
-                  <TableRow key={r.id} className={i % 2 ? "bg-muted/30" : undefined}>
+                  <TableRow
+                    key={r.id}
+                    className={`${i % 2 ? "bg-muted/30 " : ""}${rowBorderClass(r.status)}`}
+                  >
                     <TableCell className="whitespace-nowrap text-xs">
                       {formatDate(r.started_at)}
                     </TableCell>
@@ -289,21 +292,48 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 const ErrorTooltip = ({ error }: { error: string | null }) => {
   if (!error) return <span className="text-xs text-muted-foreground">—</span>;
+  const truncated = error.length > 120 ? `${error.slice(0, 120)}…` : error;
+  const copy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(error);
+      toast.success("Copied!");
+    } catch {
+      toast.error("Copy failed");
+    }
+  };
   return (
-    <TooltipProvider delayDuration={100}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-block max-w-[200px] truncate text-xs text-destructive cursor-help">
-            {error}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" align="start" className="max-w-md">
-          <p className="text-xs whitespace-pre-wrap">{error}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className="flex items-center gap-1.5">
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-block max-w-[240px] truncate text-xs text-destructive cursor-help">
+              {truncated}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="start" className="max-w-[400px]">
+            <p className="text-xs whitespace-pre-wrap break-words">{error}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <button
+        type="button"
+        onClick={copy}
+        className="text-muted-foreground hover:text-foreground transition-colors"
+        aria-label="Copy error"
+      >
+        <ClipboardCopy className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 };
+
+function rowBorderClass(status: string) {
+  if (status === "succeeded" || status === "succeeded_empty") return "border-l-4 border-green-500";
+  if (status === "failed" || status === "quota_exceeded") return "border-l-4 border-red-500";
+  if (status === "running") return "border-l-4 border-yellow-400";
+  return "";
+}
 
 function formatDate(iso: string) {
   const d = new Date(iso);

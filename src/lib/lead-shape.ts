@@ -30,6 +30,7 @@ export type RawLead = {
   target_audience_type: string | null;
   sector_tags: string[] | null;
   raw_signals: { payload: Record<string, unknown> | null } | null;
+  quality_score?: number | null;
 };
 
 export type Lead = RawLead & {
@@ -42,7 +43,7 @@ export type Lead = RawLead & {
 };
 
 export const LEAD_SELECT_COLUMNS =
-  "id,employer_name,role,country,city,priority,score,urgency_score,contact_email,contact_name,contact_phone,source_url,created_at,demand_size,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)";
+  "id,employer_name,role,country,city,priority,score,urgency_score,quality_score,contact_email,contact_name,contact_phone,source_url,created_at,demand_size,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)";
 
 /* ---------------- pickers ---------------- */
 
@@ -208,4 +209,16 @@ export function priorityScoreClass(score: number): string {
   if (score >= 80) return "bg-destructive/10 text-destructive border-destructive/30";
   if (score >= 50) return "bg-amber-500/10 text-amber-600 border-amber-500/30";
   return "bg-emerald-500/10 text-emerald-600 border-emerald-500/30";
+}
+
+/** Tier + label for the data-quality score (0–100). */
+export function qualityTier(score: number | null | undefined): {
+  cls: string;
+  symbol: string;
+  label: string;
+} {
+  const s = Math.max(0, Math.min(100, Math.round(score ?? 0)));
+  if (s >= 70) return { cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30", symbol: "★", label: `${s}` };
+  if (s >= 40) return { cls: "bg-amber-500/10 text-amber-600 border-amber-500/30", symbol: "◑", label: `${s}` };
+  return { cls: "bg-destructive/10 text-destructive border-destructive/30", symbol: "✕", label: `${s}` };
 }

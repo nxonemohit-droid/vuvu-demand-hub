@@ -7,6 +7,7 @@ import {
   audienceLabel,
   sectorLabel,
   priorityScoreClass,
+  qualityTier,
   type Lead,
 } from "@/lib/lead-shape";
 import {
@@ -95,6 +96,14 @@ export function LeadCard({ lead, blacklistedDomains }: LeadCardProps) {
       </p>
 
       <div className="flex flex-wrap gap-1 mt-3">
+        {(() => {
+          const q = qualityTier(lead.quality_score);
+          return (
+            <Badge variant="outline" className={`text-[10px] py-0 px-1.5 h-5 ${q.cls}`} title={`Data quality ${q.label}/100`}>
+              <span className="mr-0.5">{q.symbol}</span>{q.label}
+            </Badge>
+          );
+        })()}
         <Badge variant="outline" className={`text-[10px] py-0 px-1.5 h-5 ${FRESHNESS_CLASS[freshness]}`}>
           {FRESHNESS_LABEL[freshness]}
         </Badge>

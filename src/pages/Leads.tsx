@@ -108,6 +108,7 @@ import {
 import { computeLeadScore, SCORE_DIMENSIONS, type ScoreBreakdown } from "@/lib/lead-scoring";
 import { dedupeAndEnrich, type Enrichment } from "@/lib/lead-enrichment";
 import { exportLeads, exportLeadsPdf, safeFileSlug } from "@/lib/lead-export";
+import { qualityTier } from "@/lib/lead-shape";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -158,6 +159,7 @@ type RawLead = {
   target_audience_type: string | null;
   sector_tags: string[] | null;
   raw_signals: { payload: Record<string, unknown> | null } | null;
+  quality_score: number | null;
 };
 
 type Lead = RawLead & {
@@ -370,7 +372,7 @@ const Leads = () => {
       supabase
         .from("demand_leads")
         .select(
-          "id,employer_name,role,country,city,priority,score,urgency_score,contact_email,contact_name,contact_phone,source_url,created_at,demand_size,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)",
+          "id,employer_name,role,country,city,priority,score,urgency_score,quality_score,contact_email,contact_name,contact_phone,source_url,created_at,demand_size,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)",
         )
         .order("urgency_score", { ascending: false })
         .limit(2000),
@@ -494,6 +496,9 @@ const Leads = () => {
         const s = l.computed_score ?? l.score ?? l.urgency_score ?? 0;
         if (s < filters.minScore) return false;
       }
+      if (filters.minQuality > 0) {
+        if ((l.quality_score ?? 0) < filters.minQuality) return false;
+      }
       if (fromMs != null) {
         const t = new Date(l.created_at).getTime();
         if (t < fromMs) return false;
@@ -547,6 +552,10 @@ const Leads = () => {
           if (ad !== bd) return bd - ad;
           return (b.computed_score ?? 0) - (a.computed_score ?? 0);
         }
+        case "quality_desc":
+          return (b.quality_score ?? 0) - (a.quality_score ?? 0);
+        case "quality_asc":
+          return (a.quality_score ?? 0) - (b.quality_score ?? 0);
         case "priority":
         default: {
           // Composite Voynova score is the primary sort signal; priority tier
@@ -1028,6 +1037,26 @@ const Leads = () => {
                 step={5}
                 onValueChange={(v) => setFilters({ ...filters, minScore: v[0] ?? 0 })}
               />
+              <div className="flex items-center gap-2 pt-1">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                  Min quality
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={filters.minQuality}
+                  onChange={(e) =>
+                    setFilters({
+                      ...filters,
+                      minQuality: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                    })
+                  }
+                  className="h-8 w-20"
+                  aria-label="Minimum quality score"
+                />
+              </div>
             </div>
 
             <DateRangeFilter
@@ -1346,6 +1375,19 @@ const Leads = () => {
                     <TableHead>Sectors</TableHead>
                     <TableHead>Worker source</TableHead>
                     <TableHead>Priority</TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none whitespace-nowrap"
+                      onClick={() =>
+                        setFilters({
+                          ...filters,
+                          sort: filters.sort === "quality_desc" ? "quality_asc" : "quality_desc",
+                        })
+                      }
+                      title="Sort by quality"
+                    >
+                      Quality{" "}
+                      {filters.sort === "quality_desc" ? "↓" : filters.sort === "quality_asc" ? "↑" : ""}
+                    </TableHead>
                     <TableHead className="text-center">Contacts</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1453,6 +1495,16 @@ const Leads = () => {
                         >
                           {l.priority}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const q = qualityTier(l.quality_score);
+                          return (
+                            <Badge variant="outline" className={`tabular-nums text-[10px] px-1.5 h-5 ${q.cls}`} title={`Data quality ${q.label}/100`}>
+                              <span className="mr-0.5">{q.symbol}</span>{q.label}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1.5">
