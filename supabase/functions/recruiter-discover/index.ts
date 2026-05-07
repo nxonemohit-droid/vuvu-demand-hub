@@ -39,6 +39,14 @@ const AGGREGATOR_DOMAINS = new Set([
   "jora.com","neuvoo.com","jooble.org","careerjet.com","simplyhired.com",
 ]);
 
+// Social / video / forum domains — Firecrawl can't scrape these (403) and they
+// burn time + credits. Always skip.
+const SOCIAL_DOMAINS = new Set([
+  "tiktok.com","instagram.com","youtube.com","youtu.be","twitter.com","x.com",
+  "reddit.com","pinterest.com","threads.net","t.me","telegram.me","wa.me",
+  "whatsapp.com","medium.com","quora.com","vk.com",
+]);
+
 type FcSearchResult = { url?: string; title?: string; description?: string };
 
 const RECRUITER_SCHEMA = {
@@ -121,6 +129,14 @@ async function fcScrapeJson(url: string): Promise<Record<string, unknown> | null
 function isAggregator(domain: string | null): boolean {
   if (!domain) return true;
   for (const a of AGGREGATOR_DOMAINS) {
+    if (domain === a || domain.endsWith(`.${a}`)) return true;
+  }
+  return false;
+}
+
+function isSocial(domain: string | null): boolean {
+  if (!domain) return true;
+  for (const a of SOCIAL_DOMAINS) {
     if (domain === a || domain.endsWith(`.${a}`)) return true;
   }
   return false;
