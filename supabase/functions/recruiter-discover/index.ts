@@ -234,41 +234,45 @@ Deno.serve(async (req) => {
     const { data: blacklist } = await supa.from("lead_blacklist").select("domain");
     const blocked = new Set((blacklist ?? []).map((r: { domain: string }) => r.domain.toLowerCase()));
 
+    const searchConcurrency: number = Math.min(body.searchConcurrency ?? 6, 10);
     const candidates = new Map<string, { url: string; country: string }>();
     let searched = 0;
     const tunedTiers: number[] = [];
+
+    const runSearch = async ({ q, country, trade }: { q: string; country: string; trade: string }) => {
+      try {
+        const iso = COUNTRY_ISO[country];
+        const results = await fcSearch(q, iso);
+        searched++;
+        const ctKey = `${country.toLowerCase()}|${trade.toLowerCase()}`;
+        const kwKey = trade.toLowerCase();
+        let usable = 0;
+        for (const r of results) {
+          const domain = extractDomain(r.url);
+          if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain) || learnedSkipDomains.has(domain)) continue;
+          if (candidates.has(domain)) continue;
+          candidates.set(domain, { url: r.url!, country });
+          usable++;
+          bump(domHit, domain);
+        }
+        if (usable === 0) {
+          bump(ctZero, ctKey); bump(kwZero, kwKey);
+          for (const r of results) {
+            const domain = extractDomain(r.url);
+            if (domain) bump(domZero, domain);
+          }
+        } else {
+          bump(ctHit, ctKey); bump(kwHit, kwKey);
+        }
+      } catch (e) { console.error("search err", q, e); }
+    };
+
     for (const tier of [0, 1, 2] as const) {
       const queries = buildQueries(tier);
       tunedTiers.push(tier);
-      for (const { q, country, trade } of queries) {
-        try {
-          const iso = COUNTRY_ISO[country];
-          const results = await fcSearch(q, iso);
-          searched++;
-          const ctKey = `${country.toLowerCase()}|${trade.toLowerCase()}`;
-          const kwKey = trade.toLowerCase();
-          let usable = 0;
-          for (const r of results) {
-            const domain = extractDomain(r.url);
-            if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain) || learnedSkipDomains.has(domain)) continue;
-            if (candidates.has(domain)) continue;
-            candidates.set(domain, { url: r.url!, country });
-            usable++;
-            bump(domHit, domain);
-          }
-          if (usable === 0) {
-            bump(ctZero, ctKey);
-            bump(kwZero, kwKey);
-            // Charge non-usable result domains as zero contributors.
-            for (const r of results) {
-              const domain = extractDomain(r.url);
-              if (domain) bump(domZero, domain);
-            }
-          } else {
-            bump(ctHit, ctKey);
-            bump(kwHit, kwKey);
-          }
-        } catch (e) { console.error("search err", q, e); }
+      for (let i = 0; i < queries.length; i += searchConcurrency) {
+        await Promise.all(queries.slice(i, i + searchConcurrency).map(runSearch));
+        if (candidates.size >= 8) break;
       }
       console.log(`auto-tune tier ${tier}: ${candidates.size} unique candidates so far`);
       if (candidates.size >= 8) break;
