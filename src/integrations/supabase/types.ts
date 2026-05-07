@@ -1039,9 +1039,25 @@ export type Database = {
         }
         Returns: string
       }
+      archive_and_delete_demand_lead: {
+        Args: { _by?: string; _id: string; _reason: string }
+        Returns: string
+      }
       archive_and_delete_raw_signal: {
         Args: { _by?: string; _id: string; _reason: string }
         Returns: string
+      }
+      archive_low_quality_demand_leads: {
+        Args: {
+          _by?: string
+          _min_score?: number
+          _require_no_contact?: boolean
+        }
+        Returns: number
+      }
+      compute_demand_lead_quality_score: {
+        Args: { _lead: Database["public"]["Tables"]["demand_leads"]["Row"] }
+        Returns: number
       }
       compute_quality_score: {
         Args: {
@@ -1064,6 +1080,7 @@ export type Database = {
         Returns: boolean
       }
       is_team_member: { Args: { _user_id: string }; Returns: boolean }
+      restore_archived_lead: { Args: { _archived_id: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
