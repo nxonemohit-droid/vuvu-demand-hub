@@ -28,7 +28,11 @@ function buildApifyInput(source: SourceRow, job: ScrapeJobRow): Record<string, u
   // Apply the per-source result cap so we don't burn credits on bulk scrapes.
   // Apify actors use varying field names; set them all so whichever one the
   // actor honours gets the smaller value.
-  const cap = Math.max(1, source.max_items_per_run ?? 30);
+  const overrideRaw = (job.input as any)?.cap_override;
+  const override = typeof overrideRaw === "number" && overrideRaw > 0
+    ? Math.floor(overrideRaw)
+    : null;
+  const cap = override ?? Math.max(1, source.max_items_per_run ?? 30);
   const withCap = (extra: Record<string, unknown>) => ({
     maxItems: cap, maxResults: cap, maxConcurrency: 1,
     ...baseInput, ...extra,
