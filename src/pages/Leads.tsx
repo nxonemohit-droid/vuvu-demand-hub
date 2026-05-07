@@ -318,6 +318,11 @@ const Leads = () => {
   const [loading, setLoading] = useState(true);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const { isAdmin } = useRoles();
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [cleanupThreshold, setCleanupThreshold] = useState(40);
+  const [cleanupRequireNoContact, setCleanupRequireNoContact] = useState(true);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
   const [filters, setFilters] = useState<LeadFilters>(() => {
     try {
       const wasRecruiter = localStorage.getItem(RECRUITER_MODE_KEY) === "1";
