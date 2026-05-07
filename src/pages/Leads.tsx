@@ -1496,6 +1496,16 @@ const Leads = () => {
                           {l.priority}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const q = qualityTier(l.quality_score);
+                          return (
+                            <Badge variant="outline" className={`tabular-nums text-[10px] px-1.5 h-5 ${q.cls}`} title={`Data quality ${q.label}/100`}>
+                              <span className="mr-0.5">{q.symbol}</span>{q.label}
+                            </Badge>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1.5">
                           <ContactIcon
