@@ -163,21 +163,33 @@ Deno.serve(async (req) => {
     const origins: string[] = body.origins ?? ORIGINS;
     const recencyDays: number = body.recencyDays ?? 90;
     const maxQueries: number = Math.min(body.maxQueries ?? 20, 60);
+    const maxScrapes: number = Math.min(body.maxScrapes ?? 25, 60);
+    const scrapeConcurrency: number = Math.min(body.scrapeConcurrency ?? 5, 10);
     const recencyCutoff = Date.now() - recencyDays * 86400_000;
 
-    // Build a sampled query set: rotate through countries x 2 trades.
-    const sampleCountries = pickSample(countries, Math.min(countries.length, 12));
-    const queries: { q: string; country: string }[] = [];
-    outer: for (const country of sampleCountries) {
-      for (const trade of pickSample(trades, 2)) {
-        const originExpr = origins.map((o) => `"${o}"`).join(" OR ");
-        queries.push({
-          country,
-          q: `("recruitment agency" OR "manpower agency" OR "labour supply" OR "HR consultant") (${originExpr}) workers ${trade} "${country}" ("free recruitment" OR "no advance" OR "company paid" OR "employer paid") -site:linkedin.com -site:indeed.com`,
-        });
-        if (queries.length >= maxQueries) break outer;
+    // Tiered query builder — auto-tune by progressively dropping filters when
+    // narrower searches return no candidates.
+    const buildQueries = (tier: 0 | 1 | 2): { q: string; country: string }[] => {
+      const sampleCountries = pickSample(countries, Math.min(countries.length, 12));
+      const out: { q: string; country: string }[] = [];
+      const originExpr = origins.map((o) => `"${o}"`).join(" OR ");
+      outer: for (const country of sampleCountries) {
+        const tradeSample = pickSample(trades, tier === 0 ? 2 : 1);
+        for (const trade of tradeSample) {
+          let q: string;
+          if (tier === 0) {
+            q = `("recruitment agency" OR "manpower agency" OR "labour supply" OR "HR consultant") (${originExpr}) workers ${trade} "${country}" ("free recruitment" OR "no advance" OR "company paid" OR "employer paid") -site:linkedin.com -site:indeed.com`;
+          } else if (tier === 1) {
+            q = `("recruitment agency" OR "manpower agency" OR "labour supply") (${originExpr}) ${trade} workers "${country}" -site:linkedin.com -site:indeed.com`;
+          } else {
+            q = `("recruitment agency" OR "manpower agency") (Nepal OR India OR Bangladesh) workers "${country}"`;
+          }
+          out.push({ country, q });
+          if (out.length >= maxQueries) break outer;
+        }
       }
-    }
+      return out;
+    };
 
     // Fetch blacklisted domains once.
     const { data: blacklist } = await supa.from("lead_blacklist").select("domain");
@@ -185,30 +197,40 @@ Deno.serve(async (req) => {
 
     const candidates = new Map<string, { url: string; country: string }>();
     let searched = 0;
-    for (const { q, country } of queries) {
-      try {
-        const iso = COUNTRY_ISO[country];
-        const results = await fcSearch(q, iso);
-        searched++;
-        for (const r of results) {
-          const domain = extractDomain(r.url);
-          if (!domain || isAggregator(domain) || blocked.has(domain)) continue;
-          if (candidates.has(domain)) continue;
-          candidates.set(domain, { url: r.url!, country });
-        }
-      } catch (e) { console.error("search err", q, e); }
+    const tunedTiers: number[] = [];
+    for (const tier of [0, 1, 2] as const) {
+      const queries = buildQueries(tier);
+      tunedTiers.push(tier);
+      for (const { q, country } of queries) {
+        try {
+          const iso = COUNTRY_ISO[country];
+          const results = await fcSearch(q, iso);
+          searched++;
+          for (const r of results) {
+            const domain = extractDomain(r.url);
+            if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain)) continue;
+            if (candidates.has(domain)) continue;
+            candidates.set(domain, { url: r.url!, country });
+          }
+        } catch (e) { console.error("search err", q, e); }
+      }
+      console.log(`auto-tune tier ${tier}: ${candidates.size} unique candidates so far`);
+      if (candidates.size >= 8) break;
     }
+
+    // Cap scrapes so we fit within the edge timeout.
+    const candidateList = [...candidates.entries()].slice(0, maxScrapes);
 
     let inserted = 0, updated = 0, excluded = 0, skipped = 0;
     const breakdown: Record<string, number> = {};
 
-    for (const [domain, info] of candidates) {
+    const processOne = async ([domain, info]: [string, { url: string; country: string }]) => {
       try {
         const extracted = await fcScrapeJson(info.url);
-        if (!extracted || extracted.is_recruiter !== true) { skipped++; continue; }
+        if (!extracted || extracted.is_recruiter !== true) { skipped++; return; }
 
         const agencyName = String(extracted.agency_name ?? domain.split(".")[0]).trim();
-        if (!agencyName) { skipped++; continue; }
+        if (!agencyName) { skipped++; return; }
 
         const model = String(extracted.recruitment_model ?? "unknown");
         const upfront = extracted.charges_upfront_candidate_fee === true;
@@ -272,7 +294,7 @@ Deno.serve(async (req) => {
           updated++;
         } else {
           const { error } = await supa.from("recruiter_leads").insert(row);
-          if (error) { console.error("insert err", error); skipped++; continue; }
+          if (error) { console.error("insert err", error); skipped++; return; }
           inserted++;
         }
         if (excludedReason) excluded++;
@@ -281,11 +303,18 @@ Deno.serve(async (req) => {
         console.error("process err", domain, e);
         skipped++;
       }
+    };
+
+    for (let i = 0; i < candidateList.length; i += scrapeConcurrency) {
+      const batch = candidateList.slice(i, i + scrapeConcurrency);
+      await Promise.all(batch.map(processOne));
     }
 
     return jsonResponse({
       ok: true, searched, discovered: candidates.size,
+      scraped: candidateList.length,
       inserted, updated, excluded, skipped, breakdown,
+      auto_tune_tiers: tunedTiers,
     });
   } catch (e) {
     return jsonResponse({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
