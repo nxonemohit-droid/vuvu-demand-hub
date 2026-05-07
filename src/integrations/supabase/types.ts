@@ -165,7 +165,9 @@ export type Database = {
           demand_size: number | null
           duplicate_of: string | null
           employer_name: string | null
+          enrichment_attempts: number
           id: string
+          last_enriched_at: string | null
           matched_keywords: string[] | null
           normalized_demand_id: string | null
           notes: string | null
@@ -203,7 +205,9 @@ export type Database = {
           demand_size?: number | null
           duplicate_of?: string | null
           employer_name?: string | null
+          enrichment_attempts?: number
           id?: string
+          last_enriched_at?: string | null
           matched_keywords?: string[] | null
           normalized_demand_id?: string | null
           notes?: string | null
@@ -241,7 +245,9 @@ export type Database = {
           demand_size?: number | null
           duplicate_of?: string | null
           employer_name?: string | null
+          enrichment_attempts?: number
           id?: string
+          last_enriched_at?: string | null
           matched_keywords?: string[] | null
           normalized_demand_id?: string | null
           notes?: string | null
@@ -1025,6 +1031,16 @@ export type Database = {
           name: string | null
           posting_count_30d: number | null
           posting_count_7d: number | null
+        }
+        Relationships: []
+      }
+      source_quality_stats: {
+        Row: {
+          avg_quality: number | null
+          good_leads: number | null
+          good_pct: number | null
+          source: string | null
+          total_leads: number | null
         }
         Relationships: []
       }
