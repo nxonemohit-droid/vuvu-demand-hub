@@ -829,6 +829,31 @@ const Leads = () => {
               </Button>
             )}
             {isAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  toast.info("Running enrichment retry…");
+                  const { data, error } = await supabase.functions.invoke(
+                    "enrich-low-quality-leads",
+                    { body: { limit: 20 } },
+                  );
+                  if (error) {
+                    toast.error(error.message || "Enrichment failed");
+                    return;
+                  }
+                  const picked = (data as { picked?: number } | null)?.picked ?? 0;
+                  const promoted = (data as { promoted?: number } | null)?.promoted ?? 0;
+                  toast.success(
+                    `Enriched ${picked} leads${promoted ? ` · ${promoted} now have contact info` : ""}`,
+                  );
+                  load();
+                }}
+              >
+                <Sparkles className="h-4 w-4 mr-2" /> Retry enrichment
+              </Button>
+            )}
+            {isAdmin && (
               <Button size="sm" variant="ghost" asChild>
                 <Link to="/leads/archived">Archived</Link>
               </Button>
