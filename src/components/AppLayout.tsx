@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   HelpCircle,
+  Building2,
 } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/demand", label: "Demand Intelligence", icon: Radar },
   { to: "/leads", label: "Leads", icon: Briefcase },
+  { to: "/recruiters", label: "Recruiters", icon: Building2 },
   { to: "/candidates", label: "Candidates", icon: Users },
   { to: "/runs", label: "Discovery Runs", icon: PlayCircle },
   { to: "/settings", label: "Settings", icon: Settings, adminOnly: true },
