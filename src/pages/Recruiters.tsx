@@ -157,6 +157,7 @@ const Recruiters = () => {
   const [originFilter, setOriginFilter] = useState<string>("all");
   const [licensedOnly, setLicensedOnly] = useState(false);
   const [recencyDays, setRecencyDays] = useState<string>("90");
+  const [collarFilter, setCollarFilter] = useState<string>("non_white");
   const [showExcluded, setShowExcluded] = useState(false);
   const [selected, setSelected] = useState<RecruiterRow | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -468,6 +469,16 @@ const Recruiters = () => {
       .filter((r) => originFilter === "all" || (r.worker_origin_focus ?? []).includes(originFilter))
       .filter((r) => !licensedOnly || r.license_verified)
       .filter((r) => {
+        const c = ((r as any).worker_collar ?? "").toString().toLowerCase();
+        if (collarFilter === "all") return true;
+        if (collarFilter === "non_white") return c !== "white";
+        if (collarFilter === "blue") return c === "blue";
+        if (collarFilter === "mixed") return c === "mixed";
+        if (collarFilter === "unknown") return !c || c === "unknown";
+        if (collarFilter === "white") return c === "white";
+        return true;
+      })
+      .filter((r) => {
         if (cutoff === 0) return true;
         const ts = r.source_posted_at ? Date.parse(r.source_posted_at) : Date.parse(r.last_seen_at);
         return ts >= cutoff;
@@ -479,7 +490,7 @@ const Recruiters = () => {
         if (hb !== ha) return hb - ha;
         return Number(b.license_verified) - Number(a.license_verified);
       });
-  }, [rows, search, hqFilter, modelFilter, originFilter, licensedOnly, recencyDays, showExcluded]);
+  }, [rows, search, hqFilter, modelFilter, originFilter, licensedOnly, recencyDays, showExcluded, collarFilter]);
 
   const hqOptions = useMemo(
     () => Array.from(new Set(rows.map((r) => r.hq_country).filter(Boolean))).sort() as string[],
@@ -1021,6 +1032,20 @@ const Recruiters = () => {
                 <SelectItem value="30">30 days</SelectItem>
                 <SelectItem value="90">90 days</SelectItem>
                 <SelectItem value="all">Any time</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-40">
+            <Label className="text-xs">Worker collar</Label>
+            <Select value={collarFilter} onValueChange={setCollarFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="non_white">Hide white-collar</SelectItem>
+                <SelectItem value="blue">Blue-collar only</SelectItem>
+                <SelectItem value="mixed">Mixed only</SelectItem>
+                <SelectItem value="unknown">Unknown only</SelectItem>
+                <SelectItem value="white">White-collar only</SelectItem>
+                <SelectItem value="all">All</SelectItem>
               </SelectContent>
             </Select>
           </div>
