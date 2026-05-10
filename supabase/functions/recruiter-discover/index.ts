@@ -433,7 +433,9 @@ Deno.serve(async (req) => {
     };
 
     const targetCandidates = Math.max(maxScrapes * 2, 20);
-    for (const tier of [0, 1, 2, 3, 4, 5, 6] as const) {
+    // Tier 6 (email-intent boolean) runs FIRST so the highest-yield email pages
+    // are scraped before the maxScrapes budget is exhausted.
+    for (const tier of [6, 0, 4, 1, 3, 2, 5] as const) {
       const queries = buildQueries(tier);
       tunedTiers.push(tier);
       if (searchProvider === "apify") {
