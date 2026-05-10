@@ -65,13 +65,15 @@ mohit@voynovaglobal.com`;
 const renderTemplate = (tpl: string, l: Lead) => {
   const first = (l.contact_name ?? "").trim().split(" ")[0] || "there";
   const trade = (l.trades ?? [])[0] ?? "your placements";
-  return tpl
-    .replaceAll("{{agency_name}}", l.agency_name ?? "")
-    .replaceAll("{{first_name}}", first)
-    .replaceAll("{{contact_name}}", l.contact_name ?? first)
-    .replaceAll("{{eu_country}}", l.operating_eu_country ?? "Europe")
-    .replaceAll("{{hq_country}}", l.hq_country ?? "")
-    .replaceAll("{{trade}}", trade);
+  const map: Record<string, string> = {
+    agency_name: l.agency_name ?? "",
+    first_name: first,
+    contact_name: l.contact_name ?? first,
+    eu_country: l.operating_eu_country ?? "Europe",
+    hq_country: l.hq_country ?? "",
+    trade,
+  };
+  return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => map[k] ?? "");
 };
 
 const Mail = () => {
