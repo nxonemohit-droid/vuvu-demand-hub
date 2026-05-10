@@ -184,6 +184,27 @@ const Campaign = () => {
   const conversionRate = sentLeads.length
     ? Math.round((stats.converted / sentLeads.length) * 100) : 0;
 
+  const funnel = useMemo(() => {
+    const discovered = leads.length;
+    const sent = sentLeads.length;
+    const replied = sentLeads.filter((l) => !!l.replied_at).length;
+    const converted = sentLeads.filter((l) => !!l.converted_at).length;
+    const max = Math.max(discovered, 1);
+    const stage = (label: string, value: number, prev: number, tone: string) => ({
+      label,
+      value,
+      pct: Math.round((value / max) * 100),
+      conv: prev ? Math.round((value / prev) * 100) : 0,
+      tone,
+    });
+    return [
+      stage("Discovered", discovered, discovered, "bg-slate-500"),
+      stage("Sent", sent, discovered, "bg-blue-500"),
+      stage("Replied", replied, sent, "bg-amber-500"),
+      stage("Converted", converted, replied || sent, "bg-emerald-600"),
+    ];
+  }, [leads, sentLeads]);
+
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -228,6 +249,36 @@ const Campaign = () => {
           );
         })}
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Conversion funnel</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Discovered → Sent → Replied → Converted. Percentages on the right show
+            stage-to-stage conversion.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {funnel.map((s, i) => (
+            <div key={s.label} className="flex items-center gap-3">
+              <div className="w-28 text-sm font-medium">{s.label}</div>
+              <div className="flex-1 h-9 rounded-md bg-muted relative overflow-hidden">
+                <div
+                  className={`h-full ${s.tone} transition-all flex items-center px-3 text-white text-sm font-semibold`}
+                  style={{ width: `${Math.max(s.pct, 4)}%` }}
+                >
+                  {s.value}
+                </div>
+              </div>
+              <div className="w-32 text-right text-xs text-muted-foreground">
+                {i === 0
+                  ? "100% of pipeline"
+                  : `${s.conv}% from ${funnel[i - 1].label.toLowerCase()}`}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
