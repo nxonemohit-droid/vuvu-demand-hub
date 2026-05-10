@@ -21,8 +21,11 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import {
   ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck,
+  CheckCircle2, XCircle, Loader2, Clock,
 } from "lucide-react";
 
 type RecruiterRow = {
@@ -50,6 +53,22 @@ type RecruiterRow = {
   status: string;
   excluded_reason: string | null;
   quality_score: number;
+};
+
+type DiscoveryJob = {
+  id: string;
+  kind: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  params: Record<string, unknown> | null;
+  result: {
+    searched?: number; discovered?: number; scraped?: number;
+    inserted?: number; updated?: number; excluded?: number; skipped?: number;
+    breakdown?: Record<string, number>; auto_tune_tiers?: number[];
+  } | null;
+  error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
 };
 
 const MODEL_LABELS: Record<string, string> = {
@@ -84,6 +103,9 @@ const Recruiters = () => {
   const [showExcluded, setShowExcluded] = useState(false);
   const [selected, setSelected] = useState<RecruiterRow | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [tab, setTab] = useState<"recruiters" | "jobs">("recruiters");
+  const [jobs, setJobs] = useState<DiscoveryJob[]>([]);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -97,7 +119,47 @@ const Recruiters = () => {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  const loadJobs = async () => {
+    const { data } = await supabase
+      .from("discovery_jobs")
+      .select("*")
+      .eq("kind", "recruiter_discover")
+      .order("created_at", { ascending: false })
+      .limit(25);
+    setJobs((data ?? []) as DiscoveryJob[]);
+  };
+
+  useEffect(() => { load(); loadJobs(); }, []);
+
+  // Poll the active job until it finishes, then refresh the recruiter list.
+  useEffect(() => {
+    if (!activeJobId) return;
+    let cancelled = false;
+    const tick = async () => {
+      const { data } = await supabase
+        .from("discovery_jobs").select("*").eq("id", activeJobId).maybeSingle();
+      if (cancelled || !data) return;
+      setJobs((prev) => {
+        const others = prev.filter((j) => j.id !== data.id);
+        return [data as DiscoveryJob, ...others];
+      });
+      if (data.status === "completed" || data.status === "failed") {
+        setActiveJobId(null);
+        if (data.status === "completed") {
+          const r = (data as DiscoveryJob).result ?? {};
+          toast.success(
+            `Discovery complete: ${r.discovered ?? 0} found · ${r.inserted ?? 0} new · ${r.updated ?? 0} updated`
+          );
+          await load();
+        } else {
+          toast.error(`Discovery failed: ${(data as DiscoveryJob).error_message ?? "unknown error"}`);
+        }
+      }
+    };
+    const id = setInterval(tick, 3000);
+    tick();
+    return () => { cancelled = true; clearInterval(id); };
+  }, [activeJobId]);
 
   const filtered = useMemo(() => {
     const cutoff = recencyDays === "all" ? 0 : Date.now() - Number(recencyDays) * 86400_000;
@@ -134,12 +196,14 @@ const Recruiters = () => {
         body: { recencyDays: Number(recencyDays) || 90, maxQueries: 20 },
       });
       if (error) throw error;
-      const d = data as { inserted?: number; updated?: number; excluded?: number; discovered?: number };
-      toast.success(
-        `Discovery complete: ${d.discovered ?? 0} found · ${d.inserted ?? 0} new · ${d.updated ?? 0} updated · ${d.excluded ?? 0} excluded`
-      );
+      const d = data as { jobId?: string; status?: string };
+      if (d.jobId) {
+        toast.success("Discovery queued — running in the background");
+        setActiveJobId(d.jobId);
+        await loadJobs();
+        setTab("jobs");
+      }
       setDialogOpen(false);
-      await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Discovery failed");
     } finally {
@@ -157,7 +221,7 @@ const Recruiters = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => { load(); loadJobs(); }} disabled={loading}>
             <RefreshCw className="h-4 w-4 mr-1.5" /> Refresh
           </Button>
           {isAdmin && (
@@ -172,12 +236,12 @@ const Recruiters = () => {
                   <DialogTitle>Run recruiter discovery</DialogTitle>
                 </DialogHeader>
                 <p className="text-sm text-muted-foreground">
-                  Searches Firecrawl for recruitment agencies hiring NP / IN / BD workers across {`${hqOptions.length || 21}`} target countries. Up to 20 queries per run.
+                  Searches Firecrawl for recruitment agencies hiring NP / IN / BD workers across {`${hqOptions.length || 21}`} target countries. Up to 20 queries per run. The job runs in the background — you can keep using the app while it works.
                 </p>
                 <DialogFooter>
                   <Button variant="ghost" onClick={() => setDialogOpen(false)} disabled={running}>Cancel</Button>
                   <Button onClick={runDiscovery} disabled={running}>
-                    {running ? "Running…" : "Start discovery"}
+                    {running ? "Queuing…" : "Start discovery"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -186,6 +250,24 @@ const Recruiters = () => {
         </div>
       </div>
 
+      {activeJobId && (
+        <Card className="p-3 mb-4 flex items-center gap-3 border-primary/40">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <div className="flex-1">
+            <div className="text-sm font-medium">Discovery running in background…</div>
+            <Progress value={undefined as unknown as number} className="h-1.5 mt-1.5" />
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => setTab("jobs")}>View job</Button>
+        </Card>
+      )}
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "recruiters" | "jobs")} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="recruiters">Recruiters ({filtered.length})</TabsTrigger>
+          <TabsTrigger value="jobs">Discovery jobs ({jobs.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="recruiters" className="mt-4 space-y-4">
       <Card className="p-4 mb-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
@@ -332,6 +414,62 @@ const Recruiters = () => {
           </Table>
         )}
       </Card>
+        </TabsContent>
+
+        <TabsContent value="jobs" className="mt-4">
+          <Card>
+            {jobs.length === 0 ? (
+              <div className="p-12 text-center text-sm text-muted-foreground">
+                No discovery jobs yet. Click "Run discovery" to queue one.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Discovered</TableHead>
+                    <TableHead>New / Updated</TableHead>
+                    <TableHead>Excluded</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {jobs.map((j) => {
+                    const startMs = j.started_at ? Date.parse(j.started_at) : Date.parse(j.created_at);
+                    const endMs = j.finished_at ? Date.parse(j.finished_at) : Date.now();
+                    const durSec = Math.max(0, Math.round((endMs - startMs) / 1000));
+                    const r = j.result ?? {};
+                    const Icon = j.status === "completed" ? CheckCircle2
+                      : j.status === "failed" ? XCircle
+                      : j.status === "processing" ? Loader2
+                      : Clock;
+                    return (
+                      <TableRow key={j.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Icon className={`h-4 w-4 ${j.status === "processing" ? "animate-spin text-primary" : j.status === "completed" ? "text-emerald-600" : j.status === "failed" ? "text-destructive" : "text-muted-foreground"}`} />
+                            <span className="capitalize text-sm">{j.status}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs">{formatDate(j.created_at)}</TableCell>
+                        <TableCell className="text-xs">{durSec}s</TableCell>
+                        <TableCell className="text-sm">{r.discovered ?? "—"}</TableCell>
+                        <TableCell className="text-sm">{(r.inserted ?? 0)} / {(r.updated ?? 0)}</TableCell>
+                        <TableCell className="text-sm">{r.excluded ?? "—"}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                          {j.error_message ?? (r.scraped !== undefined ? `${r.scraped} scraped · ${r.skipped ?? 0} skipped` : "—")}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent className="w-full sm:max-w-xl overflow-y-auto">

@@ -158,6 +158,15 @@ Deno.serve(async (req) => {
     const supa = adminClient();
     const body = await req.json().catch(() => ({}));
 
+    // ----- Job-status polling endpoint: GET-style call with { jobId } -----
+    if (body.jobId) {
+      const { data: job, error } = await supa
+        .from("discovery_jobs").select("*").eq("id", body.jobId).maybeSingle();
+      if (error) return jsonResponse({ ok: false, error: error.message }, 500);
+      if (!job) return jsonResponse({ ok: false, error: "job not found" }, 404);
+      return jsonResponse({ ok: true, job });
+    }
+
     const countries: string[] = body.countries ?? HQ_COUNTRIES;
     const trades: string[] = body.trades ?? TRADES;
     const origins: string[] = body.origins ?? ORIGINS;
@@ -168,6 +177,27 @@ Deno.serve(async (req) => {
     const recencyCutoff = Date.now() - recencyDays * 86400_000;
     // Threshold of consecutive zero-result occurrences before a token is auto-skipped.
     const ZERO_SKIP_THRESHOLD = 3;
+
+    // Create the job row up-front so the client can poll it immediately.
+    const { data: jobRow, error: jobErr } = await supa
+      .from("discovery_jobs")
+      .insert({
+        kind: "recruiter_discover",
+        status: "queued",
+        params: { countries, trades, origins, recencyDays, maxQueries, maxScrapes, scrapeConcurrency },
+      })
+      .select("id").single();
+    if (jobErr || !jobRow) {
+      return jsonResponse({ ok: false, error: jobErr?.message ?? "job insert failed" }, 500);
+    }
+    const jobId = jobRow.id as string;
+
+    // ----- Background pipeline -----
+    const runPipeline = async () => {
+      try {
+        await supa.from("discovery_jobs").update({
+          status: "processing", started_at: new Date().toISOString(),
+        }).eq("id", jobId);
 
     // Load learned exclusions: keywords, domains, and country/trade combos that
     // have repeatedly produced zero usable results in past runs.
@@ -397,12 +427,29 @@ Deno.serve(async (req) => {
       await Promise.all(batch.map(processOne));
     }
 
-    return jsonResponse({
-      ok: true, searched, discovered: candidates.size,
-      scraped: candidateList.length,
-      inserted, updated, excluded, skipped, breakdown,
-      auto_tune_tiers: tunedTiers,
-    });
+        await supa.from("discovery_jobs").update({
+          status: "completed",
+          finished_at: new Date().toISOString(),
+          result: {
+            searched, discovered: candidates.size,
+            scraped: candidateList.length,
+            inserted, updated, excluded, skipped, breakdown,
+            auto_tune_tiers: tunedTiers,
+          },
+        }).eq("id", jobId);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("pipeline error", msg);
+        await supa.from("discovery_jobs").update({
+          status: "failed", finished_at: new Date().toISOString(), error_message: msg,
+        }).eq("id", jobId);
+      }
+    };
+
+    // @ts-ignore — EdgeRuntime is provided by Supabase Edge Functions runtime.
+    EdgeRuntime.waitUntil(runPipeline());
+
+    return jsonResponse({ ok: true, jobId, status: "queued" }, 202);
   } catch (e) {
     return jsonResponse({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }
