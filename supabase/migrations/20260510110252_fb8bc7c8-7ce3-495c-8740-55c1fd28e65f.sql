@@ -1,0 +1,1 @@
+ALTER VIEW public.email_sent_today SET (security_invoker = on);

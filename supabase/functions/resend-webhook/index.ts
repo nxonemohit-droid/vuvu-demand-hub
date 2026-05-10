@@ -105,6 +105,16 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Auto-suppress on hard bounce / complaint so we never email them again
+  if (recipient && (type === "email.bounced" || type === "email.complained")) {
+    await admin.from("email_suppressions").upsert({
+      email: recipient.toLowerCase(),
+      reason: type === "email.bounced" ? "bounce" : "complaint",
+      source: "webhook",
+      notes: type,
+    }, { onConflict: "email" });
+  }
+
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },

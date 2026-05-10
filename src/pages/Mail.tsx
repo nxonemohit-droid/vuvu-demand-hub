@@ -16,9 +16,14 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { useRoles } from "@/lib/auth";
+import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Send, Save, Eye, FileText, Search, RefreshCw, Trash2, Plus, CheckCircle2, XCircle, Beaker,
+  Clock, ShieldOff, BarChart3, Settings as SettingsIcon, Mail as MailIcon, Ban, X,
 } from "lucide-react";
 
 type Lead = {
@@ -77,6 +82,8 @@ const renderTemplate = (tpl: string, l: Lead) => {
 };
 
 const Mail = () => {
+  const { isAdmin, loading: rolesLoading } = useRoles();
+
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -100,11 +107,56 @@ const Mail = () => {
   const [testEmail, setTestEmail] = useState("");
   const [testSending, setTestSending] = useState(false);
 
+  // Scheduling
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState<string>(() => {
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    d.setSeconds(0, 0);
+    return d.toISOString().slice(0, 16);
+  });
+
+  // Tab data
+  const [scheduled, setScheduled] = useState<any[]>([]);
+  const [suppressions, setSuppressions] = useState<any[]>([]);
+  const [settings, setSettings] = useState<any | null>(null);
+  const [analytics, setAnalytics] = useState<{
+    sent: number; delivered: number; opened: number; clicked: number;
+    bounced: number; replied: number; suppressed: number;
+  } | null>(null);
+  const [newSuppression, setNewSuppression] = useState("");
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user?.email) setTestEmail(data.user.email);
     });
   }, []);
+
+  const loadOps = async () => {
+    const [{ data: sch }, { data: sup }, { data: cfg }, { data: ev }, { data: leadsAgg }] =
+      await Promise.all([
+        supabase.from("scheduled_emails").select("*").order("send_at", { ascending: true }).limit(200),
+        supabase.from("email_suppressions").select("*").order("created_at", { ascending: false }).limit(500),
+        supabase.from("email_send_settings").select("*").eq("id", 1).maybeSingle(),
+        supabase.from("email_events").select("event_type").gte("created_at", new Date(Date.now()-30*86400000).toISOString()).limit(5000),
+        supabase.from("recruiter_leads").select("email_status,replied_at").limit(5000),
+      ]);
+    setScheduled(sch ?? []);
+    setSuppressions(sup ?? []);
+    setSettings(cfg);
+    const counts = (ev ?? []).reduce((acc: Record<string, number>, e: any) => {
+      acc[e.event_type] = (acc[e.event_type] ?? 0) + 1; return acc;
+    }, {});
+    setAnalytics({
+      sent: counts["email.sent"] ?? 0,
+      delivered: counts["email.delivered"] ?? 0,
+      opened: counts["email.opened"] ?? 0,
+      clicked: counts["email.clicked"] ?? 0,
+      bounced: (counts["email.bounced"] ?? 0) + (counts["email.failed"] ?? 0),
+      replied: (leadsAgg ?? []).filter((l: any) => l.replied_at).length,
+      suppressed: 0,
+    });
+  };
+  useEffect(() => { if (isAdmin) loadOps(); }, [isAdmin]);
 
   const sampleLead: Lead = {
     id: "sample",
@@ -235,6 +287,28 @@ const Mail = () => {
     const recipients = leads.filter((l) => selected.has(l.id) && l.contact_email);
     if (recipients.length === 0) return toast.error("Select at least one lead with an email");
     if (!subject.trim() || !body.trim()) return toast.error("Subject and body are required");
+
+    if (scheduleEnabled) {
+      const sendAt = new Date(scheduleAt);
+      if (isNaN(sendAt.getTime()) || sendAt.getTime() < Date.now() - 60_000) {
+        return toast.error("Pick a future time");
+      }
+      if (!confirm(`Schedule ${recipients.length} email(s) for ${sendAt.toLocaleString()}?`)) return;
+      const { data: u } = await supabase.auth.getUser();
+      const rows = recipients.map((l) => ({
+        lead_id: l.id, to_email: l.contact_email!,
+        subject: renderTemplate(subject, l), body: renderTemplate(body, l),
+        send_at: sendAt.toISOString(), template_name: templates.find(t => t.id === activeTplId)?.name ?? null,
+        created_by: u.user?.id ?? null,
+      }));
+      const { error } = await supabase.from("scheduled_emails").insert(rows);
+      if (error) return toast.error(error.message);
+      toast.success(`${rows.length} email(s) scheduled`);
+      setSelected(new Set());
+      loadOps();
+      return;
+    }
+
     if (!confirm(`Send personalised email to ${recipients.length} recipient(s)?`)) return;
 
     setSending(true);
@@ -279,7 +353,45 @@ const Mail = () => {
     toast.success(`${okCount}/${out.length} emails sent`);
     setSelected(new Set());
     loadLeads();
+    loadOps();
   };
+
+  const cancelScheduled = async (id: string) => {
+    const { error } = await supabase.from("scheduled_emails")
+      .update({ status: "cancelled" }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Cancelled");
+    loadOps();
+  };
+
+  const addSuppression = async () => {
+    const e = newSuppression.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast.error("Invalid email");
+    const { error } = await supabase.from("email_suppressions")
+      .insert({ email: e, reason: "manual", source: "user" });
+    if (error) return toast.error(error.message);
+    toast.success("Added to suppression list");
+    setNewSuppression("");
+    loadOps();
+  };
+  const removeSuppression = async (email: string) => {
+    const { error } = await supabase.from("email_suppressions").delete().eq("email", email);
+    if (error) return toast.error(error.message);
+    loadOps();
+  };
+
+  const saveSettings = async (patch: Record<string, unknown>) => {
+    const { error } = await supabase
+      .from("email_send_settings")
+      .update(patch as never)
+      .eq("id", 1);
+    if (error) return toast.error(error.message);
+    toast.success("Settings saved");
+    loadOps();
+  };
+
+  if (rolesLoading) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
+  if (!isAdmin) return <Navigate to="/" replace />;
 
   return (
     <div className="p-6 max-w-[1500px] mx-auto space-y-5">
@@ -290,10 +402,21 @@ const Mail = () => {
             Pick recipients, choose or write a template, preview and send personalised emails in bulk.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => { loadLeads(); loadTemplates(); }}>
+        <Button variant="outline" size="sm" onClick={() => { loadLeads(); loadTemplates(); loadOps(); }}>
           <RefreshCw className="h-4 w-4 mr-1.5" /> Refresh
         </Button>
       </header>
+
+      <Tabs defaultValue="compose" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="compose"><MailIcon className="h-3.5 w-3.5 mr-1.5" />Compose</TabsTrigger>
+          <TabsTrigger value="scheduled"><Clock className="h-3.5 w-3.5 mr-1.5" />Scheduled ({scheduled.filter(s => s.status === "pending").length})</TabsTrigger>
+          <TabsTrigger value="suppressions"><ShieldOff className="h-3.5 w-3.5 mr-1.5" />Suppressions ({suppressions.length})</TabsTrigger>
+          <TabsTrigger value="analytics"><BarChart3 className="h-3.5 w-3.5 mr-1.5" />Analytics</TabsTrigger>
+          <TabsTrigger value="settings"><SettingsIcon className="h-3.5 w-3.5 mr-1.5" />Settings</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="compose">
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_460px] gap-5">
         {/* LEFT: recipients */}
@@ -451,6 +574,23 @@ const Mail = () => {
               <code>{"{{trade}}"}</code>
             </div>
 
+            <div className="rounded-md border p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" /> Schedule for later
+                </Label>
+                <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
+              </div>
+              {scheduleEnabled && (
+                <Input
+                  type="datetime-local"
+                  value={scheduleAt}
+                  onChange={(e) => setScheduleAt(e.target.value)}
+                  className="h-9"
+                />
+              )}
+            </div>
+
             {sending && (
               <div className="rounded-md border p-2 text-xs">
                 Sending… {progress.done}/{progress.total}
@@ -484,11 +624,187 @@ const Mail = () => {
               size="lg"
             >
               <Send className="h-4 w-4 mr-2" />
-              Send to {selected.size} recipient{selected.size === 1 ? "" : "s"}
+              {scheduleEnabled ? "Schedule" : "Send"} to {selected.size} recipient{selected.size === 1 ? "" : "s"}
             </Button>
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="scheduled">
+          <Card><CardContent className="pt-6">
+            <div className="rounded-md border max-h-[600px] overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background z-10"><TableRow>
+                  <TableHead>Send at</TableHead><TableHead>Recipient</TableHead>
+                  <TableHead>Subject</TableHead><TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {scheduled.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="text-xs">{new Date(s.send_at).toLocaleString()}</TableCell>
+                      <TableCell className="text-xs">{s.to_email}</TableCell>
+                      <TableCell className="text-xs max-w-[420px] truncate">{s.subject}</TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          s.status === "sent" ? "default" :
+                          s.status === "failed" ? "destructive" :
+                          s.status === "cancelled" || s.status === "suppressed" ? "secondary" : "outline"
+                        }>{s.status}</Badge>
+                        {s.error && <div className="text-[10px] text-destructive mt-0.5 truncate max-w-[260px]">{s.error}</div>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {s.status === "pending" && (
+                          <Button size="sm" variant="ghost" onClick={() => cancelScheduled(s.id)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {scheduled.length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">No scheduled emails</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="suppressions">
+          <Card><CardContent className="pt-6 space-y-3">
+            <div className="flex gap-2">
+              <Input placeholder="email@example.com" value={newSuppression}
+                onChange={(e) => setNewSuppression(e.target.value)} className="max-w-sm" />
+              <Button onClick={addSuppression}><Ban className="h-4 w-4 mr-1" />Suppress</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Bounces and spam complaints are added here automatically. Suppressed addresses will never receive future emails.
+            </p>
+            <div className="rounded-md border max-h-[500px] overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background z-10"><TableRow>
+                  <TableHead>Email</TableHead><TableHead>Reason</TableHead>
+                  <TableHead>Source</TableHead><TableHead>Added</TableHead>
+                  <TableHead className="text-right">Remove</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {suppressions.map((s) => (
+                    <TableRow key={s.email}>
+                      <TableCell className="text-xs font-mono">{s.email}</TableCell>
+                      <TableCell><Badge variant="outline">{s.reason}</Badge></TableCell>
+                      <TableCell className="text-xs">{s.source ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{new Date(s.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="ghost" onClick={() => removeSuppression(s.email)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {suppressions.length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">No suppressed emails</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <Card><CardContent className="pt-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              {analytics && [
+                { k: "Sent", v: analytics.sent },
+                { k: "Delivered", v: analytics.delivered },
+                { k: "Opened", v: analytics.opened },
+                { k: "Clicked", v: analytics.clicked },
+                { k: "Bounced", v: analytics.bounced },
+                { k: "Replied", v: analytics.replied },
+                { k: "Suppressed", v: suppressions.length },
+              ].map((s) => (
+                <div key={s.k} className="rounded-md border p-3">
+                  <div className="text-[11px] uppercase text-muted-foreground">{s.k}</div>
+                  <div className="text-2xl font-semibold mt-1">{s.v}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              {analytics && (
+                <>
+                  <div className="rounded-md border p-3">
+                    <div className="text-muted-foreground text-xs">Open rate</div>
+                    <div className="text-lg font-medium">
+                      {analytics.delivered ? Math.round((analytics.opened / analytics.delivered) * 100) : 0}%
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <div className="text-muted-foreground text-xs">Click rate</div>
+                    <div className="text-lg font-medium">
+                      {analytics.opened ? Math.round((analytics.clicked / analytics.opened) * 100) : 0}%
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <div className="text-muted-foreground text-xs">Reply rate</div>
+                    <div className="text-lg font-medium">
+                      {analytics.sent ? Math.round((analytics.replied / analytics.sent) * 100) : 0}%
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">Last 30 days. Replies require Resend inbound webhook to be configured.</p>
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <Card><CardContent className="pt-6 space-y-4 max-w-xl">
+            {settings && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Daily cap</Label>
+                    <Input type="number" defaultValue={settings.daily_cap}
+                      onBlur={(e) => saveSettings({ daily_cap: parseInt(e.target.value, 10) || 0 })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Per-domain daily cap</Label>
+                    <Input type="number" defaultValue={settings.per_domain_daily_cap}
+                      onBlur={(e) => saveSettings({ per_domain_daily_cap: parseInt(e.target.value, 10) || 0 })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Send window start hour</Label>
+                    <Input type="number" min={0} max={23} defaultValue={settings.send_window_start_hour}
+                      onBlur={(e) => saveSettings({ send_window_start_hour: parseInt(e.target.value, 10) || 0 })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Send window end hour</Label>
+                    <Input type="number" min={1} max={24} defaultValue={settings.send_window_end_hour}
+                      onBlur={(e) => saveSettings({ send_window_end_hour: parseInt(e.target.value, 10) || 0 })} />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-xs">Timezone</Label>
+                    <Input defaultValue={settings.send_window_timezone}
+                      onBlur={(e) => saveSettings({ send_window_timezone: e.target.value })} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div>
+                    <div className="text-sm font-medium">Respect send window</div>
+                    <div className="text-xs text-muted-foreground">When off, scheduled emails go out 24/7.</div>
+                  </div>
+                  <Switch checked={settings.respect_send_window}
+                    onCheckedChange={(v) => saveSettings({ respect_send_window: v })} />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  These limits apply to <b>scheduled</b> emails processed by the background worker. Manual bulk sends from the Compose tab still respect suppression but ignore caps.
+                </p>
+              </>
+            )}
+          </CardContent></Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Preview dialog */}
       <Dialog open={!!previewLead} onOpenChange={(o) => !o && setPreviewLead(null)}>
