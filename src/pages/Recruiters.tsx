@@ -91,6 +91,16 @@ type DiscoveryJob = {
     searched?: number; discovered?: number; scraped?: number;
     inserted?: number; updated?: number; excluded?: number; skipped?: number;
     breakdown?: Record<string, number>; auto_tune_tiers?: number[];
+    progress?: {
+      phase: "searching" | "scraping" | "done";
+      searched: number;
+      discovered: number;
+      scraped: number;
+      scrape_total: number;
+      tiers_done: number[];
+      by_country: Record<string, { candidates: number; scraped: number; inserted: number }>;
+      updated_at: string;
+    };
   } | null;
   error_message: string | null;
   started_at: string | null;
