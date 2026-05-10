@@ -416,7 +416,7 @@ Deno.serve(async (req) => {
           const domain = extractDomain(r.url);
           if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain) || learnedSkipDomains.has(domain)) continue;
           if (candidates.has(domain)) continue;
-          candidates.set(domain, { url: r.url!, country });
+          candidates.set(domain, { url: r.url!, country, prefilledEmail: snippetEmail(r) });
           usable++;
           bump(domHit, domain);
         }
