@@ -719,6 +719,29 @@ const Recruiters = () => {
             <RefreshCw className="h-4 w-4 mr-1.5" /> Refresh
           </Button>
           {isAdmin && (
+            <Dialog open={cleanupOpen} onOpenChange={setCleanupOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" title="Hard-delete leads with no email, phone, and no LinkedIn">
+                  <Trash2 className="h-4 w-4 mr-1.5" /> Clean no-contact
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete leads with no contact info?</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">
+                  This permanently removes every recruiter lead that has no email, no phone, and no LinkedIn URL. There are <span className="font-medium">{outreachBlocks.noContact}</span> such leads in your current view (final count is computed server-side).
+                </p>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setCleanupOpen(false)} disabled={cleanupRunning}>Cancel</Button>
+                  <Button variant="destructive" onClick={runCleanup} disabled={cleanupRunning}>
+                    {cleanupRunning ? "Deleting…" : "Delete permanently"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          {isAdmin && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">
