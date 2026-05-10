@@ -411,6 +411,11 @@ const Recruiters = () => {
       .order("created_at", { ascending: false })
       .limit(25);
     setJobs((data ?? []) as DiscoveryJob[]);
+    // Auto-resume polling if a job is still running (e.g. after page reload).
+    const running = (data ?? []).find(
+      (j) => j.status === "queued" || j.status === "processing",
+    );
+    if (running) setActiveJobId((cur) => cur ?? running.id);
   };
 
   useEffect(() => { load(); loadJobs(); }, []);
