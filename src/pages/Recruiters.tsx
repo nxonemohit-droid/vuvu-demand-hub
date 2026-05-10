@@ -23,9 +23,11 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import {
   ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck,
-  CheckCircle2, XCircle, Loader2, Clock,
+  CheckCircle2, XCircle, Loader2, Clock, Copy, Send,
 } from "lucide-react";
 
 type RecruiterRow = {
@@ -53,6 +55,8 @@ type RecruiterRow = {
   status: string;
   excluded_reason: string | null;
   quality_score: number;
+  email_status?: string;
+  email_sent_at?: string | null;
 };
 
 type DiscoveryJob = {
