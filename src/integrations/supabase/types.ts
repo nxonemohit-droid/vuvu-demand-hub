@@ -507,6 +507,63 @@ export type Database = {
         }
         Relationships: []
       }
+      email_send_settings: {
+        Row: {
+          daily_cap: number
+          id: number
+          per_domain_daily_cap: number
+          respect_send_window: boolean
+          send_window_end_hour: number
+          send_window_start_hour: number
+          send_window_timezone: string
+          updated_at: string
+        }
+        Insert: {
+          daily_cap?: number
+          id?: number
+          per_domain_daily_cap?: number
+          respect_send_window?: boolean
+          send_window_end_hour?: number
+          send_window_start_hour?: number
+          send_window_timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          daily_cap?: number
+          id?: number
+          per_domain_daily_cap?: number
+          respect_send_window?: boolean
+          send_window_end_hour?: number
+          send_window_start_hour?: number
+          send_window_timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_suppressions: {
+        Row: {
+          created_at: string
+          email: string
+          notes: string | null
+          reason: string
+          source: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          notes?: string | null
+          reason: string
+          source?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          notes?: string | null
+          reason?: string
+          source?: string | null
+        }
+        Relationships: []
+      }
       email_templates: {
         Row: {
           body: string
@@ -1069,6 +1126,60 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_emails: {
+        Row: {
+          attempts: number
+          body: string
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          lead_id: string | null
+          message_id: string | null
+          send_at: string
+          sent_at: string | null
+          status: string
+          subject: string
+          template_name: string | null
+          to_email: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          lead_id?: string | null
+          message_id?: string | null
+          send_at: string
+          sent_at?: string | null
+          status?: string
+          subject: string
+          template_name?: string | null
+          to_email: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          lead_id?: string | null
+          message_id?: string | null
+          send_at?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          template_name?: string | null
+          to_email?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       scrape_jobs: {
         Row: {
           actor_id: string | null
@@ -1286,6 +1397,13 @@ export type Database = {
           name: string | null
           posting_count_30d: number | null
           posting_count_7d: number | null
+        }
+        Relationships: []
+      }
+      email_sent_today: {
+        Row: {
+          sent_last_hour: number | null
+          sent_today: number | null
         }
         Relationships: []
       }
