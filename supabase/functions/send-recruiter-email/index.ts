@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,9 +24,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claims, error: claimsErr } = await supabase.auth.getClaims(token);
-    if (claimsErr || !claims?.claims) return json({ error: "Unauthorized" }, 401);
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
+    const userId = userData.user.id;
 
     const body = await req.json().catch(() => null);
     if (!body) return json({ error: "Invalid JSON" }, 400);
@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
       await admin.from("lead_outreach_log").insert({
         lead_id: leadId,
         channel: "email",
-        user_id: claims.claims.sub,
+        user_id: userId,
         note: `[resend:${data?.id ?? "ok"}] ${subject}\n\n${text ?? html}`,
       });
       if (data?.id) {
