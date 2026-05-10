@@ -16,6 +16,7 @@ const HQ_COUNTRIES = [
   "North Macedonia","Albania","Kosovo","Bulgaria","Romania",
   "Germany","Poland","Czechia","Slovakia","Hungary","Portugal",
   "Malta","Cyprus","Greece","Netherlands","Austria",
+  "Turkey","Moldova","Belarus",
 ];
 const COUNTRY_ISO: Record<string,string> = {
   Serbia:"rs",Croatia:"hr","Bosnia and Herzegovina":"ba",Slovenia:"si",
@@ -23,6 +24,25 @@ const COUNTRY_ISO: Record<string,string> = {
   Bulgaria:"bg",Romania:"ro",Germany:"de",Poland:"pl",Czechia:"cz",
   Slovakia:"sk",Hungary:"hu",Portugal:"pt",Malta:"mt",Cyprus:"cy",
   Greece:"gr",Netherlands:"nl",Austria:"at",
+  Turkey:"tr",Moldova:"md",Belarus:"by",
+};
+
+// Localized recruiter terms appended to email-intent boolean queries (Tier 6).
+const LOCALIZED_RECRUITER_TERMS: Record<string,string> = {
+  Serbia: `OR "agencija za zapošljavanje" OR "posredovanje pri zapošljavanju"`,
+  "Bosnia and Herzegovina": `OR "agencija za zapošljavanje" OR "posredovanje pri zapošljavanju"`,
+  Montenegro: `OR "agencija za zapošljavanje"`,
+  "North Macedonia": `OR "агенција за вработување"`,
+  Croatia: `OR "agencija za posredovanje pri zapošljavanju"`,
+  Slovenia: `OR "agencija za posredovanje dela"`,
+  Poland: `OR "agencja pracy tymczasowej" OR "agencja zatrudnienia"`,
+  Austria: `OR "Personalvermittlung" OR "Arbeitskräfteüberlasser"`,
+  Germany: `OR "Personalvermittlung" OR "Arbeitnehmerüberlassung"`,
+  Turkey: `OR "iş ve işçi bulma" OR "yurtdışı istihdam"`,
+  Moldova: `OR "agenție de recrutare" OR "plasare în câmpul muncii"`,
+  Romania: `OR "agenție de recrutare" OR "plasare forță de muncă"`,
+  Belarus: `OR "агентство по трудоустройству"`,
+  Bulgaria: `OR "агенция за подбор на персонал"`,
 };
 const TRADES = [
   "construction","welding","masonry","carpentry","steel fixing","plumbing",
