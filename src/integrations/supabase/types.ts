@@ -896,6 +896,8 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           discovered_at: string
+          email_sent_at: string | null
+          email_status: string
           excluded_reason: string | null
           hq_city: string | null
           hq_country: string | null
@@ -924,6 +926,8 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           discovered_at?: string
+          email_sent_at?: string | null
+          email_status?: string
           excluded_reason?: string | null
           hq_city?: string | null
           hq_country?: string | null
@@ -952,6 +956,8 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           discovered_at?: string
+          email_sent_at?: string | null
+          email_status?: string
           excluded_reason?: string | null
           hq_city?: string | null
           hq_country?: string | null
