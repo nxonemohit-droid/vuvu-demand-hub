@@ -1,55 +1,68 @@
-## Goal
+# Goal
+Get to **20+ Serbia-targeting recruiter leads with valid contact emails** in a single discovery run.
 
-Make the Mail page production-ready for bulk outreach: import recipients from CSV, schedule sends for later, view a per-lead email timeline, and send a test email to yourself to verify merge tags.
+# Current bottlenecks (from the last run: only 8 inserted, 0 with emails)
+1. **Hardcoded recency** — `fcSearch` ignores `recencyDays` and always passes `tbs: "qdr:m"` (30 days). Most agency pages are evergreen, so we cut ourselves off.
+2. **Early break at 8 candidates** — pipeline stops searching once `candidates.size >= 8`, even when `maxScrapes=20+` is requested.
+3. **Narrow trade pool** — 14 trades, sampled 1–2 per country. For a single-country run (Serbia) that yields only ~12 queries total.
+4. **Single-URL scrape** — only the SERP URL is scraped. Blog/news pages rarely include the agency's contact email; the `/contact` page does.
+5. **Strict model gating** — leads with `recruitment_model="unknown"` get `excluded_reason="unknown_model"` even when they look legit.
+6. **No Google-style dorks** — we don't exploit `site:*.rs`, `intext:"send CV"`, `inurl:contact "Nepal" "Serbia"`, etc.
+7. **No post-discovery email enrichment** — `hunter-enrich` exists but isn't auto-triggered for the new leads.
 
-## 1. CSV import (bulk recipients)
+# Plan
 
-- Add an "Import CSV" button next to the recipients filter on the Mail page.
-- Accept a `.csv` file with flexible columns. Auto-detect headers like `email`, `lead_id`, `id`, `agency_name`, `contact_name`. Parse client-side with PapaParse (already a common dep — add if missing).
-- Two import modes:
-  - **Match by email / lead_id** → tick those rows in the existing recipient table (no new leads created).
-  - **Add as ad-hoc recipients** → for emails not in `recruiter_leads`, insert a lightweight row in a new `mail_adhoc_recipients` table so they show up in the table and can be selected, sent to, and tracked.
-- Show an import summary dialog: `X matched · Y added · Z skipped (invalid email/duplicate)`.
-- Pre-select all imported rows.
+## 1. `recruiter-discover` enhancements (single function, no schema changes)
 
-## 2. Email scheduling
+**Recency wiring**
+- Map `recencyDays` → Firecrawl `tbs`: `<=7` → `qdr:w`, `<=31` → `qdr:m`, `<=365` → `qdr:y`, else omit (all-time). Pass through `fcSearch`.
+- Default for the Serbia re-run: `recencyDays = 365`.
 
-- Add a "Send now / Schedule for later" toggle in the composer.
-- When scheduling, show a date+time picker (defaults to +1 hour, local time).
-- Create table `scheduled_emails` (lead_id, to_email, subject, body, send_at, status, created_by, error, sent_at, message_id).
-- New edge function `process-scheduled-emails` triggered by `pg_cron` every minute: pulls due rows, calls the existing `send-recruiter-email` flow per row, marks status (`sent` / `failed`), records errors.
-- Add a "Scheduled" tab on the Mail page listing upcoming sends with cancel/edit-time actions.
+**Bigger trade & query pool**
+- Extend `TRADES` with: electrician, painter, scaffolder, HVAC, CNC operator, forklift, picker/packer, food processing, meat processing, butcher, baker, chef, kitchen helper, housekeeping, room attendant, waiter, security guard, landscaping, shipyard, automotive assembly, tyre fitter, tile setter, plasterer, roofer, ironworker.
+- When `countries.length === 1`, use **all** trades (don't sample) and bump `maxQueries` cap to 80.
 
-## 3. Per-lead email timeline
+**Boolean / Google dorks (new tier 3 + tier 4)**
+- Tier 3 — Serbia-hosted agency sites: `("manpower" OR "recruitment" OR "labour supply" OR "agencija za zapošljavanje") (Nepal OR India OR Bangladesh) site:rs`
+- Tier 4 — contact-page intent: `("workers to Serbia" OR "deployment Serbia" OR "Serbia placement") (Nepal OR India OR Bangladesh) (intext:"contact us" OR intext:"send your CV" OR inurl:contact)`
+- Tier 5 — origin-side agencies (India/Nepal/BD agencies advertising Serbia): `("recruitment agency" OR "manpower consultant") "Serbia" (Nepal OR India OR Bangladesh) (site:in OR site:np OR site:com.bd)`
 
-- Build a `<LeadTimeline leadId>` component that reads from `email_events` (sent, delivered, opened, clicked, bounced, complained) plus `lead_outreach_log` and `scheduled_emails`, merged and sorted desc.
-- Show as a vertical timeline with icon + event type + timestamp + recipient + truncated payload/error.
-- Open it from:
-  - the Mail page recipient row (new "Timeline" action in the row).
-  - the existing preview dialog (new "Timeline" tab next to preview).
-  - the Campaign page sent-leads table (replaces the current static delivery badge tooltip).
-- Realtime: subscribe to `email_events` for the open lead so new webhook events appear live.
+**Remove the early `candidates.size >= 8` break**
+- Replace with `>= maxScrapes * 2` so we always have enough headroom for the requested scrape count.
 
-## 4. Send test email
+**Contact-page fallback scrape**
+- After the SERP-URL scrape, if `contact_email` is missing, do a second `fcScrapeJson` against `https://{domain}/contact` (try `/contact-us`, `/about`, `/about-us` in order until one returns 200 with an email). Cap at 1 fallback attempt per lead to bound credit cost.
 
-- Add a "Send test" button in the composer header.
-- Opens a small popover with an email input, default = current logged-in user's email (`supabase.auth.getUser`).
-- Renders subject + body using the **first selected recipient** as the merge-tag source (or a dummy lead with all sample tag values if nothing is selected) so you see exactly what real recipients will get.
-- Calls `send-recruiter-email` with `leadId: null` so it doesn't mutate any real lead, and prefixes the subject with `[TEST]`.
-- Toast shows the Resend message id on success and the error body on failure.
+**Soften model gating**
+- Leads with `model === "unknown"` → `status="active"` (no `excluded_reason`). Still exclude `upfront_fee`, `sub_agent`, `training_institute`.
+- Drop the `stale` exclusion (we already filter via `tbs`).
 
-## Technical notes
+## 2. Auto-trigger Hunter enrichment after discovery
+- At the end of `runPipeline`, fetch newly inserted/updated leads from this run that still have `contact_email IS NULL` and a usable domain, then call `hunter-enrich` (existing edge function) with that batch. Max 30 leads per call.
 
-- New deps: `papaparse` + `@types/papaparse`.
-- New tables (one migration):
-  - `mail_adhoc_recipients(id, email, name, agency_name, source, created_by, created_at)` — RLS: team read/write.
-  - `scheduled_emails(id, lead_id nullable, to_email, subject, body, send_at, status default 'pending', sent_at, message_id, error, created_by, created_at)` — RLS: team read/write, indexed on `(status, send_at)`.
-- New edge function `process-scheduled-emails` (verify_jwt = false) + `pg_cron` job running every minute.
-- Tweak `send-recruiter-email` to skip the lead-update / outreach-log writes when `leadId` is null (so test sends and ad-hoc sends don't break).
-- Files touched: `src/pages/Mail.tsx`, `src/pages/Campaign.tsx`, new `src/components/LeadTimeline.tsx`, new `src/components/CsvImportDialog.tsx`, new `src/components/SendTestPopover.tsx`, new migration, new edge function, edited `send-recruiter-email`.
+## 3. Kick off the Serbia re-run
+Invoke `recruiter-discover` with:
+```json
+{
+  "countries": ["Serbia"],
+  "recencyDays": 365,
+  "maxQueries": 60,
+  "maxScrapes": 40,
+  "scrapeConcurrency": 6,
+  "searchConcurrency": 8
+}
+```
 
-## Out of scope
+## 4. Verify
+- Poll `discovery_jobs.result` until `status='completed'`.
+- Query `recruiter_leads where (operating_eu_country ilike 'serbia' or hq_country ilike 'serbia') and contact_email is not null and contact_email <> 'N/A'`.
+- Report: total Serbia leads, with-email count, breakdown by HQ country, and any failures.
 
-- Recurring/drip campaigns.
-- Reply detection / inbox sync (still manual via the existing "Mark replied" button).
-- Rich-text/HTML editor (composer stays plain text with merge tags).
+# Files to change
+- `supabase/functions/recruiter-discover/index.ts` — all logic above.
+- No DB migration. No frontend change.
+
+# Risk / cost notes
+- Firecrawl credits: ~60 searches + up to ~80 scrapes (40 SERP + 40 fallback) ≈ ~140 credit units. Acceptable for one targeted run.
+- Hunter call: bounded to 30 leads.
+- Auto-tune learning table (`discovery_query_stats`) still applies, so repeated runs self-prune dead queries.
