@@ -18,6 +18,7 @@ import DemandLeadDetail from "./pages/DemandLeadDetail.tsx";
 import Settings from "./pages/Settings.tsx";
 import ArchivedLeads from "./pages/ArchivedLeads.tsx";
 import Recruiters from "./pages/Recruiters.tsx";
+import Campaign from "./pages/Campaign.tsx";
 
 const queryClient = new QueryClient();
 
