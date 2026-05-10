@@ -1,0 +1,1 @@
+ALTER TABLE public.demand_leads DROP CONSTRAINT IF EXISTS demand_leads_review_status_check; ALTER TABLE public.demand_leads ADD CONSTRAINT demand_leads_review_status_check CHECK (review_status IN ('new','approved','snoozed','rejected','outreach'));
