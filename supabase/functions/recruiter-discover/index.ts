@@ -8,6 +8,8 @@ import { adminClient, extractDomain } from "../_shared/supabase.ts";
 
 const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 const FIRECRAWL_BASE = "https://api.firecrawl.dev/v2";
+const APIFY_API_TOKEN = Deno.env.get("APIFY_API_TOKEN");
+const APIFY_GOOGLE_ACTOR = "apify~google-search-scraper";
 
 const HQ_COUNTRIES = [
   "Serbia","Croatia","Bosnia and Herzegovina","Slovenia","Montenegro",
@@ -124,6 +126,45 @@ async function fcSearch(query: string, country?: string, tbs?: string): Promise<
   return (arr as FcSearchResult[]) ?? [];
 }
 
+// Run Apify Google Search Scraper for a batch of queries in a single actor run.
+// Returns a flat array of { url, title, description } across all queries.
+async function apifyGoogleSearch(
+  queries: string[],
+  countryCode?: string,
+  resultsPerPage = 20,
+): Promise<FcSearchResult[]> {
+  if (!APIFY_API_TOKEN) throw new Error("APIFY_API_TOKEN not configured");
+  const url =
+    `https://api.apify.com/v2/acts/${APIFY_GOOGLE_ACTOR}/run-sync-get-dataset-items` +
+    `?token=${APIFY_API_TOKEN}&timeout=240`;
+  const input = {
+    queries: queries.join("\n"),
+    resultsPerPage,
+    maxPagesPerQuery: 1,
+    countryCode: countryCode ?? "us",
+    languageCode: "en",
+    mobileResults: false,
+    saveHtml: false,
+    includeUnfilteredResults: false,
+  };
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(`apify google ${r.status}: ${(await r.text()).slice(0, 300)}`);
+  const items = (await r.json()) as Array<{
+    organicResults?: Array<{ url?: string; title?: string; description?: string }>;
+  }>;
+  const out: FcSearchResult[] = [];
+  for (const page of items ?? []) {
+    for (const o of page.organicResults ?? []) {
+      if (o.url) out.push({ url: o.url, title: o.title, description: o.description });
+    }
+  }
+  return out;
+}
+
 async function fcScrapeJson(url: string): Promise<Record<string, unknown> | null> {
   const r = await fetch(`${FIRECRAWL_BASE}/scrape`, {
     method: "POST",
@@ -190,6 +231,9 @@ Deno.serve(async (req) => {
     const maxScrapes: number = Math.min(body.maxScrapes ?? 25, 80);
     const scrapeConcurrency: number = Math.min(body.scrapeConcurrency ?? 5, 10);
     const recencyCutoff = Date.now() - recencyDays * 86400_000;
+    // Search provider: "firecrawl" (default) or "apify" (Google SERP via apify/google-search-scraper).
+    const searchProvider: "firecrawl" | "apify" =
+      (body.searchProvider === "apify") ? "apify" : "firecrawl";
     // Threshold of consecutive zero-result occurrences before a token is auto-skipped.
     const ZERO_SKIP_THRESHOLD = 3;
 
@@ -301,7 +345,9 @@ Deno.serve(async (req) => {
     const runSearch = async ({ q, country, trade }: { q: string; country: string; trade: string }) => {
       try {
         const iso = COUNTRY_ISO[country];
-        const results = await fcSearch(q, iso, tbs);
+        const results = searchProvider === "firecrawl"
+          ? await fcSearch(q, iso, tbs)
+          : await apifyGoogleSearch([q], iso, 20);
         searched++;
         const ctKey = `${country.toLowerCase()}|${trade.toLowerCase()}`;
         const kwKey = trade.toLowerCase();
@@ -330,9 +376,25 @@ Deno.serve(async (req) => {
     for (const tier of [0, 1, 2, 3, 4, 5] as const) {
       const queries = buildQueries(tier);
       tunedTiers.push(tier);
-      for (let i = 0; i < queries.length; i += searchConcurrency) {
-        await Promise.all(queries.slice(i, i + searchConcurrency).map(runSearch));
-        if (candidates.size >= targetCandidates) break;
+      if (searchProvider === "apify") {
+        // One actor run per tier — cheaper and faster than per-query calls.
+        try {
+          const iso = COUNTRY_ISO[queries[0]?.country ?? ""] ?? "rs";
+          const flat = await apifyGoogleSearch(queries.map((x) => x.q), iso, 20);
+          searched += queries.length;
+          for (const r of flat) {
+            const domain = extractDomain(r.url);
+            if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain) || learnedSkipDomains.has(domain)) continue;
+            if (candidates.has(domain)) continue;
+            candidates.set(domain, { url: r.url!, country: queries[0]?.country ?? "" });
+            bump(domHit, domain);
+          }
+        } catch (e) { console.error("apify search err", e); }
+      } else {
+        for (let i = 0; i < queries.length; i += searchConcurrency) {
+          await Promise.all(queries.slice(i, i + searchConcurrency).map(runSearch));
+          if (candidates.size >= targetCandidates) break;
+        }
       }
       console.log(`auto-tune tier ${tier}: ${candidates.size} unique candidates so far`);
       if (candidates.size >= targetCandidates) break;
