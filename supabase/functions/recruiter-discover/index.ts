@@ -512,12 +512,17 @@ Deno.serve(async (req) => {
     const breakdown: Record<string, number> = {};
     const seenEmails = new Set<string>(); // in-run dedup
 
-    const processOne = async ([domain, info]: [string, { url: string; country: string }]) => {
+    const processOne = async ([domain, info]: [string, { url: string; country: string; prefilledEmail?: string }]) => {
       try {
         let extracted = await fcScrapeJson(info.url);
         if (!extracted || extracted.is_recruiter !== true) { skipped++; return; }
 
-        // Contact-page fallback if no email found on the SERP page.
+        // 1) Pre-filled email from SERP snippet (free, no extra scrape).
+        if (!extracted.contact_email && info.prefilledEmail) {
+          extracted = { ...extracted, contact_email: info.prefilledEmail };
+        }
+
+        // 2) Contact-page fallback if still no email.
         if (!extracted.contact_email) {
           const candidatesPaths = ["/contact", "/contact-us", "/about", "/about-us"];
           for (const p of candidatesPaths) {
