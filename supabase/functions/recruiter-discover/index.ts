@@ -40,6 +40,33 @@ const ALLOWED_MODELS = new Set([
   "free_recruitment","company_recruitment",
 ]);
 
+// ---- Email validation & normalization ----
+const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const PLACEHOLDER_EMAILS = new Set([
+  "n/a","na","none","null","email@example.com","test@test.com",
+  "info@example.com","example@example.com","you@example.com",
+  "your@email.com","name@domain.com","email@domain.com",
+]);
+const PLACEHOLDER_DOMAINS = new Set([
+  "example.com","example.org","domain.com","email.com","test.com",
+  "yourdomain.com","mydomain.com","sentry.io","wixpress.com",
+]);
+function normalizeEmail(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  let e = raw.trim().toLowerCase();
+  if (!e) return null;
+  // strip mailto:, surrounding angle brackets, trailing punctuation
+  e = e.replace(/^mailto:/, "").replace(/^[<"']+|[>"'.,;:)]+$/g, "");
+  if (!EMAIL_RE.test(e)) return null;
+  if (e.length > 254) return null;
+  if (PLACEHOLDER_EMAILS.has(e)) return null;
+  const domain = e.split("@")[1];
+  if (!domain || PLACEHOLDER_DOMAINS.has(domain)) return null;
+  // reject obvious noreply traps
+  if (/^(noreply|no-reply|donotreply|do-not-reply)@/.test(e)) return null;
+  return e;
+}
+
 const AGGREGATOR_DOMAINS = new Set([
   "linkedin.com","indeed.com","glassdoor.com","google.com","facebook.com",
   "monster.com","reed.co.uk","stepstone.de","totaljobs.com","ziprecruiter.com",
