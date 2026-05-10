@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  Send, Save, Eye, FileText, Search, RefreshCw, Trash2, Plus, CheckCircle2, XCircle,
+  Send, Save, Eye, FileText, Search, RefreshCw, Trash2, Plus, CheckCircle2, XCircle, Beaker,
 } from "lucide-react";
 
 type Lead = {
@@ -95,6 +95,58 @@ const Mail = () => {
 
   const [saveOpen, setSaveOpen] = useState(false);
   const [newTplName, setNewTplName] = useState("");
+
+  const [testOpen, setTestOpen] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [testSending, setTestSending] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) setTestEmail(data.user.email);
+    });
+  }, []);
+
+  const sampleLead: Lead = {
+    id: "sample",
+    agency_name: "Sample Agency Ltd",
+    contact_name: "Alex Sample",
+    contact_email: "alex@sample.com",
+    hq_country: "India",
+    operating_eu_country: "Greece",
+    trades: ["Welding", "Construction"],
+    email_status: "not_sent",
+    email_sent_at: null,
+  };
+
+  const sendTest = async () => {
+    if (!testEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail)) {
+      return toast.error("Enter a valid email");
+    }
+    if (!subject.trim() || !body.trim()) return toast.error("Subject and body required");
+
+    const sourceLead =
+      leads.find((l) => selected.has(l.id)) ?? sampleLead;
+    const personalSubject = `[TEST] ${renderTemplate(subject, sourceLead)}`;
+    const personalText =
+      `--- TEST EMAIL · merge tags rendered using ${
+        sourceLead.id === "sample" ? "sample data" : sourceLead.agency_name
+      } ---\n\n` + renderTemplate(body, sourceLead);
+
+    setTestSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-recruiter-email", {
+        body: { to: testEmail.trim(), subject: personalSubject, text: personalText },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(`Test sent to ${testEmail}`);
+      setTestOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Test send failed");
+    } finally {
+      setTestSending(false);
+    }
+  };
 
   const loadLeads = async () => {
     setLoading(true);
@@ -344,6 +396,9 @@ const Mail = () => {
                 <FileText className="h-4 w-4" /> Compose
               </CardTitle>
               <div className="flex gap-1">
+                <Button variant="outline" size="sm" onClick={() => setTestOpen(true)}>
+                  <Beaker className="h-3.5 w-3.5 mr-1" /> Send test
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setSaveOpen(true)}>
                   <Save className="h-3.5 w-3.5 mr-1" /> Save as template
                 </Button>
@@ -485,6 +540,39 @@ const Mail = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSaveOpen(false)}>Cancel</Button>
             <Button onClick={saveTemplate}><Plus className="h-4 w-4 mr-1" /> Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send test dialog */}
+      <Dialog open={testOpen} onOpenChange={setTestOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send test email</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>Send to</Label>
+            <Input
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="you@yourcompany.com"
+            />
+            <p className="text-xs text-muted-foreground">
+              Renders the current subject and body using{" "}
+              {leads.find((l) => selected.has(l.id))
+                ? <>the first selected lead (<b>{leads.find((l) => selected.has(l.id))!.agency_name}</b>)</>
+                : "sample data"}{" "}
+              so you can verify merge tags before bulk sending. Subject is prefixed with <code>[TEST]</code> and no leads are updated.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestOpen(false)} disabled={testSending}>
+              Cancel
+            </Button>
+            <Button onClick={sendTest} disabled={testSending}>
+              <Send className="h-4 w-4 mr-1" /> {testSending ? "Sending…" : "Send test"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
