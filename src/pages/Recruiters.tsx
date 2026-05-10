@@ -419,6 +419,7 @@ const Recruiters = () => {
   useEffect(() => {
     if (!activeJobId) return;
     let cancelled = false;
+    let ticks = 0;
     const tick = async () => {
       const { data } = await supabase
         .from("discovery_jobs").select("*").eq("id", activeJobId).maybeSingle();
@@ -427,6 +428,12 @@ const Recruiters = () => {
         const others = prev.filter((j) => j.id !== data.id);
         return [data as DiscoveryJob, ...others];
       });
+      // While the job is running, refresh the recruiter list every ~12s so the
+      // per-country tally panel updates live as new leads land.
+      if (data.status === "queued" || data.status === "processing") {
+        ticks++;
+        if (ticks % 4 === 0) await load();
+      }
       if (data.status === "completed" || data.status === "failed") {
         setActiveJobId(null);
         if (data.status === "completed") {
