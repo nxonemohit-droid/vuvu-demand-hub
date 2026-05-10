@@ -866,6 +866,85 @@ const Recruiters = () => {
         </div>
       </Card>
 
+      <Card className="p-4 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <div className="text-sm font-semibold">Outreach blocks</div>
+            <div className="text-xs text-muted-foreground">
+              Prioritized for the 50/day automated send. Block 1 → 2 → 3.
+            </div>
+          </div>
+          {isAdmin && (
+            <Button size="sm" onClick={() => openScheduleDialog(null)} disabled={outreachTotal === 0}>
+              <Send className="h-4 w-4 mr-1.5" />
+              Schedule {scheduleDailyCap}/day outreach ({outreachTotal})
+            </Button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {([
+            { key: 1, label: "Block 1 — Email + Phone + LinkedIn", count: outreachBlocks.block1.length, tone: "border-emerald-500/40 bg-emerald-500/5" },
+            { key: 2, label: "Block 2 — Email + Phone or LinkedIn", count: outreachBlocks.block2.length, tone: "border-amber-500/40 bg-amber-500/5" },
+            { key: 3, label: "Block 3 — Email only", count: outreachBlocks.block3.length, tone: "border-muted bg-muted/30" },
+          ] as const).map((b) => (
+            <div key={b.key} className={`rounded-lg border p-3 ${b.tone}`}>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{b.label}</div>
+              <div className="mt-1 flex items-baseline justify-between">
+                <span className="text-2xl font-bold leading-none">{b.count}</span>
+                {isAdmin && (
+                  <Button size="sm" variant="ghost" onClick={() => openScheduleDialog([b.key])} disabled={b.count === 0}>
+                    Schedule
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        {outreachBlocks.noContact > 0 && (
+          <div className="mt-3 text-xs text-muted-foreground">
+            <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
+            {outreachBlocks.noContact} lead(s) have no email, phone, or LinkedIn — use "Clean no-contact" to remove them.
+          </div>
+        )}
+      </Card>
+
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule automated outreach</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              {scheduleBlocks
+                ? `Scheduling Block ${scheduleBlocks.join(", ")} only.`
+                : "Scheduling all 3 blocks in priority order (Block 1 → 2 → 3)."}{" "}
+              Already-queued or already-sent leads, suppressed addresses, and duplicates are skipped automatically.
+            </p>
+            <div className="flex items-center gap-3">
+              <Label className="text-xs w-24">Daily cap</Label>
+              <Input
+                type="number"
+                min={1}
+                max={500}
+                value={scheduleDailyCap}
+                onChange={(e) => setScheduleDailyCap(Math.max(1, Math.min(500, Number(e.target.value) || 50)))}
+                className="w-24"
+              />
+              <span className="text-xs text-muted-foreground">emails per day</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Send window: 08:00–19:00 Europe/Belgrade. Emails are spaced evenly inside the window. The global 200/day cap stays in place — staggering only applies to this batch.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setScheduleOpen(false)} disabled={scheduleRunning}>Cancel</Button>
+            <Button onClick={runSchedule} disabled={scheduleRunning}>
+              {scheduleRunning ? "Scheduling…" : "Schedule now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Tabs value={tab} onValueChange={(v) => setTab(v as "recruiters" | "jobs")} className="mb-4">
         <TabsList>
           <TabsTrigger value="recruiters">Recruiters ({filtered.length})</TabsTrigger>
