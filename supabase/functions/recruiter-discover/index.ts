@@ -437,7 +437,7 @@ Deno.serve(async (req) => {
     const blocked = new Set((blacklist ?? []).map((r: { domain: string }) => r.domain.toLowerCase()));
 
     const searchConcurrency: number = Math.min(body.searchConcurrency ?? 6, 10);
-    const candidates = new Map<string, { url: string; country: string; prefilledEmail?: string }>();
+    const candidates = new Map<string, { url: string; country: string; prefilledEmail?: string; tier: number }>();
     let searched = 0;
     const tunedTiers: number[] = [];
 
@@ -507,7 +507,7 @@ Deno.serve(async (req) => {
           const domain = extractDomain(r.url);
           if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain) || learnedSkipDomains.has(domain)) continue;
           if (candidates.has(domain)) continue;
-          candidates.set(domain, { url: r.url!, country, prefilledEmail: snippetEmail(r) });
+          candidates.set(domain, { url: r.url!, country, prefilledEmail: snippetEmail(r), tier: currentTier });
           usable++;
           bump(domHit, domain);
         }
@@ -526,7 +526,9 @@ Deno.serve(async (req) => {
     const targetCandidates = Math.max(maxScrapes * 2, 20);
     // Tier 6 (email-intent boolean) runs FIRST so the highest-yield email pages
     // are scraped before the maxScrapes budget is exhausted.
+    let currentTier = 6;
     for (const tier of [6, 0, 4, 1, 3, 2, 5] as const) {
+      currentTier = tier;
       const queries = buildQueries(tier);
       tunedTiers.push(tier);
       if (searchProvider === "apify") {
@@ -554,7 +556,7 @@ Deno.serve(async (req) => {
                   if (!existing.prefilledEmail && pe) existing.prefilledEmail = pe;
                   continue;
                 }
-                candidates.set(domain, { url: r.url!, country, prefilledEmail: pe });
+                candidates.set(domain, { url: r.url!, country, prefilledEmail: pe, tier });
                 bump(domHit, domain);
               }
             } catch (e) { console.error("apify search err", country, e); }
