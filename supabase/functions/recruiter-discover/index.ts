@@ -274,6 +274,7 @@ Deno.serve(async (req) => {
     const recencyDays: number = body.recencyDays ?? 90;
     const tbs = recencyToTbs(recencyDays);
     const singleCountry = countries.length === 1;
+    const smallCountrySet = countries.length <= 10;
     const maxQueries: number = Math.min(body.maxQueries ?? 20, singleCountry ? 80 : 60);
     const maxScrapes: number = Math.min(body.maxScrapes ?? 25, 80);
     const scrapeConcurrency: number = Math.min(body.scrapeConcurrency ?? 5, 10);
@@ -342,13 +343,13 @@ Deno.serve(async (req) => {
       .map((d) => `-site:${d}`).join(" ");
 
     // Tiered query builder — auto-tune by progressively dropping filters.
-    const buildQueries = (tier: 0 | 1 | 2 | 3 | 4 | 5): { q: string; country: string; trade: string }[] => {
+    const buildQueries = (tier: 0 | 1 | 2 | 3 | 4 | 5 | 6): { q: string; country: string; trade: string }[] => {
       const sampleCountries = pickSample(countries, Math.min(countries.length, 12));
       const out: { q: string; country: string; trade: string }[] = [];
       const originExpr = origins.map((o) => `"${o}"`).join(" OR ");
       outer: for (const country of sampleCountries) {
-        // For single-country runs, sweep ALL trades; otherwise sample.
-        const tradeSample = singleCountry
+        // For single- or small-country runs, sweep ALL trades; otherwise sample.
+        const tradeSample = (singleCountry || smallCountrySet)
           ? tradePool
           : pickSample(tradePool, tier === 0 ? 2 : 1);
         for (const trade of tradeSample) {
@@ -369,9 +370,13 @@ Deno.serve(async (req) => {
           } else if (tier === 4) {
             // Contact-page intent
             q = `("workers to ${country}" OR "deployment ${country}" OR "${country} placement") (Nepal OR India OR Bangladesh) (intext:"contact us" OR intext:"send your CV" OR inurl:contact) -site:linkedin.com -site:indeed.com ${learnedSiteExclusions}`;
-          } else {
+          } else if (tier === 5) {
             // Origin-side agencies advertising this destination
             q = `("recruitment agency" OR "manpower consultant" OR "overseas placement") "${country}" (Nepal OR India OR Bangladesh) (site:in OR site:np OR site:com.bd) ${learnedSiteExclusions}`;
+          } else {
+            // Tier 6 — email-intent boolean (high yield for contact_email).
+            const local = LOCALIZED_RECRUITER_TERMS[country] ?? "";
+            q = `("recruitment agency" OR "manpower" OR "labour supply" OR "HR consultant" ${local}) (Nepal OR India OR Bangladesh) "${country}" (intext:"@gmail.com" OR intext:"@yahoo.com" OR intext:"info@" OR intext:"contact@" OR intext:"hr@" OR inurl:contact OR inurl:kontakt) -site:linkedin.com -site:indeed.com -site:facebook.com ${learnedSiteExclusions}`;
           }
           out.push({ country, q, trade });
           if (out.length >= maxQueries) break outer;
@@ -385,9 +390,17 @@ Deno.serve(async (req) => {
     const blocked = new Set((blacklist ?? []).map((r: { domain: string }) => r.domain.toLowerCase()));
 
     const searchConcurrency: number = Math.min(body.searchConcurrency ?? 6, 10);
-    const candidates = new Map<string, { url: string; country: string }>();
+    const candidates = new Map<string, { url: string; country: string; prefilledEmail?: string }>();
     let searched = 0;
     const tunedTiers: number[] = [];
+
+    // Cheap email regex used to pre-fill from SERP snippets.
+    const SNIPPET_EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
+    const snippetEmail = (r: FcSearchResult): string | undefined => {
+      const blob = `${r.title ?? ""} ${r.description ?? ""}`;
+      const m = blob.match(SNIPPET_EMAIL_RE);
+      return m ? normalizeEmail(m[0]) ?? undefined : undefined;
+    };
 
     const runSearch = async ({ q, country, trade }: { q: string; country: string; trade: string }) => {
       try {
@@ -420,23 +433,41 @@ Deno.serve(async (req) => {
     };
 
     const targetCandidates = Math.max(maxScrapes * 2, 20);
-    for (const tier of [0, 1, 2, 3, 4, 5] as const) {
+    for (const tier of [0, 1, 2, 3, 4, 5, 6] as const) {
       const queries = buildQueries(tier);
       tunedTiers.push(tier);
       if (searchProvider === "apify") {
-        // One actor run per tier — cheaper and faster than per-query calls.
-        try {
-          const iso = COUNTRY_ISO[queries[0]?.country ?? ""] ?? "rs";
-          const flat = await apifyGoogleSearch(queries.map((x) => x.q), iso, 20);
-          searched += queries.length;
-          for (const r of flat) {
-            const domain = extractDomain(r.url);
-            if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain) || learnedSkipDomains.has(domain)) continue;
-            if (candidates.has(domain)) continue;
-            candidates.set(domain, { url: r.url!, country: queries[0]?.country ?? "" });
-            bump(domHit, domain);
-          }
-        } catch (e) { console.error("apify search err", e); }
+        // Group queries by country so each APIFY actor run uses the right geo.
+        const byCountry = new Map<string, string[]>();
+        for (const q of queries) {
+          const arr = byCountry.get(q.country) ?? [];
+          arr.push(q.q);
+          byCountry.set(q.country, arr);
+        }
+        const groups = [...byCountry.entries()];
+        // Cap parallel actor runs at 3 to respect APIFY concurrency limits.
+        for (let i = 0; i < groups.length; i += 3) {
+          await Promise.all(groups.slice(i, i + 3).map(async ([country, qs]) => {
+            try {
+              const iso = COUNTRY_ISO[country] ?? "us";
+              const flat = await apifyGoogleSearch(qs, iso, 20);
+              searched += qs.length;
+              for (const r of flat) {
+                const domain = extractDomain(r.url);
+                if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain) || learnedSkipDomains.has(domain)) continue;
+                const pe = snippetEmail(r);
+                const existing = candidates.get(domain);
+                if (existing) {
+                  if (!existing.prefilledEmail && pe) existing.prefilledEmail = pe;
+                  continue;
+                }
+                candidates.set(domain, { url: r.url!, country, prefilledEmail: pe });
+                bump(domHit, domain);
+              }
+            } catch (e) { console.error("apify search err", country, e); }
+          }));
+          if (candidates.size >= targetCandidates) break;
+        }
       } else {
         for (let i = 0; i < queries.length; i += searchConcurrency) {
           await Promise.all(queries.slice(i, i + searchConcurrency).map(runSearch));
