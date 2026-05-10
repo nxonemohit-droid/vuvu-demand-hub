@@ -25,9 +25,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck,
-  CheckCircle2, XCircle, Loader2, Clock, Copy, Send,
+  CheckCircle2, XCircle, Loader2, Clock, Copy, Send, MailCheck, AlertTriangle,
 } from "lucide-react";
 
 type RecruiterRow = {
@@ -57,6 +58,10 @@ type RecruiterRow = {
   quality_score: number;
   email_status?: string;
   email_sent_at?: string | null;
+  resend_message_id?: string | null;
+  email_delivery_status?: string | null;
+  email_last_event?: string | null;
+  email_error?: string | null;
 };
 
 type DiscoveryJob = {
@@ -133,6 +138,9 @@ const Recruiters = () => {
   const [emailBody, setEmailBody] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Reset the draft whenever a new recruiter is opened.
   useEffect(() => {
@@ -206,6 +214,58 @@ const Recruiters = () => {
     setSelected({ ...selected, email_status: "sent", email_sent_at: nowIso });
     toast.success("Email sent via Resend");
     setSendingEmail(false);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const bulkSendPersonalized = async () => {
+    const targets = rows.filter(
+      (r) => selectedIds.has(r.id) && r.contact_email && r.email_status !== "sent"
+    );
+    if (targets.length === 0) {
+      toast.error("No selected leads with a contact email and not already sent");
+      return;
+    }
+    setBulkSending(true);
+    setBulkProgress({ done: 0, total: targets.length });
+    let ok = 0, fail = 0;
+    for (const r of targets) {
+      const draft = buildOutreachDraft(r);
+      try {
+        const { data, error } = await supabase.functions.invoke("send-recruiter-email", {
+          body: { leadId: r.id, to: r.contact_email!, subject: draft.subject, text: draft.body },
+        });
+        if (error || (data as any)?.error) {
+          fail++;
+        } else {
+          ok++;
+          const nowIso = (data as any)?.sent_at ?? new Date().toISOString();
+          setRows((prev) => prev.map((x) =>
+            x.id === r.id
+              ? { ...x, email_status: "sent", email_sent_at: nowIso,
+                  resend_message_id: (data as any)?.id ?? null,
+                  email_delivery_status: "sent", email_last_event: "email.sent" }
+              : x
+          ));
+        }
+      } catch {
+        fail++;
+      }
+      setBulkProgress((p) => p ? { ...p, done: p.done + 1 } : p);
+      // small pacing delay to be gentle on the gateway
+      await new Promise((res) => setTimeout(res, 250));
+    }
+    setBulkSending(false);
+    setBulkProgress(null);
+    setSelectedIds(new Set());
+    if (fail === 0) toast.success(`Sent ${ok} personalized emails`);
+    else toast.warning(`Sent ${ok}, ${fail} failed`);
   };
 
   const load = async () => {
