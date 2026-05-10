@@ -904,9 +904,33 @@ const Recruiters = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold">Outreach email</h3>
-                    <Badge variant="outline" className="text-[10px]">
-                      {selected.email_status === "sent" ? "Already sent" : "Draft"}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {templates.length > 0 && (
+                        <Select onValueChange={(v) => {
+                          const tpl = templates.find((t) => t.id === v);
+                          if (tpl) applyTemplate(tpl, selected);
+                        }}>
+                          <SelectTrigger className="h-7 text-xs w-44">
+                            <SelectValue placeholder="Apply template…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {templates.map((t) => (
+                              <SelectItem key={t.id} value={t.id} className="text-xs">{t.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <Button
+                        size="sm" variant="ghost" className="h-7 px-2"
+                        onClick={() => { setEditingTpl(null); setTplForm({ name: "", subject: emailSubject, body: emailBody, description: "" }); setTemplatesOpen(true); }}
+                        title="Manage templates"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                      </Button>
+                      <Badge variant="outline" className="text-[10px]">
+                        {selected.email_status === "sent" ? "Already sent" : "Draft"}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="email-subject" className="text-xs">Subject</Label>
@@ -965,11 +989,142 @@ const Recruiters = () => {
                     )}
                   </div>
                 </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                      <History className="h-4 w-4" /> Delivery timeline
+                    </h3>
+                    <span className="text-[10px] text-muted-foreground">{events.length} events</span>
+                  </div>
+                  {eventsLoading ? (
+                    <Skeleton className="h-20 w-full" />
+                  ) : events.length === 0 ? (
+                    <div className="text-xs text-muted-foreground border rounded-md p-3 text-center">
+                      No events yet. Send the email to start tracking delivery.
+                    </div>
+                  ) : (
+                    <ol className="relative border-l border-border ml-2 space-y-3">
+                      {events.map((ev) => {
+                        const t = ev.event_type;
+                        const Icon =
+                          t === "email.delivered" ? Inbox :
+                          t === "email.opened" ? Eye :
+                          t === "email.clicked" ? MousePointerClick :
+                          t === "email.bounced" || t === "email.complained" || t === "email.failed" ? AlertCircle :
+                          t === "email.sent" ? Send :
+                          Clock;
+                        const tone =
+                          t === "email.bounced" || t === "email.complained" || t === "email.failed" ? "text-destructive" :
+                          t === "email.delivered" || t === "email.opened" || t === "email.clicked" ? "text-emerald-600" :
+                          "text-primary";
+                        const p = (ev.payload ?? {}) as any;
+                        const errMsg = p?.data?.bounce?.message ?? p?.data?.reason ?? p?.bounce?.message;
+                        const link = p?.data?.click?.link ?? p?.click?.link;
+                        const ts = new Date(ev.created_at);
+                        return (
+                          <li key={ev.id} className="ml-4">
+                            <span className={`absolute -left-[7px] flex h-3.5 w-3.5 items-center justify-center rounded-full bg-background ring-1 ring-border ${tone}`}>
+                              <Icon className="h-2.5 w-2.5" />
+                            </span>
+                            <div className="flex items-baseline gap-2">
+                              <span className={`text-xs font-medium capitalize ${tone}`}>
+                                {t.replace("email.", "").replace("_", " ")}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {ts.toLocaleString("en-GB", { hour12: false })}
+                              </span>
+                            </div>
+                            {ev.recipient && (
+                              <div className="text-[11px] text-muted-foreground">to {ev.recipient}</div>
+                            )}
+                            {errMsg && (
+                              <div className="text-[11px] text-destructive mt-0.5 break-words">{String(errMsg)}</div>
+                            )}
+                            {link && (
+                              <a href={link} target="_blank" rel="noreferrer" className="text-[11px] text-primary break-all inline-flex items-center gap-1">
+                                {link} <ExternalLink className="h-2.5 w-2.5" />
+                              </a>
+                            )}
+                            {ev.message_id && (
+                              <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{ev.message_id}</div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+                </div>
               </div>
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Templates manager */}
+      <Dialog open={templatesOpen} onOpenChange={(o) => { setTemplatesOpen(o); if (!o) { setEditingTpl(null); setTplForm({ name: "", subject: "", body: "", description: "" }); } }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Email templates</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Use placeholders: <code className="text-[10px]">{`{{first_name}}`}</code>, <code className="text-[10px]">{`{{agency_name}}`}</code>, <code className="text-[10px]">{`{{country}}`}</code>, <code className="text-[10px]">{`{{trades}}`}</code>, <code className="text-[10px]">{`{{contact_email}}`}</code>, <code className="text-[10px]">{`{{hq_city}}`}</code>, <code className="text-[10px]">{`{{hq_country}}`}</code>.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground">Saved ({templates.length})</h4>
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                {templates.map((t) => (
+                  <Card key={t.id} className={`p-3 cursor-pointer ${editingTpl?.id === t.id ? "border-primary" : ""}`}
+                    onClick={() => { setEditingTpl(t); setTplForm({ name: t.name, subject: t.subject, body: t.body, description: t.description ?? "" }); }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{t.name}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">{t.subject}</div>
+                        {t.description && <div className="text-[10px] text-muted-foreground mt-1">{t.description}</div>}
+                      </div>
+                      {isAdmin && (
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0"
+                          onClick={(e) => { e.stopPropagation(); if (confirm(`Delete template "${t.name}"?`)) deleteTemplate(t.id); }}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+                {templates.length === 0 && (
+                  <div className="text-xs text-muted-foreground text-center p-4 border rounded-md">No templates yet.</div>
+                )}
+              </div>
+              <Button size="sm" variant="outline" className="w-full"
+                onClick={() => { setEditingTpl(null); setTplForm({ name: "", subject: "", body: "", description: "" }); }}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> New template
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+                {editingTpl ? `Edit "${editingTpl.name}"` : "New template"}
+              </h4>
+              <Input placeholder="Template name" value={tplForm.name} onChange={(e) => setTplForm({ ...tplForm, name: e.target.value })} />
+              <Input placeholder="Description (optional)" value={tplForm.description} onChange={(e) => setTplForm({ ...tplForm, description: e.target.value })} />
+              <Input placeholder="Subject" value={tplForm.subject} onChange={(e) => setTplForm({ ...tplForm, subject: e.target.value })} />
+              <Textarea placeholder="Body" rows={12} className="font-mono text-xs" value={tplForm.body} onChange={(e) => setTplForm({ ...tplForm, body: e.target.value })} />
+              <DialogFooter>
+                {editingTpl && (
+                  <Button size="sm" variant="ghost" onClick={() => { setEditingTpl(null); setTplForm({ name: "", subject: "", body: "", description: "" }); }}>
+                    Cancel edit
+                  </Button>
+                )}
+                <Button size="sm" onClick={saveTemplate}>
+                  {editingTpl ? "Save changes" : "Create template"}
+                </Button>
+              </DialogFooter>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
