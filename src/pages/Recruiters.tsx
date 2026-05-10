@@ -713,6 +713,17 @@ const Recruiters = () => {
                       <Send className="h-3.5 w-3.5 mr-1.5" />
                       {selected.email_status === "sent" ? "Already marked" : savingEmail ? "Saving…" : "Mark as sent"}
                     </Button>
+                    {selected.contact_email && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={sendViaResend}
+                        disabled={sendingEmail || !emailSubject || !emailBody}
+                      >
+                        <Send className="h-3.5 w-3.5 mr-1.5" />
+                        {sendingEmail ? "Sending…" : "Send via Resend"}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
