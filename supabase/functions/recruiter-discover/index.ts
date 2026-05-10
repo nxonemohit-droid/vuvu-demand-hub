@@ -26,6 +26,11 @@ const TRADES = [
   "construction","welding","masonry","carpentry","steel fixing","plumbing",
   "warehouse","logistics","hospitality","cleaning","agriculture",
   "factory operator","driver",
+  "electrician","painter","scaffolder","HVAC","CNC operator","forklift",
+  "picker packer","food processing","meat processing","butcher","baker",
+  "chef","kitchen helper","housekeeping","room attendant","waiter",
+  "security guard","landscaping","shipyard","automotive assembly",
+  "tyre fitter","tile setter","plasterer","roofer","ironworker",
 ];
 const ORIGINS = ["Nepal","India","Bangladesh"];
 const ALLOWED_MODELS = new Set([
@@ -92,11 +97,19 @@ const RECRUITER_SCHEMA = {
   required: ["is_recruiter"],
 };
 
-async function fcSearch(query: string, country?: string): Promise<FcSearchResult[]> {
+function recencyToTbs(days: number): string | undefined {
+  if (!days || days <= 0) return undefined;
+  if (days <= 7) return "qdr:w";
+  if (days <= 31) return "qdr:m";
+  if (days <= 365) return "qdr:y";
+  return undefined; // all-time
+}
+
+async function fcSearch(query: string, country?: string, tbs?: string): Promise<FcSearchResult[]> {
   const r = await fetch(`${FIRECRAWL_BASE}/search`, {
     method: "POST",
     headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ query, limit: 15, tbs: "qdr:m", country }),
+    body: JSON.stringify({ query, limit: 15, ...(tbs ? { tbs } : {}), country }),
   });
   if (!r.ok) throw new Error(`fc search ${r.status}: ${(await r.text()).slice(0,200)}`);
   const j = await r.json();
@@ -171,8 +184,10 @@ Deno.serve(async (req) => {
     const trades: string[] = body.trades ?? TRADES;
     const origins: string[] = body.origins ?? ORIGINS;
     const recencyDays: number = body.recencyDays ?? 90;
-    const maxQueries: number = Math.min(body.maxQueries ?? 20, 60);
-    const maxScrapes: number = Math.min(body.maxScrapes ?? 25, 60);
+    const tbs = recencyToTbs(recencyDays);
+    const singleCountry = countries.length === 1;
+    const maxQueries: number = Math.min(body.maxQueries ?? 20, singleCountry ? 80 : 60);
+    const maxScrapes: number = Math.min(body.maxScrapes ?? 25, 80);
     const scrapeConcurrency: number = Math.min(body.scrapeConcurrency ?? 5, 10);
     const recencyCutoff = Date.now() - recencyDays * 86400_000;
     // Threshold of consecutive zero-result occurrences before a token is auto-skipped.
@@ -236,12 +251,15 @@ Deno.serve(async (req) => {
       .map((d) => `-site:${d}`).join(" ");
 
     // Tiered query builder — auto-tune by progressively dropping filters.
-    const buildQueries = (tier: 0 | 1 | 2): { q: string; country: string; trade: string }[] => {
+    const buildQueries = (tier: 0 | 1 | 2 | 3 | 4 | 5): { q: string; country: string; trade: string }[] => {
       const sampleCountries = pickSample(countries, Math.min(countries.length, 12));
       const out: { q: string; country: string; trade: string }[] = [];
       const originExpr = origins.map((o) => `"${o}"`).join(" OR ");
       outer: for (const country of sampleCountries) {
-        const tradeSample = pickSample(tradePool, tier === 0 ? 2 : 1);
+        // For single-country runs, sweep ALL trades; otherwise sample.
+        const tradeSample = singleCountry
+          ? tradePool
+          : pickSample(tradePool, tier === 0 ? 2 : 1);
         for (const trade of tradeSample) {
           // Skip combos that have repeatedly returned nothing.
           if (learnedSkipCT.has(`${country.toLowerCase()}|${trade.toLowerCase()}`)) continue;
@@ -250,8 +268,19 @@ Deno.serve(async (req) => {
             q = `("recruitment agency" OR "manpower agency" OR "labour supply" OR "HR consultant") (${originExpr}) workers ${trade} "${country}" ("free recruitment" OR "no advance" OR "company paid" OR "employer paid") -site:linkedin.com -site:indeed.com ${learnedSiteExclusions}`;
           } else if (tier === 1) {
             q = `("recruitment agency" OR "manpower agency" OR "labour supply") (${originExpr}) ${trade} workers "${country}" -site:linkedin.com -site:indeed.com ${learnedSiteExclusions}`;
-          } else {
+          } else if (tier === 2) {
             q = `("recruitment agency" OR "manpower agency") (Nepal OR India OR Bangladesh) workers "${country}" ${learnedSiteExclusions}`;
+          } else if (tier === 3) {
+            // Country-TLD agency sites (e.g. site:rs for Serbia)
+            const tld = (COUNTRY_ISO[country] ?? "").toLowerCase();
+            const tldFrag = tld ? `site:${tld}` : `"${country}"`;
+            q = `("manpower" OR "recruitment" OR "labour supply" OR "agencija za zapošljavanje" OR "agencija za posredovanje") (Nepal OR India OR Bangladesh) ${tldFrag} ${learnedSiteExclusions}`;
+          } else if (tier === 4) {
+            // Contact-page intent
+            q = `("workers to ${country}" OR "deployment ${country}" OR "${country} placement") (Nepal OR India OR Bangladesh) (intext:"contact us" OR intext:"send your CV" OR inurl:contact) -site:linkedin.com -site:indeed.com ${learnedSiteExclusions}`;
+          } else {
+            // Origin-side agencies advertising this destination
+            q = `("recruitment agency" OR "manpower consultant" OR "overseas placement") "${country}" (Nepal OR India OR Bangladesh) (site:in OR site:np OR site:com.bd) ${learnedSiteExclusions}`;
           }
           out.push({ country, q, trade });
           if (out.length >= maxQueries) break outer;
@@ -272,7 +301,7 @@ Deno.serve(async (req) => {
     const runSearch = async ({ q, country, trade }: { q: string; country: string; trade: string }) => {
       try {
         const iso = COUNTRY_ISO[country];
-        const results = await fcSearch(q, iso);
+        const results = await fcSearch(q, iso, tbs);
         searched++;
         const ctKey = `${country.toLowerCase()}|${trade.toLowerCase()}`;
         const kwKey = trade.toLowerCase();
@@ -297,15 +326,16 @@ Deno.serve(async (req) => {
       } catch (e) { console.error("search err", q, e); }
     };
 
-    for (const tier of [0, 1, 2] as const) {
+    const targetCandidates = Math.max(maxScrapes * 2, 20);
+    for (const tier of [0, 1, 2, 3, 4, 5] as const) {
       const queries = buildQueries(tier);
       tunedTiers.push(tier);
       for (let i = 0; i < queries.length; i += searchConcurrency) {
         await Promise.all(queries.slice(i, i + searchConcurrency).map(runSearch));
-        if (candidates.size >= 8) break;
+        if (candidates.size >= targetCandidates) break;
       }
       console.log(`auto-tune tier ${tier}: ${candidates.size} unique candidates so far`);
-      if (candidates.size >= 8) break;
+      if (candidates.size >= targetCandidates) break;
     }
 
     // Persist learning. Each token: increment zero_result_count or hit_count.
@@ -343,8 +373,28 @@ Deno.serve(async (req) => {
 
     const processOne = async ([domain, info]: [string, { url: string; country: string }]) => {
       try {
-        const extracted = await fcScrapeJson(info.url);
+        let extracted = await fcScrapeJson(info.url);
         if (!extracted || extracted.is_recruiter !== true) { skipped++; return; }
+
+        // Contact-page fallback if no email found on the SERP page.
+        if (!extracted.contact_email) {
+          const candidatesPaths = ["/contact", "/contact-us", "/about", "/about-us"];
+          for (const p of candidatesPaths) {
+            try {
+              const fb = await fcScrapeJson(`https://${domain}${p}`);
+              if (fb && (fb.contact_email || fb.contact_phone)) {
+                extracted = {
+                  ...extracted,
+                  contact_email: extracted.contact_email ?? fb.contact_email,
+                  contact_phone: extracted.contact_phone ?? fb.contact_phone,
+                  contact_name: extracted.contact_name ?? fb.contact_name,
+                  contact_linkedin: extracted.contact_linkedin ?? fb.contact_linkedin,
+                };
+                break;
+              }
+            } catch (_) { /* keep trying */ }
+          }
+        }
 
         const agencyName = String(extracted.agency_name ?? domain.split(".")[0]).trim();
         if (!agencyName) { skipped++; return; }
@@ -352,14 +402,13 @@ Deno.serve(async (req) => {
         const model = String(extracted.recruitment_model ?? "unknown");
         const upfront = extracted.charges_upfront_candidate_fee === true;
         const postedRaw = extracted.posted_at ? Date.parse(String(extracted.posted_at)) : NaN;
-        const isStale = !isNaN(postedRaw) && postedRaw < recencyCutoff;
 
         let excludedReason: string | null = null;
         if (upfront) excludedReason = "upfront_fee";
         else if (model === "sub_agent") excludedReason = "sub_agent";
         else if (model === "training_institute") excludedReason = "training_institute";
-        else if (!ALLOWED_MODELS.has(model)) excludedReason = "unknown_model";
-        else if (isStale) excludedReason = "stale";
+        // Note: "unknown" model is allowed (kept active). Stale check removed — recency
+        // is already enforced via Firecrawl `tbs`.
 
         // Persist raw signal for provenance.
         const { data: rs } = await supa.from("raw_signals").insert({
@@ -371,9 +420,7 @@ Deno.serve(async (req) => {
         }).select("id").maybeSingle();
 
         const status = excludedReason ? "excluded" : "active";
-        const recruitment_model = ALLOWED_MODELS.has(model)
-          ? [model]
-          : (model === "unknown" ? [] : []);
+        const recruitment_model = ALLOWED_MODELS.has(model) ? [model] : [];
 
         const row = {
           agency_name: agencyName,
