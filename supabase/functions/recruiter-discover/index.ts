@@ -474,30 +474,6 @@ Deno.serve(async (req) => {
       await Promise.all(batch.map(processOne));
     }
 
-    // ----- Auto-trigger Hunter enrichment on freshly inserted leads missing email -----
-    let enrichTriggered = 0;
-    try {
-      const sinceIso = new Date(Date.now() - 30 * 60_000).toISOString();
-      const { data: needsEmail } = await supa
-        .from("recruiter_leads")
-        .select("id")
-        .gte("last_seen_at", sinceIso)
-        .or("contact_email.is.null,contact_email.eq.,contact_email.eq.N/A")
-        .limit(30);
-      if (needsEmail && needsEmail.length > 0) {
-        const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-        const SRK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-        await fetch(`${SUPABASE_URL}/functions/v1/hunter-enrich`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${SRK}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ leadIds: needsEmail.map((l) => l.id), source: "recruiter_leads" }),
-        }).catch((e) => console.error("hunter-enrich trigger failed", e));
-        enrichTriggered = needsEmail.length;
-      }
-    } catch (e) {
-      console.error("post-discovery enrichment skipped", e);
-    }
-
         await supa.from("discovery_jobs").update({
           status: "completed",
           finished_at: new Date().toISOString(),
@@ -505,7 +481,6 @@ Deno.serve(async (req) => {
             searched, discovered: candidates.size,
             scraped: candidateList.length,
             inserted, updated, excluded, skipped, breakdown,
-            enrich_triggered: enrichTriggered,
             auto_tune_tiers: tunedTiers,
           },
         }).eq("id", jobId);
