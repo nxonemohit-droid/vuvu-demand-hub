@@ -441,6 +441,50 @@ Deno.serve(async (req) => {
     let searched = 0;
     const tunedTiers: number[] = [];
 
+    // ----- Live progress tracking (per-country + phase). Written incrementally
+    // to discovery_jobs.result.progress so the UI can poll and render status.
+    const scrapedByCountry: Record<string, number> = {};
+    const insertedByCountry: Record<string, number> = {};
+    let phase: "searching" | "scraping" | "done" = "searching";
+    let scrapeProcessed = 0;
+    let scrapeTotal = 0;
+    let lastProgressAt = 0;
+    const writeProgress = async (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastProgressAt < 1500) return;
+      lastProgressAt = now;
+      const byCountry: Record<string, { candidates: number; scraped: number; inserted: number }> = {};
+      for (const [, info] of candidates) {
+        const c = (byCountry[info.country] ??= { candidates: 0, scraped: 0, inserted: 0 });
+        c.candidates++;
+      }
+      for (const [country, n] of Object.entries(scrapedByCountry)) {
+        (byCountry[country] ??= { candidates: 0, scraped: 0, inserted: 0 }).scraped = n;
+      }
+      for (const [country, n] of Object.entries(insertedByCountry)) {
+        (byCountry[country] ??= { candidates: 0, scraped: 0, inserted: 0 }).inserted = n;
+      }
+      try {
+        await supa.from("discovery_jobs").update({
+          status: phase === "done" ? "processing" : "processing",
+          result: {
+            progress: {
+              phase,
+              searched,
+              discovered: candidates.size,
+              scraped: scrapeProcessed,
+              scrape_total: scrapeTotal,
+              tiers_done: [...tunedTiers],
+              by_country: byCountry,
+              updated_at: new Date().toISOString(),
+            },
+          },
+        }).eq("id", jobId);
+      } catch (e) {
+        console.error("progress write failed", e);
+      }
+    };
+
     // Cheap email regex used to pre-fill from SERP snippets.
     const SNIPPET_EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
     const snippetEmail = (r: FcSearchResult): string | undefined => {
@@ -515,15 +559,18 @@ Deno.serve(async (req) => {
               }
             } catch (e) { console.error("apify search err", country, e); }
           }));
+          await writeProgress();
           if (candidates.size >= targetCandidates) break;
         }
       } else {
         for (let i = 0; i < queries.length; i += searchConcurrency) {
           await Promise.all(queries.slice(i, i + searchConcurrency).map(runSearch));
+          await writeProgress();
           if (candidates.size >= targetCandidates) break;
         }
       }
       console.log(`auto-tune tier ${tier}: ${candidates.size} unique candidates so far`);
+      await writeProgress(true);
       if (candidates.size >= targetCandidates) break;
     }
 
@@ -692,15 +739,24 @@ Deno.serve(async (req) => {
         if (normalizedEmail) seenEmails.add(normalizedEmail);
         if (excludedReason) excluded++;
         breakdown[row.hq_country ?? "unknown"] = (breakdown[row.hq_country ?? "unknown"] ?? 0) + 1;
+        insertedByCountry[info.country] = (insertedByCountry[info.country] ?? 0) + 1;
       } catch (e) {
         console.error("process err", domain, e);
         skipped++;
       }
+      finally {
+        scrapedByCountry[info.country] = (scrapedByCountry[info.country] ?? 0) + 1;
+        scrapeProcessed++;
+      }
     };
 
+    phase = "scraping";
+    scrapeTotal = candidateList.length;
+    await writeProgress(true);
     for (let i = 0; i < candidateList.length; i += scrapeConcurrency) {
       const batch = candidateList.slice(i, i + scrapeConcurrency);
       await Promise.all(batch.map(processOne));
+      await writeProgress();
     }
 
         await supa.from("discovery_jobs").update({
