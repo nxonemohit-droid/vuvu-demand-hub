@@ -957,6 +957,7 @@ export type Database = {
           contact_linkedin: string | null
           contact_name: string | null
           contact_phone: string | null
+          converted_at: string | null
           created_at: string
           discovered_at: string
           email_delivery_status: string | null
@@ -977,12 +978,15 @@ export type Database = {
           quality_score: number
           raw_signal_id: string | null
           recruitment_model: Database["public"]["Enums"]["recruitment_model_tag"][]
+          replied_at: string | null
           resend_message_id: string | null
           source_posted_at: string | null
           source_url: string | null
           status: string
           trades: string[]
           updated_at: string
+          whatsapp_followup_at: string | null
+          whatsapp_status: string | null
           worker_origin_focus: string[]
         }
         Insert: {
@@ -992,6 +996,7 @@ export type Database = {
           contact_linkedin?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          converted_at?: string | null
           created_at?: string
           discovered_at?: string
           email_delivery_status?: string | null
@@ -1012,12 +1017,15 @@ export type Database = {
           quality_score?: number
           raw_signal_id?: string | null
           recruitment_model?: Database["public"]["Enums"]["recruitment_model_tag"][]
+          replied_at?: string | null
           resend_message_id?: string | null
           source_posted_at?: string | null
           source_url?: string | null
           status?: string
           trades?: string[]
           updated_at?: string
+          whatsapp_followup_at?: string | null
+          whatsapp_status?: string | null
           worker_origin_focus?: string[]
         }
         Update: {
@@ -1027,6 +1035,7 @@ export type Database = {
           contact_linkedin?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          converted_at?: string | null
           created_at?: string
           discovered_at?: string
           email_delivery_status?: string | null
@@ -1047,12 +1056,15 @@ export type Database = {
           quality_score?: number
           raw_signal_id?: string | null
           recruitment_model?: Database["public"]["Enums"]["recruitment_model_tag"][]
+          replied_at?: string | null
           resend_message_id?: string | null
           source_posted_at?: string | null
           source_url?: string | null
           status?: string
           trades?: string[]
           updated_at?: string
+          whatsapp_followup_at?: string | null
+          whatsapp_status?: string | null
           worker_origin_focus?: string[]
         }
         Relationships: []
