@@ -184,6 +184,27 @@ const Campaign = () => {
   const conversionRate = sentLeads.length
     ? Math.round((stats.converted / sentLeads.length) * 100) : 0;
 
+  const funnel = useMemo(() => {
+    const discovered = leads.length;
+    const sent = sentLeads.length;
+    const replied = sentLeads.filter((l) => !!l.replied_at).length;
+    const converted = sentLeads.filter((l) => !!l.converted_at).length;
+    const max = Math.max(discovered, 1);
+    const stage = (label: string, value: number, prev: number, tone: string) => ({
+      label,
+      value,
+      pct: Math.round((value / max) * 100),
+      conv: prev ? Math.round((value / prev) * 100) : 0,
+      tone,
+    });
+    return [
+      stage("Discovered", discovered, discovered, "bg-slate-500"),
+      stage("Sent", sent, discovered, "bg-blue-500"),
+      stage("Replied", replied, sent, "bg-amber-500"),
+      stage("Converted", converted, replied || sent, "bg-emerald-600"),
+    ];
+  }, [leads, sentLeads]);
+
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <header className="flex flex-wrap items-end justify-between gap-4">
