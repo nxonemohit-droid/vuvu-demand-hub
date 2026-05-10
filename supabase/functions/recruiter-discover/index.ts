@@ -103,6 +103,47 @@ const SOCIAL_DOMAINS = new Set([
 
 type FcSearchResult = { url?: string; title?: string; description?: string };
 
+// ---- Transient-error retry with exponential backoff + jitter ----
+// Retries on network errors and HTTP 408/425/429/500/502/503/504.
+const TRANSIENT_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+function isTransientStatus(s: number) { return TRANSIENT_STATUS.has(s); }
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+async function fetchWithRetry(
+  label: string,
+  url: string,
+  init: RequestInit,
+  opts: { retries?: number; baseDelayMs?: number; maxDelayMs?: number } = {},
+): Promise<Response> {
+  const retries = opts.retries ?? 3;
+  const baseDelayMs = opts.baseDelayMs ?? 800;
+  const maxDelayMs = opts.maxDelayMs ?? 8000;
+  let attempt = 0;
+  let lastErr: unknown;
+  while (attempt <= retries) {
+    try {
+      const r = await fetch(url, init);
+      if (r.ok) return r;
+      if (!isTransientStatus(r.status) || attempt === retries) return r;
+      // Honor Retry-After if present.
+      const ra = Number(r.headers.get("retry-after"));
+      const backoff = !Number.isNaN(ra) && ra > 0
+        ? Math.min(ra * 1000, maxDelayMs)
+        : Math.min(baseDelayMs * 2 ** attempt, maxDelayMs) + Math.random() * 250;
+      console.warn(`${label} ${r.status} — retry ${attempt + 1}/${retries} in ${Math.round(backoff)}ms`);
+      await sleep(backoff);
+    } catch (e) {
+      lastErr = e;
+      if (attempt === retries) throw e;
+      const backoff = Math.min(baseDelayMs * 2 ** attempt, maxDelayMs) + Math.random() * 250;
+      console.warn(`${label} network err — retry ${attempt + 1}/${retries} in ${Math.round(backoff)}ms`, e);
+      await sleep(backoff);
+    }
+    attempt++;
+  }
+  throw lastErr ?? new Error(`${label} failed after retries`);
+}
+
 const RECRUITER_SCHEMA = {
   type: "object",
   properties: {
@@ -155,7 +196,7 @@ function recencyToTbs(days: number): string | undefined {
 }
 
 async function fcSearch(query: string, country?: string, tbs?: string): Promise<FcSearchResult[]> {
-  const r = await fetch(`${FIRECRAWL_BASE}/search`, {
+  const r = await fetchWithRetry("fc search", `${FIRECRAWL_BASE}/search`, {
     method: "POST",
     headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ query, limit: 15, ...(tbs ? { tbs } : {}), country }),
@@ -194,11 +235,11 @@ async function apifyGoogleSearch(
     saveHtml: false,
     includeUnfilteredResults: false,
   };
-  const r = await fetch(url, {
+  const r = await fetchWithRetry("apify google", url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
-  });
+  }, { retries: 3, baseDelayMs: 1500, maxDelayMs: 15000 });
   if (!r.ok) throw new Error(`apify google ${r.status}: ${(await r.text()).slice(0, 300)}`);
   const items = (await r.json()) as Array<{
     organicResults?: Array<{ url?: string; title?: string; description?: string }>;
@@ -213,15 +254,21 @@ async function apifyGoogleSearch(
 }
 
 async function fcScrapeJson(url: string): Promise<Record<string, unknown> | null> {
-  const r = await fetch(`${FIRECRAWL_BASE}/scrape`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      url,
-      formats: [{ type: "json", schema: RECRUITER_SCHEMA }],
-      onlyMainContent: true,
-    }),
-  });
+  let r: Response;
+  try {
+    r = await fetchWithRetry("fc scrape", `${FIRECRAWL_BASE}/scrape`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${FIRECRAWL_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        formats: [{ type: "json", schema: RECRUITER_SCHEMA }],
+        onlyMainContent: true,
+      }),
+    }, { retries: 2, baseDelayMs: 1000, maxDelayMs: 6000 });
+  } catch (e) {
+    console.error("fc scrape network err", url, e);
+    return null;
+  }
   if (!r.ok) { console.error("fc scrape failed", url, r.status); return null; }
   const j = await r.json();
   return (j?.data?.json ?? j?.json ?? null) as Record<string, unknown> | null;
