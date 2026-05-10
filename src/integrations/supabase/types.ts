@@ -1045,6 +1045,7 @@ export type Database = {
           updated_at: string
           whatsapp_followup_at: string | null
           whatsapp_status: string | null
+          worker_collar: string | null
           worker_origin_focus: string[]
         }
         Insert: {
@@ -1085,6 +1086,7 @@ export type Database = {
           updated_at?: string
           whatsapp_followup_at?: string | null
           whatsapp_status?: string | null
+          worker_collar?: string | null
           worker_origin_focus?: string[]
         }
         Update: {
@@ -1125,6 +1127,7 @@ export type Database = {
           updated_at?: string
           whatsapp_followup_at?: string | null
           whatsapp_status?: string | null
+          worker_collar?: string | null
           worker_origin_focus?: string[]
         }
         Relationships: []

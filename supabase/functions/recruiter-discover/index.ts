@@ -55,6 +55,9 @@ const TRADES = [
   "tyre fitter","tile setter","plasterer","roofer","ironworker",
 ];
 const ORIGINS = ["Nepal","India","Bangladesh"];
+// Negative search terms appended to every query so we exclude white-collar
+// recruiters (IT, finance, marketing, medical, legal, executive search, etc.).
+const EXCLUDE_WHITE_COLLAR = `-software -developer -"software engineer" -"IT recruitment" -"IT staffing" -finance -accounting -marketing -"sales executive" -doctor -nurse -lawyer -teacher -designer -"white collar" -"office staff" -"executive search" -"head hunter" -SaaS -fintech -consulting`;
 const ALLOWED_MODELS = new Set([
   "no_advance_after_visa","no_advance_after_deployment",
   "free_recruitment","company_recruitment",
@@ -148,6 +151,11 @@ const RECRUITER_SCHEMA = {
   type: "object",
   properties: {
     is_recruiter: { type: "boolean", description: "True if page is by a recruiter / manpower agency / labour supplier / HR consultant" },
+    worker_collar: {
+      type: "string",
+      enum: ["blue", "white", "mixed", "unknown"],
+      description: "blue = manual/labour/trades workers (construction, welding, factory, hospitality, drivers, warehouse, cleaning, agriculture, etc.). white = office/professional/IT/finance/marketing/medical/legal staff. mixed = both. unknown = unclear.",
+    },
     agency_name: { type: "string" },
     hq_country: { type: "string" },
     hq_city: { type: "string" },
@@ -425,6 +433,8 @@ Deno.serve(async (req) => {
             const local = LOCALIZED_RECRUITER_TERMS[country] ?? "";
             q = `("recruitment agency" OR "manpower" OR "labour supply" OR "HR consultant" ${local}) (Nepal OR India OR Bangladesh) "${country}" (intext:"@gmail.com" OR intext:"@yahoo.com" OR intext:"info@" OR intext:"contact@" OR intext:"hr@" OR inurl:contact OR inurl:kontakt) -site:linkedin.com -site:indeed.com -site:facebook.com ${learnedSiteExclusions}`;
           }
+          // Append blue-collar-only exclusions to every query.
+          q = `${q} ${EXCLUDE_WHITE_COLLAR}`;
           out.push({ country, q, trade });
           if (out.length >= maxQueries) break outer;
         }
@@ -615,6 +625,9 @@ Deno.serve(async (req) => {
         let extracted = await fcScrapeJson(info.url);
         if (!extracted || extracted.is_recruiter !== true) { skipped++; return; }
 
+        // Blue-collar-only gate: reject white-collar agencies.
+        if (extracted.worker_collar === "white") { skipped++; return; }
+
         // 1) Pre-filled email from SERP snippet (free, no extra scrape).
         if (!extracted.contact_email && info.prefilledEmail) {
           extracted = { ...extracted, contact_email: info.prefilledEmail };
@@ -720,6 +733,7 @@ Deno.serve(async (req) => {
           status,
           excluded_reason: excludedReason,
           discovery_tier: info.tier,
+          worker_collar: (extracted.worker_collar as string) ?? null,
         };
 
         // Upsert by lower(agency_name) + hq_country
