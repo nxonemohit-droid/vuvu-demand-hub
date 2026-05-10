@@ -466,7 +466,7 @@ Deno.serve(async (req) => {
       }
       try {
         await supa.from("discovery_jobs").update({
-          status: phase === "done" ? "processing" : "processing",
+          status: "processing",
           result: {
             progress: {
               phase,
