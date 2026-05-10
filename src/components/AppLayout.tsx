@@ -10,6 +10,7 @@ import {
   LogOut,
   HelpCircle,
   Building2,
+  Send,
 } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
