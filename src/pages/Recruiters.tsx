@@ -132,6 +132,7 @@ const Recruiters = () => {
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Reset the draft whenever a new recruiter is opened.
   useEffect(() => {
@@ -176,6 +177,35 @@ const Recruiters = () => {
     setSelected({ ...selected, email_status: "sent", email_sent_at: nowIso });
     toast.success("Marked as sent");
     setSavingEmail(false);
+  };
+
+  const sendViaResend = async () => {
+    if (!selected) return;
+    if (!selected.contact_email) {
+      toast.error("No recipient email on this lead");
+      return;
+    }
+    setSendingEmail(true);
+    const { data, error } = await supabase.functions.invoke("send-recruiter-email", {
+      body: {
+        leadId: selected.id,
+        to: selected.contact_email,
+        subject: emailSubject,
+        text: emailBody,
+      },
+    });
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Send failed");
+      setSendingEmail(false);
+      return;
+    }
+    const nowIso = (data as any)?.sent_at ?? new Date().toISOString();
+    setRows((prev) => prev.map((r) =>
+      r.id === selected.id ? { ...r, email_status: "sent", email_sent_at: nowIso } : r
+    ));
+    setSelected({ ...selected, email_status: "sent", email_sent_at: nowIso });
+    toast.success("Email sent via Resend");
+    setSendingEmail(false);
   };
 
   const load = async () => {
