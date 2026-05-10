@@ -463,6 +463,31 @@ const Recruiters = () => {
     [rows]
   );
 
+  // 9-country APIFY sweep tally — counts leads + leads with a valid contact email per target country.
+  const SWEEP_COUNTRIES = [
+    "Serbia", "Turkey", "Poland", "Austria", "Bosnia and Herzegovina",
+    "North Macedonia", "Montenegro", "Moldova", "Belarus",
+  ] as const;
+  const VALID_EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  const sweepTally = useMemo(() => {
+    const norm = (s: string | null) => (s ?? "").trim().toLowerCase();
+    return SWEEP_COUNTRIES.map((country) => {
+      const matches = rows.filter((r) =>
+        norm(r.hq_country) === country.toLowerCase() ||
+        norm(r.operating_eu_country) === country.toLowerCase()
+      );
+      const withEmail = matches.filter((r) => {
+        const e = (r.contact_email ?? "").trim().toLowerCase();
+        return e && e !== "n/a" && VALID_EMAIL_RE.test(e);
+      }).length;
+      return { country, total: matches.length, withEmail };
+    });
+  }, [rows]);
+  const sweepTotals = useMemo(() => ({
+    total: sweepTally.reduce((a, b) => a + b.total, 0),
+    withEmail: sweepTally.reduce((a, b) => a + b.withEmail, 0),
+  }), [sweepTally]);
+
   const runDiscovery = async () => {
     setRunning(true);
     try {
@@ -534,6 +559,44 @@ const Recruiters = () => {
           <Button size="sm" variant="ghost" onClick={() => setTab("jobs")}>View job</Button>
         </Card>
       )}
+
+      <Card className="p-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-sm font-semibold">9-country APIFY sweep</div>
+            <div className="text-xs text-muted-foreground">
+              Leads with a valid contact email across the targeted countries.
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-bold leading-tight">
+              {sweepTotals.withEmail}<span className="text-base text-muted-foreground"> / {sweepTotals.total}</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wide">with email / total</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+          {sweepTally.map((t) => {
+            const pct = t.total > 0 ? Math.round((t.withEmail / t.total) * 100) : 0;
+            return (
+              <button
+                key={t.country}
+                type="button"
+                onClick={() => { setHqFilter(t.country); setTab("recruiters"); }}
+                className="text-left rounded-lg border bg-card hover:bg-accent/40 transition p-2"
+                title={`${t.country}: ${t.withEmail} of ${t.total} leads have a valid email`}
+              >
+                <div className="text-[11px] font-medium text-muted-foreground truncate">{t.country}</div>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="text-lg font-bold leading-none">{t.withEmail}</span>
+                  <span className="text-xs text-muted-foreground">/ {t.total}</span>
+                </div>
+                <Progress value={pct} className="h-1 mt-1.5" />
+              </button>
+            );
+          })}
+        </div>
+      </Card>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "recruiters" | "jobs")} className="mb-4">
         <TabsList>
