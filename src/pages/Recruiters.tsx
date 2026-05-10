@@ -29,7 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck,
   CheckCircle2, XCircle, Loader2, Clock, Copy, Send, MailCheck, AlertTriangle,
-  History, Eye, MousePointerClick, Inbox, AlertCircle, Plus, Trash2, FileText,
+  History, Eye, MousePointerClick, Inbox, AlertCircle, Plus, Trash2, FileText, Download,
 } from "lucide-react";
 
 type EmailEvent = {
@@ -516,6 +516,78 @@ const Recruiters = () => {
   );
   const progress = activeJob?.result?.progress ?? null;
 
+  // Build the export rows = leads in the 9 sweep countries, sorted by country.
+  const sweepExportRows = useMemo(() => {
+    const set = new Set(SWEEP_COUNTRIES.map((c) => c.toLowerCase()));
+    const norm = (s: string | null) => (s ?? "").trim().toLowerCase();
+    return rows
+      .filter((r) => set.has(norm(r.hq_country)) || set.has(norm(r.operating_eu_country)))
+      .map((r) => ({
+        country: r.hq_country ?? r.operating_eu_country ?? "",
+        agency_name: r.agency_name,
+        contact_name: r.contact_name ?? "",
+        contact_email: r.contact_email ?? "",
+        contact_phone: r.contact_phone ?? "",
+        contact_linkedin: r.contact_linkedin ?? "",
+        hq_city: r.hq_city ?? "",
+        operating_eu_country: r.operating_eu_country ?? "",
+        recruitment_model: (r.recruitment_model ?? []).join("|"),
+        license_number: r.license_number ?? "",
+        license_verified: r.license_verified ? "yes" : "no",
+        worker_origin_focus: (r.worker_origin_focus ?? []).join("|"),
+        trades: (r.trades ?? []).join("|"),
+        status: r.status,
+        excluded_reason: r.excluded_reason ?? "",
+        source_url: r.source_url ?? "",
+        source_posted_at: r.source_posted_at ?? "",
+        last_seen_at: r.last_seen_at,
+      }))
+      .sort((a, b) =>
+        a.country.localeCompare(b.country) || a.agency_name.localeCompare(b.agency_name),
+      );
+  }, [rows]);
+
+  const triggerDownload = (filename: string, mime: string, content: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const exportSweep = (format: "csv" | "json") => {
+    if (sweepExportRows.length === 0) {
+      toast.warning("No leads to export yet");
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (format === "json") {
+      triggerDownload(
+        `recruiter-leads-${stamp}.json`,
+        "application/json",
+        JSON.stringify(sweepExportRows, null, 2),
+      );
+    } else {
+      const headers = Object.keys(sweepExportRows[0]);
+      const escape = (v: unknown) => {
+        const s = v == null ? "" : String(v);
+        return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const csv = [
+        headers.join(","),
+        ...sweepExportRows.map((r) =>
+          headers.map((h) => escape((r as Record<string, unknown>)[h])).join(","),
+        ),
+      ].join("\n");
+      triggerDownload(`recruiter-leads-${stamp}.csv`, "text/csv;charset=utf-8", csv);
+    }
+    toast.success(`Exported ${sweepExportRows.length} leads as ${format.toUpperCase()}`);
+  };
+
   const runDiscovery = async () => {
     setRunning(true);
     try {
@@ -609,11 +681,33 @@ const Recruiters = () => {
               Leads with a valid contact email across the targeted countries.
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold leading-tight">
-              {sweepTotals.withEmail}<span className="text-base text-muted-foreground"> / {sweepTotals.total}</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => exportSweep("csv")}
+                disabled={sweepExportRows.length === 0}
+                title="Download all sweep leads as CSV"
+              >
+                <Download className="h-4 w-4 mr-1.5" /> CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => exportSweep("json")}
+                disabled={sweepExportRows.length === 0}
+                title="Download all sweep leads as JSON"
+              >
+                <Download className="h-4 w-4 mr-1.5" /> JSON
+              </Button>
             </div>
-            <div className="text-[11px] text-muted-foreground uppercase tracking-wide">with email / total</div>
+            <div className="text-right">
+              <div className="text-2xl font-bold leading-tight">
+                {sweepTotals.withEmail}<span className="text-base text-muted-foreground"> / {sweepTotals.total}</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground uppercase tracking-wide">with email / total</div>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
