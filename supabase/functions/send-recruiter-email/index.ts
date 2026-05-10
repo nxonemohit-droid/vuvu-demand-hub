@@ -93,7 +93,15 @@ Deno.serve(async (req) => {
     if (leadId) {
       await admin
         .from("recruiter_leads")
-        .update({ email_status: "sent", email_sent_at: nowIso })
+        .update({
+          email_status: "sent",
+          email_sent_at: nowIso,
+          resend_message_id: data?.id ?? null,
+          email_delivery_status: "sent",
+          email_delivery_updated_at: nowIso,
+          email_last_event: "email.sent",
+          email_error: null,
+        })
         .eq("id", leadId);
       await admin.from("lead_outreach_log").insert({
         lead_id: leadId,
@@ -101,6 +109,15 @@ Deno.serve(async (req) => {
         user_id: claims.claims.sub,
         note: `[resend:${data?.id ?? "ok"}] ${subject}\n\n${text ?? html}`,
       });
+      if (data?.id) {
+        await admin.from("email_events").insert({
+          message_id: data.id,
+          lead_id: leadId,
+          event_type: "email.sent",
+          recipient: to,
+          payload: data,
+        });
+      }
     }
 
     return json({ ok: true, id: data?.id, sent_at: nowIso });
