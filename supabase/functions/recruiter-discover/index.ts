@@ -40,6 +40,33 @@ const ALLOWED_MODELS = new Set([
   "free_recruitment","company_recruitment",
 ]);
 
+// ---- Email validation & normalization ----
+const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const PLACEHOLDER_EMAILS = new Set([
+  "n/a","na","none","null","email@example.com","test@test.com",
+  "info@example.com","example@example.com","you@example.com",
+  "your@email.com","name@domain.com","email@domain.com",
+]);
+const PLACEHOLDER_DOMAINS = new Set([
+  "example.com","example.org","domain.com","email.com","test.com",
+  "yourdomain.com","mydomain.com","sentry.io","wixpress.com",
+]);
+function normalizeEmail(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  let e = raw.trim().toLowerCase();
+  if (!e) return null;
+  // strip mailto:, surrounding angle brackets, trailing punctuation
+  e = e.replace(/^mailto:/, "").replace(/^[<"']+|[>"'.,;:)]+$/g, "");
+  if (!EMAIL_RE.test(e)) return null;
+  if (e.length > 254) return null;
+  if (PLACEHOLDER_EMAILS.has(e)) return null;
+  const domain = e.split("@")[1];
+  if (!domain || PLACEHOLDER_DOMAINS.has(domain)) return null;
+  // reject obvious noreply traps
+  if (/^(noreply|no-reply|donotreply|do-not-reply)@/.test(e)) return null;
+  return e;
+}
+
 const AGGREGATOR_DOMAINS = new Set([
   "linkedin.com","indeed.com","glassdoor.com","google.com","facebook.com",
   "monster.com","reed.co.uk","stepstone.de","totaljobs.com","ziprecruiter.com",
@@ -432,6 +459,7 @@ Deno.serve(async (req) => {
 
     let inserted = 0, updated = 0, excluded = 0, skipped = 0;
     const breakdown: Record<string, number> = {};
+    const seenEmails = new Set<string>(); // in-run dedup
 
     const processOne = async ([domain, info]: [string, { url: string; country: string }]) => {
       try {
@@ -460,6 +488,39 @@ Deno.serve(async (req) => {
 
         const agencyName = String(extracted.agency_name ?? domain.split(".")[0]).trim();
         if (!agencyName) { skipped++; return; }
+
+        // Validate + normalize email; fall back to null if invalid/placeholder.
+        const normalizedEmail = normalizeEmail(extracted.contact_email);
+        if (extracted.contact_email && !normalizedEmail) {
+          console.log("rejected invalid email", extracted.contact_email, "for", domain);
+        }
+
+        // In-run dedup: skip if we've already accepted this email this run.
+        if (normalizedEmail && seenEmails.has(normalizedEmail)) {
+          skipped++;
+          return;
+        }
+
+        // Cross-run dedup: skip if email is suppressed or already on another lead.
+        if (normalizedEmail) {
+          const { data: suppressed } = await supa
+            .from("email_suppressions")
+            .select("email")
+            .eq("email", normalizedEmail)
+            .maybeSingle();
+          if (suppressed) { skipped++; return; }
+
+          const { data: dupe } = await supa
+            .from("recruiter_leads")
+            .select("id, agency_name")
+            .eq("contact_email", normalizedEmail)
+            .maybeSingle();
+          if (dupe && dupe.agency_name?.toLowerCase() !== agencyName.toLowerCase()) {
+            // Same email on a different agency → skip to avoid duplicate outreach.
+            skipped++;
+            return;
+          }
+        }
 
         const model = String(extracted.recruitment_model ?? "unknown");
         const upfront = extracted.charges_upfront_candidate_fee === true;
@@ -490,7 +551,7 @@ Deno.serve(async (req) => {
           hq_city: (extracted.hq_city as string) ?? null,
           operating_eu_country: (extracted.operating_country as string) ?? info.country,
           contact_name: (extracted.contact_name as string) ?? null,
-          contact_email: (extracted.contact_email as string) ?? null,
+          contact_email: normalizedEmail,
           contact_phone: (extracted.contact_phone as string) ?? null,
           contact_linkedin: (extracted.contact_linkedin as string) ?? null,
           recruitment_model,
@@ -523,6 +584,7 @@ Deno.serve(async (req) => {
           if (error) { console.error("insert err", error); skipped++; return; }
           inserted++;
         }
+        if (normalizedEmail) seenEmails.add(normalizedEmail);
         if (excludedReason) excluded++;
         breakdown[row.hq_country ?? "unknown"] = (breakdown[row.hq_country ?? "unknown"] ?? 0) + 1;
       } catch (e) {
