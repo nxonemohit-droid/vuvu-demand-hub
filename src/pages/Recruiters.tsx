@@ -1035,6 +1035,20 @@ const Recruiters = () => {
               </SelectContent>
             </Select>
           </div>
+          <div className="w-40">
+            <Label className="text-xs">Worker collar</Label>
+            <Select value={collarFilter} onValueChange={setCollarFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="non_white">Hide white-collar</SelectItem>
+                <SelectItem value="blue">Blue-collar only</SelectItem>
+                <SelectItem value="mixed">Mixed only</SelectItem>
+                <SelectItem value="unknown">Unknown only</SelectItem>
+                <SelectItem value="white">White-collar only</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-center gap-2 pb-2">
             <Switch id="lic" checked={licensedOnly} onCheckedChange={setLicensedOnly} />
             <Label htmlFor="lic" className="text-xs">Verified license only</Label>
