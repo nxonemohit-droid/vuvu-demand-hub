@@ -55,6 +55,9 @@ const TRADES = [
   "tyre fitter","tile setter","plasterer","roofer","ironworker",
 ];
 const ORIGINS = ["Nepal","India","Bangladesh"];
+// Negative search terms appended to every query so we exclude white-collar
+// recruiters (IT, finance, marketing, medical, legal, executive search, etc.).
+const EXCLUDE_WHITE_COLLAR = `-software -developer -"software engineer" -"IT recruitment" -"IT staffing" -finance -accounting -marketing -"sales executive" -doctor -nurse -lawyer -teacher -designer -"white collar" -"office staff" -"executive search" -"head hunter" -SaaS -fintech -consulting`;
 const ALLOWED_MODELS = new Set([
   "no_advance_after_visa","no_advance_after_deployment",
   "free_recruitment","company_recruitment",
