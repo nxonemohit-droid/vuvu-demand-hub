@@ -91,6 +91,16 @@ type DiscoveryJob = {
     searched?: number; discovered?: number; scraped?: number;
     inserted?: number; updated?: number; excluded?: number; skipped?: number;
     breakdown?: Record<string, number>; auto_tune_tiers?: number[];
+    progress?: {
+      phase: "searching" | "scraping" | "done";
+      searched: number;
+      discovered: number;
+      scraped: number;
+      scrape_total: number;
+      tiers_done: number[];
+      by_country: Record<string, { candidates: number; scraped: number; inserted: number }>;
+      updated_at: string;
+    };
   } | null;
   error_message: string | null;
   started_at: string | null;
@@ -401,6 +411,11 @@ const Recruiters = () => {
       .order("created_at", { ascending: false })
       .limit(25);
     setJobs((data ?? []) as DiscoveryJob[]);
+    // Auto-resume polling if a job is still running (e.g. after page reload).
+    const running = (data ?? []).find(
+      (j) => j.status === "queued" || j.status === "processing",
+    );
+    if (running) setActiveJobId((cur) => cur ?? running.id);
   };
 
   useEffect(() => { load(); loadJobs(); }, []);
@@ -409,6 +424,7 @@ const Recruiters = () => {
   useEffect(() => {
     if (!activeJobId) return;
     let cancelled = false;
+    let ticks = 0;
     const tick = async () => {
       const { data } = await supabase
         .from("discovery_jobs").select("*").eq("id", activeJobId).maybeSingle();
@@ -417,6 +433,12 @@ const Recruiters = () => {
         const others = prev.filter((j) => j.id !== data.id);
         return [data as DiscoveryJob, ...others];
       });
+      // While the job is running, refresh the recruiter list every ~12s so the
+      // per-country tally panel updates live as new leads land.
+      if (data.status === "queued" || data.status === "processing") {
+        ticks++;
+        if (ticks % 4 === 0) await load();
+      }
       if (data.status === "completed" || data.status === "failed") {
         setActiveJobId(null);
         if (data.status === "completed") {
@@ -488,6 +510,12 @@ const Recruiters = () => {
     withEmail: sweepTally.reduce((a, b) => a + b.withEmail, 0),
   }), [sweepTally]);
 
+  const activeJob = useMemo(
+    () => jobs.find((j) => j.id === activeJobId) ?? null,
+    [jobs, activeJobId],
+  );
+  const progress = activeJob?.result?.progress ?? null;
+
   const runDiscovery = async () => {
     setRunning(true);
     try {
@@ -553,8 +581,21 @@ const Recruiters = () => {
         <Card className="p-3 mb-4 flex items-center gap-3 border-primary/40">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
           <div className="flex-1">
-            <div className="text-sm font-medium">Discovery running in background…</div>
-            <Progress value={undefined as unknown as number} className="h-1.5 mt-1.5" />
+            <div className="text-sm font-medium">
+              {progress?.phase === "scraping"
+                ? `Scraping ${progress.scraped}/${progress.scrape_total} candidate sites…`
+                : progress?.phase === "searching"
+                ? `Searching Google: ${progress.searched} queries · ${progress.discovered} candidates found`
+                : "Discovery running in background…"}
+            </div>
+            <Progress
+              value={
+                progress?.phase === "scraping" && progress.scrape_total > 0
+                  ? Math.round((progress.scraped / progress.scrape_total) * 100)
+                  : undefined as unknown as number
+              }
+              className="h-1.5 mt-1.5"
+            />
           </div>
           <Button size="sm" variant="ghost" onClick={() => setTab("jobs")}>View job</Button>
         </Card>
@@ -578,6 +619,16 @@ const Recruiters = () => {
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
           {sweepTally.map((t) => {
             const pct = t.total > 0 ? Math.round((t.withEmail / t.total) * 100) : 0;
+            const live = progress?.by_country?.[t.country];
+            const liveStatus = !progress
+              ? null
+              : live
+              ? progress.phase === "scraping"
+                ? `${live.scraped}/${live.candidates} scraped`
+                : `${live.candidates} found`
+              : progress.phase === "searching"
+              ? "searching…"
+              : "pending";
             return (
               <button
                 key={t.country}
@@ -592,6 +643,11 @@ const Recruiters = () => {
                   <span className="text-xs text-muted-foreground">/ {t.total}</span>
                 </div>
                 <Progress value={pct} className="h-1 mt-1.5" />
+                {liveStatus && (
+                  <div className="mt-1 text-[10px] text-muted-foreground truncate">
+                    {liveStatus}
+                  </div>
+                )}
               </button>
             );
           })}
