@@ -80,6 +80,7 @@ type RecruiterRow = {
   email_delivery_status?: string | null;
   email_last_event?: string | null;
   email_error?: string | null;
+  discovery_tier?: number | null;
 };
 
 type DiscoveryJob = {
