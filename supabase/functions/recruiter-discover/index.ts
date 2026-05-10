@@ -440,6 +440,7 @@ Deno.serve(async (req) => {
     const candidates = new Map<string, { url: string; country: string; prefilledEmail?: string; tier: number }>();
     let searched = 0;
     const tunedTiers: number[] = [];
+    let currentTier = 0;
 
     // ----- Live progress tracking (per-country + phase). Written incrementally
     // to discovery_jobs.result.progress so the UI can poll and render status.
@@ -526,7 +527,6 @@ Deno.serve(async (req) => {
     const targetCandidates = Math.max(maxScrapes * 2, 20);
     // Tier 6 (email-intent boolean) runs FIRST so the highest-yield email pages
     // are scraped before the maxScrapes budget is exhausted.
-    let currentTier = 6;
     for (const tier of [6, 0, 4, 1, 3, 2, 5] as const) {
       currentTier = tier;
       const queries = buildQueries(tier);
