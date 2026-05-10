@@ -429,6 +429,26 @@ const Recruiters = () => {
         </TabsList>
 
         <TabsContent value="recruiters" className="mt-4 space-y-4">
+      {selectedIds.size > 0 && (
+        <Card className="p-3 flex items-center gap-3 border-primary/40 bg-primary/5">
+          <MailCheck className="h-4 w-4 text-primary" />
+          <div className="flex-1 text-sm">
+            <span className="font-medium">{selectedIds.size}</span> selected
+            {bulkProgress && (
+              <span className="ml-2 text-muted-foreground">
+                · sending {bulkProgress.done}/{bulkProgress.total}…
+              </span>
+            )}
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} disabled={bulkSending}>
+            Clear
+          </Button>
+          <Button size="sm" onClick={bulkSendPersonalized} disabled={bulkSending}>
+            <Send className="h-4 w-4 mr-1.5" />
+            {bulkSending ? "Sending…" : "Send personalized emails"}
+          </Button>
+        </Card>
+      )}
       <Card className="p-4 mb-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[200px]">
@@ -506,12 +526,29 @@ const Recruiters = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8">
+                  <Checkbox
+                    checked={
+                      filtered.length > 0 &&
+                      filtered.every((r) => selectedIds.has(r.id))
+                    }
+                    onCheckedChange={(v) => {
+                      setSelectedIds((prev) => {
+                        const n = new Set(prev);
+                        if (v) filtered.forEach((r) => n.add(r.id));
+                        else filtered.forEach((r) => n.delete(r.id));
+                        return n;
+                      });
+                    }}
+                  />
+                </TableHead>
                 <TableHead>Agency</TableHead>
                 <TableHead>HQ → Operating</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Model</TableHead>
                 <TableHead>Orders</TableHead>
                 <TableHead>License</TableHead>
+                <TableHead>Delivery</TableHead>
                 <TableHead>Last seen</TableHead>
               </TableRow>
             </TableHeader>
@@ -524,6 +561,12 @@ const Recruiters = () => {
                     className="cursor-pointer"
                     onClick={() => setSelected(r)}
                   >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(r.id)}
+                        onCheckedChange={() => toggleSelect(r.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium">{r.agency_name}</div>
                       <div className="text-xs text-muted-foreground">
@@ -566,6 +609,29 @@ const Recruiters = () => {
                           <span className="font-mono">{r.license_number}</span>
                         </div>
                       ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {r.email_delivery_status ? (
+                        <Badge
+                          variant={
+                            r.email_delivery_status === "delivered" || r.email_delivery_status === "opened" || r.email_delivery_status === "clicked"
+                              ? "secondary"
+                              : r.email_delivery_status === "bounced" || r.email_delivery_status === "complained" || r.email_delivery_status === "failed"
+                              ? "destructive"
+                              : "outline"
+                          }
+                          className="text-[10px]"
+                        >
+                          {(r.email_delivery_status === "bounced" || r.email_delivery_status === "complained") && (
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                          )}
+                          {r.email_delivery_status}
+                        </Badge>
+                      ) : r.email_status === "sent" ? (
+                        <span className="text-muted-foreground">sent</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs">{formatDate(r.last_seen_at)}</TableCell>
                   </TableRow>
