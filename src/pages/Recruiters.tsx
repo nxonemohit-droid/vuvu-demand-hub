@@ -80,6 +80,7 @@ type RecruiterRow = {
   email_delivery_status?: string | null;
   email_last_event?: string | null;
   email_error?: string | null;
+  discovery_tier?: number | null;
 };
 
 type DiscoveryJob = {
@@ -509,6 +510,32 @@ const Recruiters = () => {
     total: sweepTally.reduce((a, b) => a + b.total, 0),
     withEmail: sweepTally.reduce((a, b) => a + b.withEmail, 0),
   }), [sweepTally]);
+
+  // Tier-attribution breakdown — splits leads by their original discovery tier.
+  // Tier 6 = email-intent boolean queries (highest-yield for contact emails).
+  // Tiers 0-5 = earlier broader queries. Unknown = legacy leads pre-tier tracking.
+  const tierBreakdown = useMemo(() => {
+    const buckets = {
+      tier6: { leads: 0, withEmail: 0 },
+      earlier: { leads: 0, withEmail: 0 },
+      unknown: { leads: 0, withEmail: 0 },
+    };
+    const perTier: Record<number, { leads: number; withEmail: number }> = {};
+    for (const r of rows) {
+      const e = (r.contact_email ?? "").trim().toLowerCase();
+      const hasEmail = !!e && e !== "n/a" && VALID_EMAIL_RE.test(e);
+      const t = r.discovery_tier;
+      const bucket = t == null ? buckets.unknown : t === 6 ? buckets.tier6 : buckets.earlier;
+      bucket.leads++;
+      if (hasEmail) bucket.withEmail++;
+      if (t != null) {
+        const slot = (perTier[t] ??= { leads: 0, withEmail: 0 });
+        slot.leads++;
+        if (hasEmail) slot.withEmail++;
+      }
+    }
+    return { ...buckets, perTier };
+  }, [rows]);
 
   const activeJob = useMemo(
     () => jobs.find((j) => j.id === activeJobId) ?? null,

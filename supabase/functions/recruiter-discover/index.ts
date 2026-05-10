@@ -437,9 +437,10 @@ Deno.serve(async (req) => {
     const blocked = new Set((blacklist ?? []).map((r: { domain: string }) => r.domain.toLowerCase()));
 
     const searchConcurrency: number = Math.min(body.searchConcurrency ?? 6, 10);
-    const candidates = new Map<string, { url: string; country: string; prefilledEmail?: string }>();
+    const candidates = new Map<string, { url: string; country: string; prefilledEmail?: string; tier: number }>();
     let searched = 0;
     const tunedTiers: number[] = [];
+    let currentTier = 0;
 
     // ----- Live progress tracking (per-country + phase). Written incrementally
     // to discovery_jobs.result.progress so the UI can poll and render status.
@@ -507,7 +508,7 @@ Deno.serve(async (req) => {
           const domain = extractDomain(r.url);
           if (!domain || isAggregator(domain) || isSocial(domain) || blocked.has(domain) || learnedSkipDomains.has(domain)) continue;
           if (candidates.has(domain)) continue;
-          candidates.set(domain, { url: r.url!, country, prefilledEmail: snippetEmail(r) });
+          candidates.set(domain, { url: r.url!, country, prefilledEmail: snippetEmail(r), tier: currentTier });
           usable++;
           bump(domHit, domain);
         }
@@ -527,6 +528,7 @@ Deno.serve(async (req) => {
     // Tier 6 (email-intent boolean) runs FIRST so the highest-yield email pages
     // are scraped before the maxScrapes budget is exhausted.
     for (const tier of [6, 0, 4, 1, 3, 2, 5] as const) {
+      currentTier = tier;
       const queries = buildQueries(tier);
       tunedTiers.push(tier);
       if (searchProvider === "apify") {
@@ -554,7 +556,7 @@ Deno.serve(async (req) => {
                   if (!existing.prefilledEmail && pe) existing.prefilledEmail = pe;
                   continue;
                 }
-                candidates.set(domain, { url: r.url!, country, prefilledEmail: pe });
+                candidates.set(domain, { url: r.url!, country, prefilledEmail: pe, tier });
                 bump(domHit, domain);
               }
             } catch (e) { console.error("apify search err", country, e); }
@@ -717,6 +719,7 @@ Deno.serve(async (req) => {
           raw_signal_id: rs?.id ?? null,
           status,
           excluded_reason: excludedReason,
+          discovery_tier: info.tier,
         };
 
         // Upsert by lower(agency_name) + hq_country
@@ -729,7 +732,10 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (existing) {
-          await supa.from("recruiter_leads").update(row).eq("id", existing.id);
+          // Preserve the *original* discovery_tier on subsequent re-discoveries.
+          const { discovery_tier: _omit, ...updateRow } = row;
+          void _omit;
+          await supa.from("recruiter_leads").update(updateRow).eq("id", existing.id);
           updated++;
         } else {
           const { error } = await supa.from("recruiter_leads").insert(row);

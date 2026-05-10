@@ -1017,6 +1017,7 @@ export type Database = {
           converted_at: string | null
           created_at: string
           discovered_at: string
+          discovery_tier: number | null
           email_delivery_status: string | null
           email_delivery_updated_at: string | null
           email_error: string | null
@@ -1056,6 +1057,7 @@ export type Database = {
           converted_at?: string | null
           created_at?: string
           discovered_at?: string
+          discovery_tier?: number | null
           email_delivery_status?: string | null
           email_delivery_updated_at?: string | null
           email_error?: string | null
@@ -1095,6 +1097,7 @@ export type Database = {
           converted_at?: string | null
           created_at?: string
           discovered_at?: string
+          discovery_tier?: number | null
           email_delivery_status?: string | null
           email_delivery_updated_at?: string | null
           email_error?: string | null
