@@ -87,6 +87,25 @@ function totalHeadcount(orders: RecruiterRow["active_orders"]) {
   return (orders ?? []).reduce((sum, o) => sum + (Number(o.headcount) || 0), 0);
 }
 
+function buildOutreachDraft(r: RecruiterRow) {
+  const trades = (r.trades ?? []).slice(0, 3).join(", ") || "blue-collar workers";
+  const country = r.operating_eu_country || r.hq_country || "Europe";
+  const greeting = r.contact_name ? `Hi ${r.contact_name.split(" ")[0]},` : `Hello ${r.agency_name} team,`;
+  const subject = `Vetted ${trades} from Nepal / India / Bangladesh — ready for ${country}`;
+  const body = `${greeting}
+
+I'm reaching out from Voynova Global Solutions. We supply pre-screened, document-ready blue-collar workers (${trades}) from Nepal, India and Bangladesh to employers and licensed agencies across Europe.
+
+I noticed ${r.agency_name} is active in ${country}. We currently have candidates ready for deployment with full medicals, police clearance and EU-recognised trade certificates — and we operate strictly on no-advance / employer-paid terms.
+
+Would you be open to a 15-minute call this week to align on your active orders?
+
+Best regards,
+Voynova Global Solutions
+contact@voynova.com`;
+  return { subject, body };
+}
+
 function formatDate(s: string | null) {
   if (!s) return "—";
   const d = new Date(s);
