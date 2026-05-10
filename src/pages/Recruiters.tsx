@@ -681,11 +681,33 @@ const Recruiters = () => {
               Leads with a valid contact email across the targeted countries.
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold leading-tight">
-              {sweepTotals.withEmail}<span className="text-base text-muted-foreground"> / {sweepTotals.total}</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => exportSweep("csv")}
+                disabled={sweepExportRows.length === 0}
+                title="Download all sweep leads as CSV"
+              >
+                <Download className="h-4 w-4 mr-1.5" /> CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => exportSweep("json")}
+                disabled={sweepExportRows.length === 0}
+                title="Download all sweep leads as JSON"
+              >
+                <Download className="h-4 w-4 mr-1.5" /> JSON
+              </Button>
             </div>
-            <div className="text-[11px] text-muted-foreground uppercase tracking-wide">with email / total</div>
+            <div className="text-right">
+              <div className="text-2xl font-bold leading-tight">
+                {sweepTotals.withEmail}<span className="text-base text-muted-foreground"> / {sweepTotals.total}</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground uppercase tracking-wide">with email / total</div>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
