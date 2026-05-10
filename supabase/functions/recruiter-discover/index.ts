@@ -732,7 +732,10 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (existing) {
-          await supa.from("recruiter_leads").update(row).eq("id", existing.id);
+          // Preserve the *original* discovery_tier on subsequent re-discoveries.
+          const { discovery_tier: _omit, ...updateRow } = row;
+          void _omit;
+          await supa.from("recruiter_leads").update(updateRow).eq("id", existing.id);
           updated++;
         } else {
           const { error } = await supa.from("recruiter_leads").insert(row);
