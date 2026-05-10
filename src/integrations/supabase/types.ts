@@ -477,6 +477,36 @@ export type Database = {
         }
         Relationships: []
       }
+      email_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          lead_id: string | null
+          message_id: string | null
+          payload: Json
+          recipient: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          lead_id?: string | null
+          message_id?: string | null
+          payload?: Json
+          recipient?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          lead_id?: string | null
+          message_id?: string | null
+          payload?: Json
+          recipient?: string | null
+        }
+        Relationships: []
+      }
       firecrawl_jobs: {
         Row: {
           company_id: string | null
@@ -896,6 +926,10 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           discovered_at: string
+          email_delivery_status: string | null
+          email_delivery_updated_at: string | null
+          email_error: string | null
+          email_last_event: string | null
           email_sent_at: string | null
           email_status: string
           excluded_reason: string | null
@@ -910,6 +944,7 @@ export type Database = {
           quality_score: number
           raw_signal_id: string | null
           recruitment_model: Database["public"]["Enums"]["recruitment_model_tag"][]
+          resend_message_id: string | null
           source_posted_at: string | null
           source_url: string | null
           status: string
@@ -926,6 +961,10 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           discovered_at?: string
+          email_delivery_status?: string | null
+          email_delivery_updated_at?: string | null
+          email_error?: string | null
+          email_last_event?: string | null
           email_sent_at?: string | null
           email_status?: string
           excluded_reason?: string | null
@@ -940,6 +979,7 @@ export type Database = {
           quality_score?: number
           raw_signal_id?: string | null
           recruitment_model?: Database["public"]["Enums"]["recruitment_model_tag"][]
+          resend_message_id?: string | null
           source_posted_at?: string | null
           source_url?: string | null
           status?: string
@@ -956,6 +996,10 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           discovered_at?: string
+          email_delivery_status?: string | null
+          email_delivery_updated_at?: string | null
+          email_error?: string | null
+          email_last_event?: string | null
           email_sent_at?: string | null
           email_status?: string
           excluded_reason?: string | null
@@ -970,6 +1014,7 @@ export type Database = {
           quality_score?: number
           raw_signal_id?: string | null
           recruitment_model?: Database["public"]["Enums"]["recruitment_model_tag"][]
+          resend_message_id?: string | null
           source_posted_at?: string | null
           source_url?: string | null
           status?: string
