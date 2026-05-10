@@ -380,8 +380,11 @@ const Mail = () => {
     loadOps();
   };
 
-  const saveSettings = async (patch: Partial<typeof settings>) => {
-    const { error } = await supabase.from("email_send_settings").update(patch).eq("id", 1);
+  const saveSettings = async (patch: Record<string, unknown>) => {
+    const { error } = await supabase
+      .from("email_send_settings")
+      .update(patch as never)
+      .eq("id", 1);
     if (error) return toast.error(error.message);
     toast.success("Settings saved");
     loadOps();
