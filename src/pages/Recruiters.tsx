@@ -23,9 +23,11 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import {
   ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck,
-  CheckCircle2, XCircle, Loader2, Clock,
+  CheckCircle2, XCircle, Loader2, Clock, Copy, Send,
 } from "lucide-react";
 
 type RecruiterRow = {
@@ -53,6 +55,8 @@ type RecruiterRow = {
   status: string;
   excluded_reason: string | null;
   quality_score: number;
+  email_status?: string;
+  email_sent_at?: string | null;
 };
 
 type DiscoveryJob = {
@@ -83,6 +87,25 @@ function totalHeadcount(orders: RecruiterRow["active_orders"]) {
   return (orders ?? []).reduce((sum, o) => sum + (Number(o.headcount) || 0), 0);
 }
 
+function buildOutreachDraft(r: RecruiterRow) {
+  const trades = (r.trades ?? []).slice(0, 3).join(", ") || "blue-collar workers";
+  const country = r.operating_eu_country || r.hq_country || "Europe";
+  const greeting = r.contact_name ? `Hi ${r.contact_name.split(" ")[0]},` : `Hello ${r.agency_name} team,`;
+  const subject = `Vetted ${trades} from Nepal / India / Bangladesh — ready for ${country}`;
+  const body = `${greeting}
+
+I'm reaching out from Voynova Global Solutions. We supply pre-screened, document-ready blue-collar workers (${trades}) from Nepal, India and Bangladesh to employers and licensed agencies across Europe.
+
+I noticed ${r.agency_name} is active in ${country}. We currently have candidates ready for deployment with full medicals, police clearance and EU-recognised trade certificates — and we operate strictly on no-advance / employer-paid terms.
+
+Would you be open to a 15-minute call this week to align on your active orders?
+
+Best regards,
+Voynova Global Solutions
+contact@voynova.com`;
+  return { subject, body };
+}
+
 function formatDate(s: string | null) {
   if (!s) return "—";
   const d = new Date(s);
@@ -106,6 +129,54 @@ const Recruiters = () => {
   const [tab, setTab] = useState<"recruiters" | "jobs">("recruiters");
   const [jobs, setJobs] = useState<DiscoveryJob[]>([]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  // Reset the draft whenever a new recruiter is opened.
+  useEffect(() => {
+    if (selected) {
+      const draft = buildOutreachDraft(selected);
+      setEmailSubject(draft.subject);
+      setEmailBody(draft.body);
+    }
+  }, [selected?.id]);
+
+  const copyDraft = async () => {
+    const text = `Subject: ${emailSubject}\n\n${emailBody}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Email copied to clipboard");
+    } catch {
+      toast.error("Could not copy — please select and copy manually");
+    }
+  };
+
+  const markAsSent = async () => {
+    if (!selected) return;
+    setSavingEmail(true);
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from("recruiter_leads")
+      .update({ email_status: "sent", email_sent_at: nowIso })
+      .eq("id", selected.id);
+    if (error) {
+      toast.error(error.message);
+      setSavingEmail(false);
+      return;
+    }
+    // Also log to outreach history if the table exists; ignore failures.
+    await supabase.from("lead_outreach_log").insert({
+      lead_id: selected.id, channel: "email",
+      note: `${emailSubject}\n\n${emailBody}`,
+    }).then(() => {}, () => {});
+    setRows((prev) => prev.map((r) =>
+      r.id === selected.id ? { ...r, email_status: "sent", email_sent_at: nowIso } : r
+    ));
+    setSelected({ ...selected, email_status: "sent", email_sent_at: nowIso });
+    toast.success("Marked as sent");
+    setSavingEmail(false);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -552,6 +623,67 @@ const Recruiters = () => {
                   <Badge variant={selected.status === "active" ? "secondary" : "destructive"}>
                     {selected.status}
                   </Badge>
+                  {selected.email_status === "sent" && (
+                    <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600">
+                      Email sent {selected.email_sent_at ? `· ${formatDate(selected.email_sent_at)}` : ""}
+                    </Badge>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Outreach email</h3>
+                    <Badge variant="outline" className="text-[10px]">
+                      {selected.email_status === "sent" ? "Already sent" : "Draft"}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email-subject" className="text-xs">Subject</Label>
+                    <Input
+                      id="email-subject"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      maxLength={200}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email-body" className="text-xs">Body</Label>
+                    <Textarea
+                      id="email-body"
+                      value={emailBody}
+                      onChange={(e) => setEmailBody(e.target.value)}
+                      rows={12}
+                      maxLength={4000}
+                      className="font-mono text-xs"
+                    />
+                    <div className="text-[10px] text-muted-foreground text-right">
+                      {emailBody.length}/4000
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={copyDraft}>
+                      <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy to clipboard
+                    </Button>
+                    {selected.contact_email && (
+                      <Button size="sm" variant="outline" asChild>
+                        <a
+                          href={`mailto:${selected.contact_email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
+                        >
+                          <Mail className="h-3.5 w-3.5 mr-1.5" /> Open in mail app
+                        </a>
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={markAsSent}
+                      disabled={savingEmail || selected.email_status === "sent"}
+                    >
+                      <Send className="h-3.5 w-3.5 mr-1.5" />
+                      {selected.email_status === "sent" ? "Already marked" : savingEmail ? "Saving…" : "Mark as sent"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </>
