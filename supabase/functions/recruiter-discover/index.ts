@@ -719,6 +719,7 @@ Deno.serve(async (req) => {
           raw_signal_id: rs?.id ?? null,
           status,
           excluded_reason: excludedReason,
+          discovery_tier: info.tier,
         };
 
         // Upsert by lower(agency_name) + hq_country
