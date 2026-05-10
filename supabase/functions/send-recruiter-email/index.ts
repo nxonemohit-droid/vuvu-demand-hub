@@ -28,6 +28,15 @@ Deno.serve(async (req) => {
     if (userErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
     const userId = userData.user.id;
 
+    // Admin-only sending
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const { data: roleRow } = await adminClient
+      .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (!roleRow) return json({ error: "Only admins can send emails" }, 403);
+
     const body = await req.json().catch(() => null);
     if (!body) return json({ error: "Invalid JSON" }, 400);
 
@@ -47,6 +56,13 @@ Deno.serve(async (req) => {
     }
     if (subject.length > 300 || (html ?? text ?? "").length > 50000) {
       return json({ error: "Subject or body too long" }, 400);
+    }
+
+    // Suppression check
+    const { data: sup } = await adminClient
+      .from("email_suppressions").select("email,reason").eq("email", to.toLowerCase()).maybeSingle();
+    if (sup) {
+      return json({ error: `Recipient is suppressed (${sup.reason})` }, 409);
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -85,10 +101,7 @@ Deno.serve(async (req) => {
     }
 
     // Update lead + log outreach using service role to bypass any per-user friction.
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const admin = adminClient;
     const nowIso = new Date().toISOString();
     if (leadId) {
       await admin
