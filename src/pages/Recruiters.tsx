@@ -29,7 +29,25 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck,
   CheckCircle2, XCircle, Loader2, Clock, Copy, Send, MailCheck, AlertTriangle,
+  History, Eye, MousePointerClick, Inbox, AlertCircle, Plus, Trash2, FileText,
 } from "lucide-react";
+
+type EmailEvent = {
+  id: string;
+  created_at: string;
+  event_type: string;
+  recipient: string | null;
+  message_id: string | null;
+  payload: Record<string, unknown> | null;
+};
+
+type EmailTemplate = {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  description: string | null;
+};
 
 type RecruiterRow = {
   id: string;
@@ -141,6 +159,12 @@ const Recruiters = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSending, setBulkSending] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [events, setEvents] = useState<EmailEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [editingTpl, setEditingTpl] = useState<EmailTemplate | null>(null);
+  const [tplForm, setTplForm] = useState({ name: "", subject: "", body: "", description: "" });
 
   // Reset the draft whenever a new recruiter is opened.
   useEffect(() => {
@@ -150,6 +174,95 @@ const Recruiters = () => {
       setEmailBody(draft.body);
     }
   }, [selected?.id]);
+
+  // Load timeline + templates when a lead opens
+  useEffect(() => {
+    if (!selected?.id) { setEvents([]); return; }
+    let cancelled = false;
+    setEventsLoading(true);
+    (async () => {
+      const { data } = await supabase
+        .from("email_events")
+        .select("id, created_at, event_type, recipient, message_id, payload")
+        .eq("lead_id", selected.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (!cancelled) {
+        setEvents((data ?? []) as EmailEvent[]);
+        setEventsLoading(false);
+      }
+    })();
+    // realtime: refresh on new event for this lead
+    const channel = supabase
+      .channel(`email_events:${selected.id}`)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "email_events",
+        filter: `lead_id=eq.${selected.id}`,
+      }, (payload) => {
+        setEvents((prev) => [payload.new as EmailEvent, ...prev]);
+      })
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [selected?.id]);
+
+  const loadTemplates = async () => {
+    const { data } = await supabase
+      .from("email_templates")
+      .select("id, name, subject, body, description")
+      .order("name");
+    setTemplates((data ?? []) as EmailTemplate[]);
+  };
+  useEffect(() => { loadTemplates(); }, []);
+
+  const applyTemplate = (tpl: EmailTemplate, r: RecruiterRow) => {
+    const trades = (r.trades ?? []).slice(0, 3).join(", ") || "blue-collar workers";
+    const country = r.operating_eu_country || r.hq_country || "Europe";
+    const firstName = r.contact_name?.split(" ")[0] ?? "there";
+    const vars: Record<string, string> = {
+      first_name: firstName,
+      contact_name: r.contact_name ?? "",
+      contact_email: r.contact_email ?? "",
+      agency_name: r.agency_name,
+      country,
+      hq_country: r.hq_country ?? "",
+      hq_city: r.hq_city ?? "",
+      trades,
+    };
+    const fill = (s: string) =>
+      s.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, k) => vars[k] ?? `{{${k}}}`);
+    setEmailSubject(fill(tpl.subject));
+    setEmailBody(fill(tpl.body));
+    toast.success(`Applied template "${tpl.name}"`);
+  };
+
+  const saveTemplate = async () => {
+    if (!tplForm.name.trim() || !tplForm.subject.trim() || !tplForm.body.trim()) {
+      toast.error("Name, subject and body are required");
+      return;
+    }
+    if (editingTpl) {
+      const { error } = await supabase.from("email_templates")
+        .update({ name: tplForm.name, subject: tplForm.subject, body: tplForm.body, description: tplForm.description || null })
+        .eq("id", editingTpl.id);
+      if (error) return toast.error(error.message);
+      toast.success("Template updated");
+    } else {
+      const { error } = await supabase.from("email_templates")
+        .insert({ name: tplForm.name, subject: tplForm.subject, body: tplForm.body, description: tplForm.description || null });
+      if (error) return toast.error(error.message);
+      toast.success("Template created");
+    }
+    setEditingTpl(null);
+    setTplForm({ name: "", subject: "", body: "", description: "" });
+    await loadTemplates();
+  };
+
+  const deleteTemplate = async (id: string) => {
+    const { error } = await supabase.from("email_templates").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Template deleted");
+    await loadTemplates();
+  };
 
   const copyDraft = async () => {
     const text = `Subject: ${emailSubject}\n\n${emailBody}`;
