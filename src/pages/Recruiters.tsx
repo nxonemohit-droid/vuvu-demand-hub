@@ -637,6 +637,74 @@ const Recruiters = () => {
     }
   };
 
+  // Outreach priority blocks based on contact channels available.
+  // Block 1 = email + phone + LinkedIn, Block 2 = email + (phone XOR LinkedIn), Block 3 = email only.
+  const outreachBlocks = useMemo(() => {
+    const b: { block1: RecruiterRow[]; block2: RecruiterRow[]; block3: RecruiterRow[]; noContact: number } =
+      { block1: [], block2: [], block3: [], noContact: 0 };
+    for (const r of rows) {
+      const e = (r.contact_email ?? "").trim();
+      const p = (r.contact_phone ?? "").trim();
+      const l = (r.contact_linkedin ?? "").trim();
+      const validEmail = e && e.toLowerCase() !== "n/a" && VALID_EMAIL_RE.test(e);
+      if (!e && !p && !l) { b.noContact++; continue; }
+      if (!validEmail) continue;
+      if (p && l) b.block1.push(r);
+      else if (p || l) b.block2.push(r);
+      else b.block3.push(r);
+    }
+    return b;
+  }, [rows]);
+  const outreachTotal = outreachBlocks.block1.length + outreachBlocks.block2.length + outreachBlocks.block3.length;
+
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+  const runCleanup = async () => {
+    setCleanupRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recruiter-cleanup", { body: {} });
+      if (error) throw error;
+      const d = data as { ok?: boolean; deleted?: number; error?: string };
+      if (!d?.ok) throw new Error(d?.error ?? "Cleanup failed");
+      toast.success(`Deleted ${d.deleted ?? 0} no-contact leads`);
+      setCleanupOpen(false);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Cleanup failed");
+    } finally {
+      setCleanupRunning(false);
+    }
+  };
+
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleRunning, setScheduleRunning] = useState(false);
+  const [scheduleBlocks, setScheduleBlocks] = useState<number[] | null>(null);
+  const [scheduleDailyCap, setScheduleDailyCap] = useState(50);
+  const openScheduleDialog = (blocks: number[] | null) => {
+    setScheduleBlocks(blocks);
+    setScheduleOpen(true);
+  };
+  const runSchedule = async () => {
+    setScheduleRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recruiter-schedule-outreach", {
+        body: {
+          dailyCap: scheduleDailyCap,
+          ...(scheduleBlocks ? { blocks: scheduleBlocks } : {}),
+        },
+      });
+      if (error) throw error;
+      const d = data as { ok?: boolean; scheduled?: number; days?: number; error?: string };
+      if (!d?.ok) throw new Error(d?.error ?? "Schedule failed");
+      toast.success(`Scheduled ${d.scheduled ?? 0} emails across ${d.days ?? 0} day(s)`);
+      setScheduleOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Schedule failed");
+    } finally {
+      setScheduleRunning(false);
+    }
+  };
+
   return (
     <div className="container py-8 max-w-7xl">
       <div className="flex items-start justify-between gap-4 mb-6">
