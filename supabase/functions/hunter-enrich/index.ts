@@ -41,7 +41,7 @@ function extractDomains(url?: string | null, employer?: string | null, country?:
   return Array.from(out).slice(0, 4);
 }
 
-async function runActor(actorId: string, input: unknown, timeoutMs = 90_000) {
+async function runActor(actorId: string, input: unknown, timeoutMs = 35_000) {
   const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${Math.floor(timeoutMs / 1000)}`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs + 5000);
@@ -108,7 +108,8 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     const body = await req.json().catch(() => ({}));
-    const limit: number = Math.min(Number(body.limit ?? 10), 25);
+    // Hard cap: with ~35s per actor + a few domain attempts, 4 leads keeps us safely under the 150s edge limit.
+    const limit: number = Math.min(Number(body.limit ?? 4), 4);
     const actorId: string = body.actor_id ?? DEFAULT_HUNTER_ACTOR;
     const leadIds: string[] | undefined = body.lead_ids;
 
@@ -121,21 +122,25 @@ Deno.serve(async (req) => {
       .limit(limit);
     if (leadIds?.length) q = supabase.from("demand_leads")
       .select("id, employer_name, source_url, contact_email, country")
-      .in("id", leadIds);
+      .in("id", leadIds.slice(0, 4));
 
     const { data: leads, error } = await q;
     if (error) throw error;
 
-    const results: any[] = [];
-    for (const lead of leads ?? []) {
+    // Run the slow enrichment loop in the background so the HTTP request returns immediately.
+    const work = async () => {
+      const deadline = Date.now() + 140_000; // leave a small safety margin under 150s
+      for (const lead of leads ?? []) {
+        if (Date.now() > deadline) break;
       const domains = extractDomains(lead.source_url, lead.employer_name, (lead as any).country);
-      if (!domains.length) { results.push({ id: lead.id, skipped: "no_domain" }); continue; }
+      if (!domains.length) continue;
 
       let best: { email?: string; name?: string; phone?: string } = {};
       let triedDomain = "";
       let totalItems = 0;
       let lastError = "";
       for (const domain of domains) {
+        if (Date.now() > deadline) break;
         triedDomain = domain;
         try {
           // contact-info-scraper expects startUrls; build a homepage + /contact crawl
@@ -157,7 +162,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      const { data: jobRow } = await supabase.from("scrape_jobs").insert({
+      await supabase.from("scrape_jobs").insert({
         source: "other", actor_id: actorId, country: (lead as any).country ?? null,
         keyword: `hunter:${triedDomain}`,
         status: best.email ? "succeeded" : (lastError ? "failed" : "succeeded"),
@@ -165,7 +170,7 @@ Deno.serve(async (req) => {
         items_structured: best.email ? 1 : 0,
         error: best.email ? null : lastError || null,
         finished_at: new Date().toISOString(),
-      }).select().single();
+      });
 
       if (best.email) {
         await supabase.from("demand_leads").update({
@@ -174,10 +179,13 @@ Deno.serve(async (req) => {
           contact_phone: best.phone ?? undefined,
         }).eq("id", lead.id);
       }
-      results.push({ id: lead.id, domains, email: best.email ?? null, error: best.email ? null : lastError || null, job_id: jobRow?.id });
-    }
+      }
+    };
 
-    return new Response(JSON.stringify({ ok: true, processed: results.length, results }), {
+    // @ts-ignore - EdgeRuntime is provided by Supabase edge runtime at runtime.
+    EdgeRuntime.waitUntil(work().catch((e) => console.error("hunter-enrich background error", e)));
+
+    return new Response(JSON.stringify({ ok: true, queued: leads?.length ?? 0, status: "processing_in_background" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
