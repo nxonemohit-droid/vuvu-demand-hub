@@ -1562,6 +1562,26 @@ const Recruiters = () => {
                         merge tags filled from this lead
                       </span>
                     </div>
+                    {missingTags.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1.5 rounded-sm border border-destructive/40 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        <span className="font-medium">
+                          {missingTags.length} empty merge tag{missingTags.length === 1 ? "" : "s"}:
+                        </span>
+                        {missingTags.map((t) => (
+                          <Badge key={t} variant="destructive" className="text-[10px] font-mono">
+                            {`{{${t}}}`}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      /\{\{\s*[a-z_]/i.test(`${emailSubject}\n${emailBody}`) && (
+                        <div className="flex items-center gap-1.5 rounded-sm border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[11px] text-emerald-700 dark:text-emerald-400">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          All merge tags resolved for this lead
+                        </div>
+                      )
+                    )}
                     <div className="text-xs">
                       <span className="text-muted-foreground">Subject: </span>
                       <span className="font-medium">{previewSubject || <em className="text-muted-foreground">—</em>}</span>
