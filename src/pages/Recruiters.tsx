@@ -1785,6 +1785,86 @@ const Recruiters = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                      <MailCheck className="h-4 w-4" /> Send history
+                    </h3>
+                    <span className="text-[10px] text-muted-foreground">
+                      {sendHistory.length} {sendHistory.length === 1 ? "send" : "sends"}
+                    </span>
+                  </div>
+                  {sendHistoryLoading ? (
+                    <Skeleton className="h-16 w-full" />
+                  ) : sendHistory.length === 0 ? (
+                    <div className="text-xs text-muted-foreground border rounded-md p-3 text-center">
+                      No sends yet. Test sends and real sends to {selected.agency_name} will appear here.
+                    </div>
+                  ) : (
+                    <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
+                      {sendHistory.map((s) => {
+                        const isTest = s.channel === "email_test";
+                        const m = s.note.match(/^\[(OK|FAILED)\] To: (\S+) — (.+?)(?: — (.+))?$/);
+                        const status = (m?.[1] ?? "OK").toLowerCase();
+                        const to = m?.[2] ?? "";
+                        const subject = m?.[3] ?? s.note;
+                        const errMsg = m?.[4];
+                        const ok = status === "ok";
+                        return (
+                          <div key={s.id} className="p-2.5 text-xs space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    isTest
+                                      ? "border-amber-500/40 text-amber-700 dark:text-amber-400"
+                                      : "border-primary/40 text-primary"
+                                  }
+                                >
+                                  {isTest ? (
+                                    <><Beaker className="h-3 w-3 mr-1" />Test</>
+                                  ) : (
+                                    <><Send className="h-3 w-3 mr-1" />Real send</>
+                                  )}
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    ok
+                                      ? "border-emerald-500/40 text-emerald-600"
+                                      : "border-destructive/40 text-destructive"
+                                  }
+                                >
+                                  {ok ? (
+                                    <><CheckCircle2 className="h-3 w-3 mr-1" />Sent</>
+                                  ) : (
+                                    <><XCircle className="h-3 w-3 mr-1" />Failed</>
+                                  )}
+                                </Badge>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                {new Date(s.created_at).toLocaleString("en-GB", { hour12: false })}
+                              </span>
+                            </div>
+                            {to && (
+                              <div className="text-[11px] text-muted-foreground truncate">
+                                to <span className="font-medium text-foreground">{to}</span>
+                              </div>
+                            )}
+                            <div className="text-[11px] truncate" title={subject}>{subject}</div>
+                            {errMsg && (
+                              <div className="text-[11px] text-destructive break-words">{errMsg}</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold flex items-center gap-1.5">
                       <History className="h-4 w-4" /> Delivery timeline
                     </h3>
                     <span className="text-[10px] text-muted-foreground">{events.length} events</span>
