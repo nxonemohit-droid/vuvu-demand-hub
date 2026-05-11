@@ -503,7 +503,8 @@ const Recruiters = () => {
         leadId: selected.id,
         to: selected.contact_email,
         subject: previewSubject,
-        text: previewBody,
+        text: plainTextBody,
+        ...(isHtmlBody ? { html: safeHtml } : {}),
       },
     });
     if (error || (data as any)?.error) {
