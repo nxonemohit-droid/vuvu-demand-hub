@@ -322,7 +322,7 @@ const Recruiters = () => {
   };
 
   const copyDraft = async () => {
-    const text = `Subject: ${emailSubject}\n\n${emailBody}`;
+    const text = `Subject: ${previewSubject}\n\n${previewBody}`;
     try {
       await navigator.clipboard.writeText(text);
       toast.success("Email copied to clipboard");
@@ -368,8 +368,8 @@ const Recruiters = () => {
       body: {
         leadId: selected.id,
         to: selected.contact_email,
-        subject: emailSubject,
-        text: emailBody,
+        subject: previewSubject,
+        text: previewBody,
       },
     });
     if (error || (data as any)?.error) {
