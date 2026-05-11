@@ -236,6 +236,53 @@ const Recruiters = () => {
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [selected?.id]);
 
+  // Load send history (test + real sends recorded in lead_outreach_log) for this lead
+  useEffect(() => {
+    if (!selected?.id) { setSendHistory([]); return; }
+    let cancelled = false;
+    setSendHistoryLoading(true);
+    (async () => {
+      const { data } = await supabase
+        .from("lead_outreach_log")
+        .select("id, created_at, channel, note")
+        .eq("lead_id", selected.id)
+        .in("channel", ["email_test", "email_resend", "email"])
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (!cancelled) {
+        setSendHistory((data ?? []) as SendHistoryEntry[]);
+        setSendHistoryLoading(false);
+      }
+    })();
+    const channel = supabase
+      .channel(`lead_outreach_log:${selected.id}`)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "lead_outreach_log",
+        filter: `lead_id=eq.${selected.id}`,
+      }, (payload) => {
+        const row = payload.new as SendHistoryEntry;
+        if (["email_test", "email_resend", "email"].includes(row.channel)) {
+          setSendHistory((prev) => [row, ...prev]);
+        }
+      })
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [selected?.id]);
+
+  const logSend = async (
+    leadId: string,
+    channel: "email_test" | "email_resend",
+    status: "ok" | "failed",
+    to: string,
+    subject: string,
+    extra?: string,
+  ) => {
+    const note = `[${status.toUpperCase()}] To: ${to} — ${subject}${extra ? ` — ${extra}` : ""}`;
+    await supabase.from("lead_outreach_log").insert({
+      lead_id: leadId, channel, note,
+    }).then(() => {}, () => {});
+  };
+
   const loadTemplates = async () => {
     const { data } = await supabase
       .from("email_templates")
