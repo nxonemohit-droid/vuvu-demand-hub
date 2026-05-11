@@ -177,6 +177,8 @@ const Recruiters = () => {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [editingTpl, setEditingTpl] = useState<EmailTemplate | null>(null);
   const [tplForm, setTplForm] = useState({ name: "", subject: "", body: "", description: "" });
+  const [testEmail, setTestEmail] = useState("");
+  const [testSending, setTestSending] = useState(false);
 
   // Reset the draft whenever a new recruiter is opened.
   useEffect(() => {
@@ -226,12 +228,12 @@ const Recruiters = () => {
   };
   useEffect(() => { loadTemplates(); }, []);
 
-  const applyTemplate = (tpl: EmailTemplate, r: RecruiterRow) => {
+  const buildVars = (r: RecruiterRow): Record<string, string> => {
     const trades = (r.trades ?? []).slice(0, 3).join(", ") || "blue-collar workers";
     const trade = (r.trades ?? [])[0] ?? "blue-collar workers";
     const country = r.operating_eu_country || r.hq_country || "Europe";
     const firstName = r.contact_name?.split(" ")[0] ?? "there";
-    const vars: Record<string, string> = {
+    return {
       first_name: firstName,
       contact_name: r.contact_name ?? "",
       contact_email: r.contact_email ?? "",
@@ -245,11 +247,49 @@ const Recruiters = () => {
       trades,
       trade,
     };
-    const fill = (s: string) =>
-      s.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, k) => vars[k.toLowerCase()] ?? "");
-    setEmailSubject(fill(tpl.subject));
-    setEmailBody(fill(tpl.body));
+  };
+
+  const fillTemplate = (s: string, r: RecruiterRow) => {
+    const vars = buildVars(r);
+    return s.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, k) => vars[k.toLowerCase()] ?? "");
+  };
+
+  const applyTemplate = (tpl: EmailTemplate, r: RecruiterRow) => {
+    setEmailSubject(fillTemplate(tpl.subject, r));
+    setEmailBody(fillTemplate(tpl.body, r));
     toast.success(`Applied template "${tpl.name}"`);
+  };
+
+  const previewSubject = useMemo(
+    () => (selected ? fillTemplate(emailSubject, selected) : emailSubject),
+    [emailSubject, selected],
+  );
+  const previewBody = useMemo(
+    () => (selected ? fillTemplate(emailBody, selected) : emailBody),
+    [emailBody, selected],
+  );
+
+  const sendTestEmail = async () => {
+    if (!selected) return;
+    const to = testEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      toast.error("Enter a valid test email address");
+      return;
+    }
+    setTestSending(true);
+    const { data, error } = await supabase.functions.invoke("send-recruiter-email", {
+      body: {
+        to,
+        subject: `[TEST] ${previewSubject}`,
+        text: `--- TEST SEND for ${selected.agency_name} ---\n\n${previewBody}`,
+      },
+    });
+    setTestSending(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Test send failed");
+      return;
+    }
+    toast.success(`Test email sent to ${to}`);
   };
 
   const saveTemplate = async () => {
@@ -282,7 +322,7 @@ const Recruiters = () => {
   };
 
   const copyDraft = async () => {
-    const text = `Subject: ${emailSubject}\n\n${emailBody}`;
+    const text = `Subject: ${previewSubject}\n\n${previewBody}`;
     try {
       await navigator.clipboard.writeText(text);
       toast.success("Email copied to clipboard");
@@ -328,8 +368,8 @@ const Recruiters = () => {
       body: {
         leadId: selected.id,
         to: selected.contact_email,
-        subject: emailSubject,
-        text: emailBody,
+        subject: previewSubject,
+        text: previewBody,
       },
     });
     if (error || (data as any)?.error) {
@@ -1395,6 +1435,47 @@ const Recruiters = () => {
                       {emailBody.length}/4000
                     </div>
                   </div>
+                  <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        <Eye className="h-3.5 w-3.5" /> Live preview · {selected.agency_name}
+                      </Label>
+                      <span className="text-[10px] text-muted-foreground">
+                        merge tags filled from this lead
+                      </span>
+                    </div>
+                    <div className="text-xs">
+                      <span className="text-muted-foreground">Subject: </span>
+                      <span className="font-medium">{previewSubject || <em className="text-muted-foreground">—</em>}</span>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      To: {selected.contact_name ?? "—"} &lt;{selected.contact_email ?? "no email"}&gt;
+                    </div>
+                    <pre className="whitespace-pre-wrap text-xs leading-relaxed font-sans bg-background border rounded-sm p-2 max-h-64 overflow-auto">
+{previewBody || "—"}
+                    </pre>
+                  </div>
+                  <div className="space-y-1.5 rounded-md border p-3">
+                    <Label className="text-xs">Test send (sends preview to your address — no lead update)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        placeholder="you@voynovaglobal.com"
+                        value={testEmail}
+                        onChange={(e) => setTestEmail(e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={sendTestEmail}
+                        disabled={testSending || !testEmail.trim() || !previewSubject || !previewBody}
+                      >
+                        <Send className="h-3.5 w-3.5 mr-1.5" />
+                        {testSending ? "Sending…" : "Test send"}
+                      </Button>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={copyDraft}>
                       <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy to clipboard
@@ -1402,7 +1483,7 @@ const Recruiters = () => {
                     {selected.contact_email && (
                       <Button size="sm" variant="outline" asChild>
                         <a
-                          href={`mailto:${selected.contact_email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
+                          href={`mailto:${selected.contact_email}?subject=${encodeURIComponent(previewSubject)}&body=${encodeURIComponent(previewBody)}`}
                         >
                           <Mail className="h-3.5 w-3.5 mr-1.5" /> Open in mail app
                         </a>
