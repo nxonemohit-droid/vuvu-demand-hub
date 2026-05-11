@@ -1644,9 +1644,23 @@ const Recruiters = () => {
                     <div className="text-[11px] text-muted-foreground">
                       To: {selected.contact_name ?? "—"} &lt;{selected.contact_email ?? "no email"}&gt;
                     </div>
-                    <pre className="whitespace-pre-wrap text-xs leading-relaxed font-sans bg-background border rounded-sm p-2 max-h-64 overflow-auto">
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span>Format:</span>
+                      <Badge variant={isHtmlBody ? "default" : "outline"} className="text-[10px]">
+                        {isHtmlBody ? "HTML (sanitised)" : "Plain text"}
+                      </Badge>
+                    </div>
+                    {isHtmlBody ? (
+                      <div
+                        className="prose prose-sm max-w-none text-xs leading-relaxed bg-background border rounded-sm p-2 max-h-64 overflow-auto"
+                        // safeHtml has been run through DOMPurify with a strict allow-list
+                        dangerouslySetInnerHTML={{ __html: safeHtml || "—" }}
+                      />
+                    ) : (
+                      <pre className="whitespace-pre-wrap text-xs leading-relaxed font-sans bg-background border rounded-sm p-2 max-h-64 overflow-auto">
 {previewBody || "—"}
-                    </pre>
+                      </pre>
+                    )}
                   </div>
                   <div className="space-y-1.5 rounded-md border p-3">
                     <Label className="text-xs">Test send (sends preview to your address — no lead update)</Label>
