@@ -27,7 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck,
+  ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck, Beaker,
   CheckCircle2, XCircle, Loader2, Clock, Copy, Send, MailCheck, AlertTriangle,
   History, Eye, MousePointerClick, Inbox, AlertCircle, Plus, Trash2, FileText, Download,
 } from "lucide-react";
