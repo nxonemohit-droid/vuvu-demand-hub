@@ -284,8 +284,12 @@ const Mail = () => {
   };
 
   const sendBulk = async () => {
-    const recipients = leads.filter((l) => selected.has(l.id) && l.contact_email);
-    if (recipients.length === 0) return toast.error("Select at least one lead with an email");
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const recipients = leads
+      .filter((l) => selected.has(l.id) && l.contact_email)
+      .map((l) => ({ ...l, contact_email: l.contact_email!.trim() }))
+      .filter((l) => emailRe.test(l.contact_email));
+    if (recipients.length === 0) return toast.error("Select at least one lead with a valid email");
     if (!subject.trim() || !body.trim()) return toast.error("Subject and body are required");
 
     if (scheduleEnabled) {
