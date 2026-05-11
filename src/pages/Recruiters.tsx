@@ -228,6 +228,7 @@ const Recruiters = () => {
 
   const applyTemplate = (tpl: EmailTemplate, r: RecruiterRow) => {
     const trades = (r.trades ?? []).slice(0, 3).join(", ") || "blue-collar workers";
+    const trade = (r.trades ?? [])[0] ?? "blue-collar workers";
     const country = r.operating_eu_country || r.hq_country || "Europe";
     const firstName = r.contact_name?.split(" ")[0] ?? "there";
     const vars: Record<string, string> = {
@@ -235,13 +236,17 @@ const Recruiters = () => {
       contact_name: r.contact_name ?? "",
       contact_email: r.contact_email ?? "",
       agency_name: r.agency_name,
+      company_name: r.agency_name,
       country,
+      eu_country: r.operating_eu_country ?? "Europe",
+      operating_eu_country: r.operating_eu_country ?? "Europe",
       hq_country: r.hq_country ?? "",
       hq_city: r.hq_city ?? "",
       trades,
+      trade,
     };
     const fill = (s: string) =>
-      s.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, k) => vars[k] ?? `{{${k}}}`);
+      s.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, k) => vars[k.toLowerCase()] ?? "");
     setEmailSubject(fill(tpl.subject));
     setEmailBody(fill(tpl.body));
     toast.success(`Applied template "${tpl.name}"`);

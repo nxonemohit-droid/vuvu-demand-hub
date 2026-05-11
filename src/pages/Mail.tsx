@@ -69,14 +69,22 @@ mohit@voynovaglobal.com`;
 
 const renderTemplate = (tpl: string, l: Lead) => {
   const first = (l.contact_name ?? "").trim().split(" ")[0] || "there";
-  const trade = (l.trades ?? [])[0] ?? "your placements";
+  const tradesArr = (l.trades ?? []).filter(Boolean);
+  const trade = tradesArr[0] ?? "blue-collar workers";
+  const trades = tradesArr.slice(0, 3).join(", ") || trade;
+  const country = l.operating_eu_country || l.hq_country || "Europe";
   const map: Record<string, string> = {
     agency_name: l.agency_name ?? "",
+    company_name: l.agency_name ?? "",
     first_name: first,
     contact_name: l.contact_name ?? first,
+    contact_email: l.contact_email ?? "",
     eu_country: l.operating_eu_country ?? "Europe",
+    operating_eu_country: l.operating_eu_country ?? "Europe",
     hq_country: l.hq_country ?? "",
+    country,
     trade,
+    trades,
   };
   return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => map[k] ?? "");
 };
