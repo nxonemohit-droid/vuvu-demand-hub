@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoles } from "@/lib/auth";
 import { toast } from "sonner";
+import DOMPurify from "dompurify";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -323,6 +324,35 @@ const Recruiters = () => {
     [emailBody, selected],
   );
 
+  // ----- HTML/plain-text safety -----
+  // Treat the body as HTML only if it actually contains markup.
+  const looksLikeHtml = (s: string) =>
+    /<\/?[a-z][\s\S]*?>/i.test(s) || /&[a-z#0-9]+;/i.test(s);
+  const isHtmlBody = useMemo(() => looksLikeHtml(previewBody), [previewBody]);
+
+  // Sanitised HTML for safe rendering and outbound send.
+  const safeHtml = useMemo(() => {
+    if (!isHtmlBody) return "";
+    return DOMPurify.sanitize(previewBody, {
+      USE_PROFILES: { html: true },
+      // Only allow safe link/image targets; block javascript:, data: etc.
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+      FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form"],
+      FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "style"],
+    });
+  }, [isHtmlBody, previewBody]);
+
+  // Plain-text fallback derived from sanitised HTML (entities decoded, tags stripped).
+  const plainTextBody = useMemo(() => {
+    if (!isHtmlBody) return previewBody;
+    const tmp = document.createElement("div");
+    tmp.innerHTML = safeHtml
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+      .replace(/<li[^>]*>/gi, "• ");
+    return (tmp.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim();
+  }, [isHtmlBody, safeHtml, previewBody]);
+
   // Validate merge tags used in the raw template against the selected lead.
   // Returns the list of tags that resolve to an empty value (or are unknown).
   const missingTags = useMemo(() => {
@@ -357,11 +387,19 @@ const Recruiters = () => {
       return;
     }
     setTestSending(true);
+    const banner = `--- TEST SEND for ${selected.agency_name} ---`;
     const { data, error } = await supabase.functions.invoke("send-recruiter-email", {
       body: {
         to,
         subject: `[TEST] ${previewSubject}`,
-        text: `--- TEST SEND for ${selected.agency_name} ---\n\n${previewBody}`,
+        text: `${banner}\n\n${plainTextBody}`,
+        ...(isHtmlBody
+          ? {
+              html:
+                `<div style="font:12px/1.4 monospace;color:#666;margin-bottom:12px">` +
+                `${banner}</div>${safeHtml}`,
+            }
+          : {}),
       },
     });
     setTestSending(false);
@@ -402,9 +440,25 @@ const Recruiters = () => {
   };
 
   const copyDraft = async () => {
-    const text = `Subject: ${previewSubject}\n\n${previewBody}`;
+    const text = `Subject: ${previewSubject}\n\n${plainTextBody}`;
     try {
-      await navigator.clipboard.writeText(text);
+      // When the body is HTML, write both rich + plain so it pastes nicely
+      // into Gmail/Outlook while remaining safe in plain-text editors.
+      if (
+        isHtmlBody &&
+        typeof ClipboardItem !== "undefined" &&
+        navigator.clipboard?.write
+      ) {
+        const html = `<div>${safeHtml}</div>`;
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([text], { type: "text/plain" }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(text);
+      }
       toast.success("Email copied to clipboard");
     } catch {
       toast.error("Could not copy — please select and copy manually");
@@ -457,7 +511,8 @@ const Recruiters = () => {
         leadId: selected.id,
         to: selected.contact_email,
         subject: previewSubject,
-        text: previewBody,
+        text: plainTextBody,
+        ...(isHtmlBody ? { html: safeHtml } : {}),
       },
     });
     if (error || (data as any)?.error) {
@@ -1589,9 +1644,23 @@ const Recruiters = () => {
                     <div className="text-[11px] text-muted-foreground">
                       To: {selected.contact_name ?? "—"} &lt;{selected.contact_email ?? "no email"}&gt;
                     </div>
-                    <pre className="whitespace-pre-wrap text-xs leading-relaxed font-sans bg-background border rounded-sm p-2 max-h-64 overflow-auto">
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <span>Format:</span>
+                      <Badge variant={isHtmlBody ? "default" : "outline"} className="text-[10px]">
+                        {isHtmlBody ? "HTML (sanitised)" : "Plain text"}
+                      </Badge>
+                    </div>
+                    {isHtmlBody ? (
+                      <div
+                        className="prose prose-sm max-w-none text-xs leading-relaxed bg-background border rounded-sm p-2 max-h-64 overflow-auto"
+                        // safeHtml has been run through DOMPurify with a strict allow-list
+                        dangerouslySetInnerHTML={{ __html: safeHtml || "—" }}
+                      />
+                    ) : (
+                      <pre className="whitespace-pre-wrap text-xs leading-relaxed font-sans bg-background border rounded-sm p-2 max-h-64 overflow-auto">
 {previewBody || "—"}
-                    </pre>
+                      </pre>
+                    )}
                   </div>
                   <div className="space-y-1.5 rounded-md border p-3">
                     <Label className="text-xs">Test send (sends preview to your address — no lead update)</Label>
@@ -1621,7 +1690,7 @@ const Recruiters = () => {
                     {selected.contact_email && (
                       <Button size="sm" variant="outline" asChild>
                         <a
-                          href={`mailto:${selected.contact_email}?subject=${encodeURIComponent(previewSubject)}&body=${encodeURIComponent(previewBody)}`}
+                          href={`mailto:${encodeURIComponent(selected.contact_email)}?subject=${encodeURIComponent(previewSubject)}&body=${encodeURIComponent(plainTextBody)}`}
                         >
                           <Mail className="h-3.5 w-3.5 mr-1.5" /> Open in mail app
                         </a>
