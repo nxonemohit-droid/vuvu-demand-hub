@@ -40,19 +40,20 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null);
     if (!body) return json({ error: "Invalid JSON" }, 400);
 
-    const { leadId, to, subject, html, text } = body as {
+    let { leadId, to, subject, html, text } = body as {
       leadId?: string;
       to?: string;
       subject?: string;
       html?: string;
       text?: string;
     };
+    to = typeof to === "string" ? to.trim() : to;
 
     if (!to || !subject || (!html && !text)) {
       return json({ error: "Missing to / subject / body" }, 400);
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-      return json({ error: "Invalid recipient email" }, 400);
+      return json({ error: `Invalid recipient email: ${JSON.stringify(to)}` }, 400);
     }
     if (subject.length > 300 || (html ?? text ?? "").length > 50000) {
       return json({ error: "Subject or body too long" }, 400);
