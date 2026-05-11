@@ -86,7 +86,33 @@ const renderTemplate = (tpl: string, l: Lead) => {
     trade,
     trades,
   };
-  return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => map[k] ?? "");
+  // Allow ad-hoc fields (e.g. salary, visa_likelihood) carried on the lead
+  const extra = l as unknown as Record<string, unknown>;
+  const lookup = (k: string): string => {
+    if (k in map) return map[k];
+    const v = extra?.[k];
+    return v == null ? "" : String(v);
+  };
+  // Conditional blocks: {{#if key}}...{{/if}} and {{#unless key}}...{{/unless}}
+  // Render only when the value is truthy (non-empty string, non-zero, etc.)
+  const truthy = (k: string) => {
+    const v = lookup(k);
+    return v !== "" && v !== "0" && v.toLowerCase() !== "false";
+  };
+  let out = tpl;
+  for (let i = 0; i < 5; i++) {
+    const before = out;
+    out = out.replace(
+      /\{\{\s*#if\s+(\w+)\s*\}\}([\s\S]*?)\{\{\s*\/if\s*\}\}/g,
+      (_, k, inner) => (truthy(k) ? inner : ""),
+    );
+    out = out.replace(
+      /\{\{\s*#unless\s+(\w+)\s*\}\}([\s\S]*?)\{\{\s*\/unless\s*\}\}/g,
+      (_, k, inner) => (truthy(k) ? "" : inner),
+    );
+    if (out === before) break;
+  }
+  return out.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => lookup(k));
 };
 
 const Mail = () => {
