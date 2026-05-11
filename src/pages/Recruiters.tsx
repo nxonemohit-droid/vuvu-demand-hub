@@ -181,6 +181,8 @@ const Recruiters = () => {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [events, setEvents] = useState<EmailEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [sendHistory, setSendHistory] = useState<SendHistoryEntry[]>([]);
+  const [sendHistoryLoading, setSendHistoryLoading] = useState(false);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [editingTpl, setEditingTpl] = useState<EmailTemplate | null>(null);
