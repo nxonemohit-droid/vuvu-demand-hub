@@ -750,6 +750,27 @@ const Mail = () => {
               </div>
             )}
 
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setDraftsOpen(true)}
+                disabled={selected.size === 0}
+                size="sm"
+              >
+                <Layers className="h-4 w-4 mr-1.5" />
+                Preview {selected.size} draft{selected.size === 1 ? "" : "s"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={exportDraftsCsv}
+                disabled={selected.size === 0}
+                size="sm"
+              >
+                <Download className="h-4 w-4 mr-1.5" />
+                Export CSV
+              </Button>
+            </div>
+
             <Button
               onClick={sendBulk}
               disabled={sending || selected.size === 0}
