@@ -432,9 +432,25 @@ const Recruiters = () => {
   };
 
   const copyDraft = async () => {
-    const text = `Subject: ${previewSubject}\n\n${previewBody}`;
+    const text = `Subject: ${previewSubject}\n\n${plainTextBody}`;
     try {
-      await navigator.clipboard.writeText(text);
+      // When the body is HTML, write both rich + plain so it pastes nicely
+      // into Gmail/Outlook while remaining safe in plain-text editors.
+      if (
+        isHtmlBody &&
+        typeof ClipboardItem !== "undefined" &&
+        navigator.clipboard?.write
+      ) {
+        const html = `<div>${safeHtml}</div>`;
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([text], { type: "text/plain" }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(text);
+      }
       toast.success("Email copied to clipboard");
     } catch {
       toast.error("Could not copy — please select and copy manually");
