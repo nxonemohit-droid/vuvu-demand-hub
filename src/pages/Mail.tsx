@@ -266,7 +266,7 @@ const Mail = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("recruiter_leads")
-      .select("id,agency_name,contact_name,contact_email,hq_country,operating_eu_country,trades,email_status,email_sent_at")
+      .select("id,agency_name,contact_name,contact_email,contact_phone,contact_linkedin,source_url,hq_country,operating_eu_country,trades,email_status,email_sent_at")
       .eq("status", "active")
       .not("contact_email", "is", null)
       .order("quality_score", { ascending: false })
