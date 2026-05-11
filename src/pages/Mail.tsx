@@ -990,6 +990,69 @@ const Mail = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Bulk drafts dialog: one personalised copy per selected lead */}
+      <Dialog open={draftsOpen} onOpenChange={setDraftsOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {drafts.length} personalised draft{drafts.length === 1 ? "" : "s"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-2 pb-2">
+            <div className="relative flex-1">
+              <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Input
+                placeholder="Filter by agency, contact or email…"
+                value={draftFilter}
+                onChange={(e) => setDraftFilter(e.target.value)}
+                className="pl-8 h-9"
+              />
+            </div>
+            <Button size="sm" variant="outline" onClick={exportDraftsCsv}>
+              <Download className="h-4 w-4 mr-1.5" /> Export CSV
+            </Button>
+          </div>
+          <div className="overflow-auto flex-1 space-y-3 pr-1">
+            {filteredDrafts.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center py-8">
+                No drafts match this filter
+              </div>
+            )}
+            {filteredDrafts.map((d) => (
+              <div key={d.lead.id} className="rounded-md border p-3 space-y-1.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{d.lead.agency_name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {d.lead.contact_name ?? "—"} · {d.to || "no email"}
+                    </div>
+                  </div>
+                  <Badge variant={d.valid ? "outline" : "destructive"} className="shrink-0">
+                    {d.valid ? "ready" : "invalid email"}
+                  </Badge>
+                </div>
+                <div className="text-xs"><span className="text-muted-foreground">Subject:</span>{" "}
+                  <span className="font-medium">{d.subject}</span>
+                </div>
+                <pre className="text-xs whitespace-pre-wrap font-sans bg-muted/40 rounded p-2 max-h-48 overflow-auto">
+{d.body}
+                </pre>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setDraftsOpen(false)}>Close</Button>
+            <Button
+              onClick={() => { setDraftsOpen(false); sendBulk(); }}
+              disabled={drafts.filter((d) => d.valid).length === 0}
+            >
+              <Send className="h-4 w-4 mr-1.5" />
+              {scheduleEnabled ? "Schedule all" : "Send all"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Save template dialog */}
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
         <DialogContent>
