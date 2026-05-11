@@ -460,9 +460,12 @@ const Recruiters = () => {
     });
     setTestSending(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Test send failed");
+      const msg = (data as any)?.error || error?.message || "Test send failed";
+      await logSend(selected.id, "email_test", "failed", to, previewSubject, msg);
+      toast.error(msg);
       return;
     }
+    await logSend(selected.id, "email_test", "ok", to, previewSubject);
     toast.success(`Test email sent to ${to}`);
   };
 
