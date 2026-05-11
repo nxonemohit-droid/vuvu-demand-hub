@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import {
   Send, Save, Eye, FileText, Search, RefreshCw, Trash2, Plus, CheckCircle2, XCircle, Beaker,
   Clock, ShieldOff, BarChart3, Settings as SettingsIcon, Mail as MailIcon, Ban, X,
+  Download, Layers,
 } from "lucide-react";
 
 type Lead = {
