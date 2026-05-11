@@ -1690,7 +1690,7 @@ const Recruiters = () => {
                     {selected.contact_email && (
                       <Button size="sm" variant="outline" asChild>
                         <a
-                          href={`mailto:${selected.contact_email}?subject=${encodeURIComponent(previewSubject)}&body=${encodeURIComponent(previewBody)}`}
+                          href={`mailto:${encodeURIComponent(selected.contact_email)}?subject=${encodeURIComponent(previewSubject)}&body=${encodeURIComponent(plainTextBody)}`}
                         >
                           <Mail className="h-3.5 w-3.5 mr-1.5" /> Open in mail app
                         </a>
