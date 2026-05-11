@@ -443,6 +443,14 @@ const Recruiters = () => {
       toast.error("No recipient email on this lead");
       return;
     }
+    if (missingTags.length > 0) {
+      const ok = window.confirm(
+        `These merge tags are empty for this lead and will render as blank:\n\n${missingTags
+          .map((t) => `{{${t}}}`)
+          .join(", ")}\n\nSend anyway?`,
+      );
+      if (!ok) return;
+    }
     setSendingEmail(true);
     const { data, error } = await supabase.functions.invoke("send-recruiter-email", {
       body: {
