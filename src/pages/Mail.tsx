@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import {
   Send, Save, Eye, FileText, Search, RefreshCw, Trash2, Plus, CheckCircle2, XCircle, Beaker,
   Clock, ShieldOff, BarChart3, Settings as SettingsIcon, Mail as MailIcon, Ban, X,
+  Download, Layers,
 } from "lucide-react";
 
 type Lead = {
@@ -165,6 +166,10 @@ const Mail = () => {
   const [testOpen, setTestOpen] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [testSending, setTestSending] = useState(false);
+
+  // Bulk drafts (per-lead personalised copies)
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftFilter, setDraftFilter] = useState("");
 
   // Scheduling
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
@@ -430,6 +435,68 @@ const Mail = () => {
     loadOps();
   };
 
+  // Build a personalised draft per selected lead, sorted by agency name.
+  const drafts = useMemo(() => {
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return leads
+      .filter((l) => selected.has(l.id))
+      .map((l) => {
+        const email = (l.contact_email ?? "").trim();
+        return {
+          lead: l,
+          to: email,
+          valid: emailRe.test(email),
+          subject: renderTemplate(subject, l),
+          body: renderTemplate(body, l),
+        };
+      })
+      .sort((a, b) =>
+        (a.lead.agency_name ?? "").localeCompare(b.lead.agency_name ?? ""),
+      );
+  }, [leads, selected, subject, body]);
+
+  const filteredDrafts = useMemo(() => {
+    const q = draftFilter.trim().toLowerCase();
+    if (!q) return drafts;
+    return drafts.filter((d) =>
+      [d.lead.agency_name, d.lead.contact_name, d.to, d.subject]
+        .filter(Boolean)
+        .some((x) => (x as string).toLowerCase().includes(q)),
+    );
+  }, [drafts, draftFilter]);
+
+  const exportDraftsCsv = () => {
+    if (drafts.length === 0) return toast.error("Select at least one recipient");
+    const headers = [
+      "agency_name", "contact_name", "to_email", "valid_email",
+      "hq_country", "operating_eu_country", "trades", "subject", "body",
+    ];
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = drafts.map((d) => [
+      d.lead.agency_name ?? "",
+      d.lead.contact_name ?? "",
+      d.to,
+      d.valid ? "yes" : "no",
+      d.lead.hq_country ?? "",
+      d.lead.operating_eu_country ?? "",
+      (d.lead.trades ?? []).join("; "),
+      d.subject,
+      d.body,
+    ].map(esc).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `outreach-drafts-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${drafts.length} draft(s)`);
+  };
+
   const addSuppression = async () => {
     const e = newSuppression.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast.error("Invalid email");
@@ -683,6 +750,27 @@ const Mail = () => {
               </div>
             )}
 
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setDraftsOpen(true)}
+                disabled={selected.size === 0}
+                size="sm"
+              >
+                <Layers className="h-4 w-4 mr-1.5" />
+                Preview {selected.size} draft{selected.size === 1 ? "" : "s"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={exportDraftsCsv}
+                disabled={selected.size === 0}
+                size="sm"
+              >
+                <Download className="h-4 w-4 mr-1.5" />
+                Export CSV
+              </Button>
+            </div>
+
             <Button
               onClick={sendBulk}
               disabled={sending || selected.size === 0}
@@ -898,6 +986,69 @@ const Mail = () => {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreviewLead(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk drafts dialog: one personalised copy per selected lead */}
+      <Dialog open={draftsOpen} onOpenChange={setDraftsOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {drafts.length} personalised draft{drafts.length === 1 ? "" : "s"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-2 pb-2">
+            <div className="relative flex-1">
+              <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Input
+                placeholder="Filter by agency, contact or email…"
+                value={draftFilter}
+                onChange={(e) => setDraftFilter(e.target.value)}
+                className="pl-8 h-9"
+              />
+            </div>
+            <Button size="sm" variant="outline" onClick={exportDraftsCsv}>
+              <Download className="h-4 w-4 mr-1.5" /> Export CSV
+            </Button>
+          </div>
+          <div className="overflow-auto flex-1 space-y-3 pr-1">
+            {filteredDrafts.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center py-8">
+                No drafts match this filter
+              </div>
+            )}
+            {filteredDrafts.map((d) => (
+              <div key={d.lead.id} className="rounded-md border p-3 space-y-1.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{d.lead.agency_name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {d.lead.contact_name ?? "—"} · {d.to || "no email"}
+                    </div>
+                  </div>
+                  <Badge variant={d.valid ? "outline" : "destructive"} className="shrink-0">
+                    {d.valid ? "ready" : "invalid email"}
+                  </Badge>
+                </div>
+                <div className="text-xs"><span className="text-muted-foreground">Subject:</span>{" "}
+                  <span className="font-medium">{d.subject}</span>
+                </div>
+                <pre className="text-xs whitespace-pre-wrap font-sans bg-muted/40 rounded p-2 max-h-48 overflow-auto">
+{d.body}
+                </pre>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setDraftsOpen(false)}>Close</Button>
+            <Button
+              onClick={() => { setDraftsOpen(false); sendBulk(); }}
+              disabled={drafts.filter((d) => d.valid).length === 0}
+            >
+              <Send className="h-4 w-4 mr-1.5" />
+              {scheduleEnabled ? "Schedule all" : "Send all"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
