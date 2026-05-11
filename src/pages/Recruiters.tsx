@@ -180,6 +180,13 @@ const Recruiters = () => {
   const [testEmail, setTestEmail] = useState("");
   const [testSending, setTestSending] = useState(false);
 
+  // Prefill the QA test address with the signed-in user's email
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) setTestEmail((cur) => cur || data.user!.email!);
+    });
+  }, []);
+
   // Reset the draft whenever a new recruiter is opened.
   useEffect(() => {
     if (selected) {
