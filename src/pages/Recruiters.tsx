@@ -323,6 +323,32 @@ const Recruiters = () => {
     [emailBody, selected],
   );
 
+  // Validate merge tags used in the raw template against the selected lead.
+  // Returns the list of tags that resolve to an empty value (or are unknown).
+  const missingTags = useMemo(() => {
+    if (!selected) return [] as string[];
+    const vars = buildVars(selected);
+    const extra = selected as unknown as Record<string, unknown>;
+    const lookup = (k: string): string => {
+      const key = k.toLowerCase();
+      if (key in vars) return vars[key];
+      const v = extra?.[key];
+      return v == null ? "" : String(v);
+    };
+    const found = new Set<string>();
+    const re = /\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi;
+    const reserved = new Set(["if", "unless"]);
+    for (const src of [emailSubject, emailBody]) {
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(src)) !== null) {
+        const tag = m[1].toLowerCase();
+        if (reserved.has(tag)) continue;
+        if (lookup(tag).trim() === "") found.add(tag);
+      }
+    }
+    return Array.from(found).sort();
+  }, [selected, emailSubject, emailBody]);
+
   const sendTestEmail = async () => {
     if (!selected) return;
     const to = testEmail.trim();
