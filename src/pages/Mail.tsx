@@ -167,6 +167,10 @@ const Mail = () => {
   const [testEmail, setTestEmail] = useState("");
   const [testSending, setTestSending] = useState(false);
 
+  // Bulk drafts (per-lead personalised copies)
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftFilter, setDraftFilter] = useState("");
+
   // Scheduling
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduleAt, setScheduleAt] = useState<string>(() => {
