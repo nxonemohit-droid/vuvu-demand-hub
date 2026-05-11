@@ -42,6 +42,13 @@ type EmailEvent = {
   payload: Record<string, unknown> | null;
 };
 
+type SendHistoryEntry = {
+  id: string;
+  created_at: string;
+  channel: string; // 'email_test' | 'email_resend' | 'email' | etc.
+  note: string;
+};
+
 type EmailTemplate = {
   id: string;
   name: string;
