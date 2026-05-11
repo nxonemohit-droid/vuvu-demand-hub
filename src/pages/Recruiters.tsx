@@ -177,6 +177,8 @@ const Recruiters = () => {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [editingTpl, setEditingTpl] = useState<EmailTemplate | null>(null);
   const [tplForm, setTplForm] = useState({ name: "", subject: "", body: "", description: "" });
+  const [testEmail, setTestEmail] = useState("");
+  const [testSending, setTestSending] = useState(false);
 
   // Reset the draft whenever a new recruiter is opened.
   useEffect(() => {
@@ -226,12 +228,12 @@ const Recruiters = () => {
   };
   useEffect(() => { loadTemplates(); }, []);
 
-  const applyTemplate = (tpl: EmailTemplate, r: RecruiterRow) => {
+  const buildVars = (r: RecruiterRow): Record<string, string> => {
     const trades = (r.trades ?? []).slice(0, 3).join(", ") || "blue-collar workers";
     const trade = (r.trades ?? [])[0] ?? "blue-collar workers";
     const country = r.operating_eu_country || r.hq_country || "Europe";
     const firstName = r.contact_name?.split(" ")[0] ?? "there";
-    const vars: Record<string, string> = {
+    return {
       first_name: firstName,
       contact_name: r.contact_name ?? "",
       contact_email: r.contact_email ?? "",
@@ -245,11 +247,49 @@ const Recruiters = () => {
       trades,
       trade,
     };
-    const fill = (s: string) =>
-      s.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, k) => vars[k.toLowerCase()] ?? "");
-    setEmailSubject(fill(tpl.subject));
-    setEmailBody(fill(tpl.body));
+  };
+
+  const fillTemplate = (s: string, r: RecruiterRow) => {
+    const vars = buildVars(r);
+    return s.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, k) => vars[k.toLowerCase()] ?? "");
+  };
+
+  const applyTemplate = (tpl: EmailTemplate, r: RecruiterRow) => {
+    setEmailSubject(fillTemplate(tpl.subject, r));
+    setEmailBody(fillTemplate(tpl.body, r));
     toast.success(`Applied template "${tpl.name}"`);
+  };
+
+  const previewSubject = useMemo(
+    () => (selected ? fillTemplate(emailSubject, selected) : emailSubject),
+    [emailSubject, selected],
+  );
+  const previewBody = useMemo(
+    () => (selected ? fillTemplate(emailBody, selected) : emailBody),
+    [emailBody, selected],
+  );
+
+  const sendTestEmail = async () => {
+    if (!selected) return;
+    const to = testEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      toast.error("Enter a valid test email address");
+      return;
+    }
+    setTestSending(true);
+    const { data, error } = await supabase.functions.invoke("send-recruiter-email", {
+      body: {
+        to,
+        subject: `[TEST] ${previewSubject}`,
+        text: `--- TEST SEND for ${selected.agency_name} ---\n\n${previewBody}`,
+      },
+    });
+    setTestSending(false);
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.error || error?.message || "Test send failed");
+      return;
+    }
+    toast.success(`Test email sent to ${to}`);
   };
 
   const saveTemplate = async () => {
