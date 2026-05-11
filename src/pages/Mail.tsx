@@ -227,6 +227,9 @@ const Mail = () => {
     trades: ["Welding", "Construction"],
     email_status: "not_sent",
     email_sent_at: null,
+    contact_phone: "+30 21 0000 0000",
+    contact_linkedin: "https://www.linkedin.com/in/alex-sample",
+    source_url: "https://www.sample-agency.com",
   };
 
   const sendTest = async () => {
