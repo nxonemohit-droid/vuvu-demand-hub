@@ -435,6 +435,68 @@ const Mail = () => {
     loadOps();
   };
 
+  // Build a personalised draft per selected lead, sorted by agency name.
+  const drafts = useMemo(() => {
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return leads
+      .filter((l) => selected.has(l.id))
+      .map((l) => {
+        const email = (l.contact_email ?? "").trim();
+        return {
+          lead: l,
+          to: email,
+          valid: emailRe.test(email),
+          subject: renderTemplate(subject, l),
+          body: renderTemplate(body, l),
+        };
+      })
+      .sort((a, b) =>
+        (a.lead.agency_name ?? "").localeCompare(b.lead.agency_name ?? ""),
+      );
+  }, [leads, selected, subject, body]);
+
+  const filteredDrafts = useMemo(() => {
+    const q = draftFilter.trim().toLowerCase();
+    if (!q) return drafts;
+    return drafts.filter((d) =>
+      [d.lead.agency_name, d.lead.contact_name, d.to, d.subject]
+        .filter(Boolean)
+        .some((x) => (x as string).toLowerCase().includes(q)),
+    );
+  }, [drafts, draftFilter]);
+
+  const exportDraftsCsv = () => {
+    if (drafts.length === 0) return toast.error("Select at least one recipient");
+    const headers = [
+      "agency_name", "contact_name", "to_email", "valid_email",
+      "hq_country", "operating_eu_country", "trades", "subject", "body",
+    ];
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = drafts.map((d) => [
+      d.lead.agency_name ?? "",
+      d.lead.contact_name ?? "",
+      d.to,
+      d.valid ? "yes" : "no",
+      d.lead.hq_country ?? "",
+      d.lead.operating_eu_country ?? "",
+      (d.lead.trades ?? []).join("; "),
+      d.subject,
+      d.body,
+    ].map(esc).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `outreach-drafts-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${drafts.length} draft(s)`);
+  };
+
   const addSuppression = async () => {
     const e = newSuppression.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast.error("Invalid email");
