@@ -36,6 +36,9 @@ type Lead = {
   trades: string[] | null;
   email_status: string;
   email_sent_at: string | null;
+  contact_phone: string | null;
+  contact_linkedin: string | null;
+  source_url: string | null;
 };
 
 type Template = {
@@ -73,12 +76,34 @@ const renderTemplate = (tpl: string, l: Lead) => {
   const trade = tradesArr[0] ?? "blue-collar workers";
   const trades = tradesArr.slice(0, 3).join(", ") || trade;
   const country = l.operating_eu_country || l.hq_country || "Europe";
+  const sourceUrl = (l.source_url ?? "").trim();
+  let website = sourceUrl;
+  let websiteDomain = "";
+  try {
+    if (sourceUrl) {
+      const u = new URL(sourceUrl.startsWith("http") ? sourceUrl : `https://${sourceUrl}`);
+      website = `${u.protocol}//${u.host}`;
+      websiteDomain = u.host.replace(/^www\./, "");
+    }
+  } catch { /* ignore */ }
+  const phone = (l.contact_phone ?? "").trim();
+  const linkedin = (l.contact_linkedin ?? "").trim();
+  const recruiterName = (l.contact_name ?? "").trim() || first;
   const map: Record<string, string> = {
     agency_name: l.agency_name ?? "",
     company_name: l.agency_name ?? "",
     first_name: first,
     contact_name: l.contact_name ?? first,
     contact_email: l.contact_email ?? "",
+    contact_phone: phone,
+    phone,
+    contact_linkedin: linkedin,
+    linkedin,
+    recruiter_name: recruiterName,
+    agency_website: website,
+    website,
+    website_domain: websiteDomain,
+    source_url: sourceUrl,
     eu_country: l.operating_eu_country ?? "Europe",
     operating_eu_country: l.operating_eu_country ?? "Europe",
     hq_country: l.hq_country ?? "",
@@ -202,6 +227,9 @@ const Mail = () => {
     trades: ["Welding", "Construction"],
     email_status: "not_sent",
     email_sent_at: null,
+    contact_phone: "+30 21 0000 0000",
+    contact_linkedin: "https://www.linkedin.com/in/alex-sample",
+    source_url: "https://www.sample-agency.com",
   };
 
   const sendTest = async () => {
@@ -238,7 +266,7 @@ const Mail = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("recruiter_leads")
-      .select("id,agency_name,contact_name,contact_email,hq_country,operating_eu_country,trades,email_status,email_sent_at")
+      .select("id,agency_name,contact_name,contact_email,contact_phone,contact_linkedin,source_url,hq_country,operating_eu_country,trades,email_status,email_sent_at")
       .eq("status", "active")
       .not("contact_email", "is", null)
       .order("quality_score", { ascending: false })

@@ -233,10 +233,32 @@ const Recruiters = () => {
     const trade = (r.trades ?? [])[0] ?? "blue-collar workers";
     const country = r.operating_eu_country || r.hq_country || "Europe";
     const firstName = r.contact_name?.split(" ")[0] ?? "there";
+    const sourceUrl = (r.source_url ?? "").trim();
+    let website = sourceUrl;
+    let websiteDomain = "";
+    try {
+      if (sourceUrl) {
+        const u = new URL(sourceUrl.startsWith("http") ? sourceUrl : `https://${sourceUrl}`);
+        website = `${u.protocol}//${u.host}`;
+        websiteDomain = u.host.replace(/^www\./, "");
+      }
+    } catch { /* ignore */ }
+    const phone = (r.contact_phone ?? "").trim();
+    const linkedin = (r.contact_linkedin ?? "").trim();
+    const recruiterName = (r.contact_name ?? "").trim() || firstName;
     return {
       first_name: firstName,
       contact_name: r.contact_name ?? "",
       contact_email: r.contact_email ?? "",
+      contact_phone: phone,
+      phone,
+      contact_linkedin: linkedin,
+      linkedin,
+      recruiter_name: recruiterName,
+      agency_website: website,
+      website,
+      website_domain: websiteDomain,
+      source_url: sourceUrl,
       agency_name: r.agency_name,
       company_name: r.agency_name,
       country,
