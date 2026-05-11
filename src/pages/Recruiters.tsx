@@ -387,11 +387,19 @@ const Recruiters = () => {
       return;
     }
     setTestSending(true);
+    const banner = `--- TEST SEND for ${selected.agency_name} ---`;
     const { data, error } = await supabase.functions.invoke("send-recruiter-email", {
       body: {
         to,
         subject: `[TEST] ${previewSubject}`,
-        text: `--- TEST SEND for ${selected.agency_name} ---\n\n${previewBody}`,
+        text: `${banner}\n\n${plainTextBody}`,
+        ...(isHtmlBody
+          ? {
+              html:
+                `<div style="font:12px/1.4 monospace;color:#666;margin-bottom:12px">` +
+                `${banner}</div>${safeHtml}`,
+            }
+          : {}),
       },
     });
     setTestSending(false);
