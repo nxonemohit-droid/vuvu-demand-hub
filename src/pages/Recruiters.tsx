@@ -27,7 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck,
+  ExternalLink, Mail, Phone, Linkedin, Sparkles, Filter, RefreshCw, ShieldCheck, Beaker,
   CheckCircle2, XCircle, Loader2, Clock, Copy, Send, MailCheck, AlertTriangle,
   History, Eye, MousePointerClick, Inbox, AlertCircle, Plus, Trash2, FileText, Download,
 } from "lucide-react";
@@ -179,6 +179,13 @@ const Recruiters = () => {
   const [tplForm, setTplForm] = useState({ name: "", subject: "", body: "", description: "" });
   const [testEmail, setTestEmail] = useState("");
   const [testSending, setTestSending] = useState(false);
+
+  // Prefill the QA test address with the signed-in user's email
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) setTestEmail((cur) => cur || data.user!.email!);
+    });
+  }, []);
 
   // Reset the draft whenever a new recruiter is opened.
   useEffect(() => {
@@ -1343,7 +1350,37 @@ const Recruiters = () => {
           {selected && (
             <>
               <SheetHeader>
-                <SheetTitle>{selected.agency_name}</SheetTitle>
+                <SheetTitle className="flex items-center justify-between gap-2">
+                  <span className="truncate">{selected.agency_name}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={sendTestEmail}
+                    disabled={
+                      testSending ||
+                      !testEmail.trim() ||
+                      !previewSubject ||
+                      !previewBody
+                    }
+                    title={
+                      testEmail
+                        ? `Send a one-click QA copy to ${testEmail}`
+                        : "Set a QA test address in the email panel below"
+                    }
+                  >
+                    {testSending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Beaker className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    QA send
+                  </Button>
+                </SheetTitle>
+                {testEmail && (
+                  <p className="text-[11px] text-muted-foreground">
+                    QA copy will be sent to <span className="font-mono">{testEmail}</span> via Resend
+                  </p>
+                )}
               </SheetHeader>
               <div className="mt-4 space-y-4 text-sm">
                 <div>
