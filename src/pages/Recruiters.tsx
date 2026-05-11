@@ -1435,6 +1435,47 @@ const Recruiters = () => {
                       {emailBody.length}/4000
                     </div>
                   </div>
+                  <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        <Eye className="h-3.5 w-3.5" /> Live preview · {selected.agency_name}
+                      </Label>
+                      <span className="text-[10px] text-muted-foreground">
+                        merge tags filled from this lead
+                      </span>
+                    </div>
+                    <div className="text-xs">
+                      <span className="text-muted-foreground">Subject: </span>
+                      <span className="font-medium">{previewSubject || <em className="text-muted-foreground">—</em>}</span>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      To: {selected.contact_name ?? "—"} &lt;{selected.contact_email ?? "no email"}&gt;
+                    </div>
+                    <pre className="whitespace-pre-wrap text-xs leading-relaxed font-sans bg-background border rounded-sm p-2 max-h-64 overflow-auto">
+{previewBody || "—"}
+                    </pre>
+                  </div>
+                  <div className="space-y-1.5 rounded-md border p-3">
+                    <Label className="text-xs">Test send (sends preview to your address — no lead update)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        placeholder="you@voynovaglobal.com"
+                        value={testEmail}
+                        onChange={(e) => setTestEmail(e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={sendTestEmail}
+                        disabled={testSending || !testEmail.trim() || !previewSubject || !previewBody}
+                      >
+                        <Send className="h-3.5 w-3.5 mr-1.5" />
+                        {testSending ? "Sending…" : "Test send"}
+                      </Button>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={copyDraft}>
                       <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy to clipboard
@@ -1442,7 +1483,7 @@ const Recruiters = () => {
                     {selected.contact_email && (
                       <Button size="sm" variant="outline" asChild>
                         <a
-                          href={`mailto:${selected.contact_email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
+                          href={`mailto:${selected.contact_email}?subject=${encodeURIComponent(previewSubject)}&body=${encodeURIComponent(previewBody)}`}
                         >
                           <Mail className="h-3.5 w-3.5 mr-1.5" /> Open in mail app
                         </a>
