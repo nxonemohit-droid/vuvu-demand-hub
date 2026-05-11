@@ -1350,7 +1350,37 @@ const Recruiters = () => {
           {selected && (
             <>
               <SheetHeader>
-                <SheetTitle>{selected.agency_name}</SheetTitle>
+                <SheetTitle className="flex items-center justify-between gap-2">
+                  <span className="truncate">{selected.agency_name}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={sendTestEmail}
+                    disabled={
+                      testSending ||
+                      !testEmail.trim() ||
+                      !previewSubject ||
+                      !previewBody
+                    }
+                    title={
+                      testEmail
+                        ? `Send a one-click QA copy to ${testEmail}`
+                        : "Set a QA test address in the email panel below"
+                    }
+                  >
+                    {testSending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Beaker className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    QA send
+                  </Button>
+                </SheetTitle>
+                {testEmail && (
+                  <p className="text-[11px] text-muted-foreground">
+                    QA copy will be sent to <span className="font-mono">{testEmail}</span> via Resend
+                  </p>
+                )}
               </SheetHeader>
               <div className="mt-4 space-y-4 text-sm">
                 <div>
