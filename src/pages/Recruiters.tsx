@@ -324,6 +324,35 @@ const Recruiters = () => {
     [emailBody, selected],
   );
 
+  // ----- HTML/plain-text safety -----
+  // Treat the body as HTML only if it actually contains markup.
+  const looksLikeHtml = (s: string) =>
+    /<\/?[a-z][\s\S]*?>/i.test(s) || /&[a-z#0-9]+;/i.test(s);
+  const isHtmlBody = useMemo(() => looksLikeHtml(previewBody), [previewBody]);
+
+  // Sanitised HTML for safe rendering and outbound send.
+  const safeHtml = useMemo(() => {
+    if (!isHtmlBody) return "";
+    return DOMPurify.sanitize(previewBody, {
+      USE_PROFILES: { html: true },
+      // Only allow safe link/image targets; block javascript:, data: etc.
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+      FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form"],
+      FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "style"],
+    });
+  }, [isHtmlBody, previewBody]);
+
+  // Plain-text fallback derived from sanitised HTML (entities decoded, tags stripped).
+  const plainTextBody = useMemo(() => {
+    if (!isHtmlBody) return previewBody;
+    const tmp = document.createElement("div");
+    tmp.innerHTML = safeHtml
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+      .replace(/<li[^>]*>/gi, "• ");
+    return (tmp.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim();
+  }, [isHtmlBody, safeHtml, previewBody]);
+
   // Validate merge tags used in the raw template against the selected lead.
   // Returns the list of tags that resolve to an empty value (or are unknown).
   const missingTags = useMemo(() => {
