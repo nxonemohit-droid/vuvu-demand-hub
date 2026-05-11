@@ -42,6 +42,13 @@ type EmailEvent = {
   payload: Record<string, unknown> | null;
 };
 
+type SendHistoryEntry = {
+  id: string;
+  created_at: string;
+  channel: string; // 'email_test' | 'email_resend' | 'email' | etc.
+  note: string;
+};
+
 type EmailTemplate = {
   id: string;
   name: string;
@@ -174,6 +181,8 @@ const Recruiters = () => {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [events, setEvents] = useState<EmailEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [sendHistory, setSendHistory] = useState<SendHistoryEntry[]>([]);
+  const [sendHistoryLoading, setSendHistoryLoading] = useState(false);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [editingTpl, setEditingTpl] = useState<EmailTemplate | null>(null);
@@ -226,6 +235,53 @@ const Recruiters = () => {
       .subscribe();
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [selected?.id]);
+
+  // Load send history (test + real sends recorded in lead_outreach_log) for this lead
+  useEffect(() => {
+    if (!selected?.id) { setSendHistory([]); return; }
+    let cancelled = false;
+    setSendHistoryLoading(true);
+    (async () => {
+      const { data } = await supabase
+        .from("lead_outreach_log")
+        .select("id, created_at, channel, note")
+        .eq("lead_id", selected.id)
+        .in("channel", ["email_test", "email_resend", "email"])
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (!cancelled) {
+        setSendHistory((data ?? []) as SendHistoryEntry[]);
+        setSendHistoryLoading(false);
+      }
+    })();
+    const channel = supabase
+      .channel(`lead_outreach_log:${selected.id}`)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "lead_outreach_log",
+        filter: `lead_id=eq.${selected.id}`,
+      }, (payload) => {
+        const row = payload.new as SendHistoryEntry;
+        if (["email_test", "email_resend", "email"].includes(row.channel)) {
+          setSendHistory((prev) => [row, ...prev]);
+        }
+      })
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [selected?.id]);
+
+  const logSend = async (
+    leadId: string,
+    channel: "email_test" | "email_resend",
+    status: "ok" | "failed",
+    to: string,
+    subject: string,
+    extra?: string,
+  ) => {
+    const note = `[${status.toUpperCase()}] To: ${to} — ${subject}${extra ? ` — ${extra}` : ""}`;
+    await supabase.from("lead_outreach_log").insert({
+      lead_id: leadId, channel, note,
+    }).then(() => {}, () => {});
+  };
 
   const loadTemplates = async () => {
     const { data } = await supabase
@@ -404,9 +460,12 @@ const Recruiters = () => {
     });
     setTestSending(false);
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Test send failed");
+      const msg = (data as any)?.error || error?.message || "Test send failed";
+      await logSend(selected.id, "email_test", "failed", to, previewSubject, msg);
+      toast.error(msg);
       return;
     }
+    await logSend(selected.id, "email_test", "ok", to, previewSubject);
     toast.success(`Test email sent to ${to}`);
   };
 
@@ -516,11 +575,14 @@ const Recruiters = () => {
       },
     });
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Send failed");
+      const msg = (data as any)?.error || error?.message || "Send failed";
+      await logSend(selected.id, "email_resend", "failed", selected.contact_email, previewSubject, msg);
+      toast.error(msg);
       setSendingEmail(false);
       return;
     }
     const nowIso = (data as any)?.sent_at ?? new Date().toISOString();
+    await logSend(selected.id, "email_resend", "ok", selected.contact_email, previewSubject);
     setRows((prev) => prev.map((r) =>
       r.id === selected.id ? { ...r, email_status: "sent", email_sent_at: nowIso } : r
     ));
@@ -1716,6 +1778,86 @@ const Recruiters = () => {
                       </Button>
                     )}
                   </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                      <MailCheck className="h-4 w-4" /> Send history
+                    </h3>
+                    <span className="text-[10px] text-muted-foreground">
+                      {sendHistory.length} {sendHistory.length === 1 ? "send" : "sends"}
+                    </span>
+                  </div>
+                  {sendHistoryLoading ? (
+                    <Skeleton className="h-16 w-full" />
+                  ) : sendHistory.length === 0 ? (
+                    <div className="text-xs text-muted-foreground border rounded-md p-3 text-center">
+                      No sends yet. Test sends and real sends to {selected.agency_name} will appear here.
+                    </div>
+                  ) : (
+                    <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
+                      {sendHistory.map((s) => {
+                        const isTest = s.channel === "email_test";
+                        const m = s.note.match(/^\[(OK|FAILED)\] To: (\S+) — (.+?)(?: — (.+))?$/);
+                        const status = (m?.[1] ?? "OK").toLowerCase();
+                        const to = m?.[2] ?? "";
+                        const subject = m?.[3] ?? s.note;
+                        const errMsg = m?.[4];
+                        const ok = status === "ok";
+                        return (
+                          <div key={s.id} className="p-2.5 text-xs space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    isTest
+                                      ? "border-amber-500/40 text-amber-700 dark:text-amber-400"
+                                      : "border-primary/40 text-primary"
+                                  }
+                                >
+                                  {isTest ? (
+                                    <><Beaker className="h-3 w-3 mr-1" />Test</>
+                                  ) : (
+                                    <><Send className="h-3 w-3 mr-1" />Real send</>
+                                  )}
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    ok
+                                      ? "border-emerald-500/40 text-emerald-600"
+                                      : "border-destructive/40 text-destructive"
+                                  }
+                                >
+                                  {ok ? (
+                                    <><CheckCircle2 className="h-3 w-3 mr-1" />Sent</>
+                                  ) : (
+                                    <><XCircle className="h-3 w-3 mr-1" />Failed</>
+                                  )}
+                                </Badge>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                {new Date(s.created_at).toLocaleString("en-GB", { hour12: false })}
+                              </span>
+                            </div>
+                            {to && (
+                              <div className="text-[11px] text-muted-foreground truncate">
+                                to <span className="font-medium text-foreground">{to}</span>
+                              </div>
+                            )}
+                            <div className="text-[11px] truncate" title={subject}>{subject}</div>
+                            {errMsg && (
+                              <div className="text-[11px] text-destructive break-words">{errMsg}</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <Separator />
