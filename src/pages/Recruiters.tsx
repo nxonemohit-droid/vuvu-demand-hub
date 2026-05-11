@@ -575,11 +575,14 @@ const Recruiters = () => {
       },
     });
     if (error || (data as any)?.error) {
-      toast.error((data as any)?.error || error?.message || "Send failed");
+      const msg = (data as any)?.error || error?.message || "Send failed";
+      await logSend(selected.id, "email_resend", "failed", selected.contact_email, previewSubject, msg);
+      toast.error(msg);
       setSendingEmail(false);
       return;
     }
     const nowIso = (data as any)?.sent_at ?? new Date().toISOString();
+    await logSend(selected.id, "email_resend", "ok", selected.contact_email, previewSubject);
     setRows((prev) => prev.map((r) =>
       r.id === selected.id ? { ...r, email_status: "sent", email_sent_at: nowIso } : r
     ));
