@@ -251,7 +251,32 @@ const Recruiters = () => {
 
   const fillTemplate = (s: string, r: RecruiterRow) => {
     const vars = buildVars(r);
-    return s.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, k) => vars[k.toLowerCase()] ?? "");
+    const extra = r as unknown as Record<string, unknown>;
+    const lookup = (k: string): string => {
+      const key = k.toLowerCase();
+      if (key in vars) return vars[key];
+      const v = extra?.[key];
+      return v == null ? "" : String(v);
+    };
+    const truthy = (k: string) => {
+      const v = lookup(k);
+      return v !== "" && v !== "0" && v.toLowerCase() !== "false";
+    };
+    let out = s;
+    // Conditional blocks: {{#if key}}...{{/if}} / {{#unless key}}...{{/unless}}
+    for (let i = 0; i < 5; i++) {
+      const before = out;
+      out = out.replace(
+        /\{\{\s*#if\s+([a-z_]+)\s*\}\}([\s\S]*?)\{\{\s*\/if\s*\}\}/gi,
+        (_, k, inner) => (truthy(k) ? inner : ""),
+      );
+      out = out.replace(
+        /\{\{\s*#unless\s+([a-z_]+)\s*\}\}([\s\S]*?)\{\{\s*\/unless\s*\}\}/gi,
+        (_, k, inner) => (truthy(k) ? "" : inner),
+      );
+      if (out === before) break;
+    }
+    return out.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, k) => lookup(k));
   };
 
   const applyTemplate = (tpl: EmailTemplate, r: RecruiterRow) => {
