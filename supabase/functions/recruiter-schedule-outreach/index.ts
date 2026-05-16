@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const dailyCap: number = Math.max(1, Math.min(500, Number(body?.dailyCap ?? 50)));
     const templateId: string | undefined = body?.templateId;
+    const dryRun: boolean = Boolean(body?.dryRun);
     const blockFilter: number[] | undefined = Array.isArray(body?.blocks)
       ? body.blocks.map((b: unknown) => Number(b)).filter((n: number) => [1,2,3].includes(n))
       : undefined;
@@ -208,6 +209,66 @@ Deno.serve(async (req) => {
         status: "pending",
         template_name: templateName,
         created_by: userData.user.id,
+      });
+    }
+
+    // Validate Block 1 → 2 → 3 ordering (and ordering by send_at) without touching the DB.
+    const blockSequence = buckets.map((b) => b.block);
+    let orderingValid = true;
+    let firstViolationIndex: number | null = null;
+    for (let i = 1; i < blockSequence.length; i++) {
+      if (blockSequence[i] < blockSequence[i - 1]) {
+        orderingValid = false;
+        firstViolationIndex = i;
+        break;
+      }
+    }
+    let sendAtMonotonic = true;
+    for (let i = 1; i < rows.length; i++) {
+      const prev = new Date(rows[i - 1].send_at as string).getTime();
+      const cur = new Date(rows[i].send_at as string).getTime();
+      if (cur < prev) { sendAtMonotonic = false; break; }
+    }
+    const previewSample = rows.slice(0, 5).map((r, i) => ({
+      position: i + 1,
+      block: buckets[i].block,
+      agency_name: buckets[i].agency_name,
+      to_email: r.to_email,
+      send_at: r.send_at,
+    }));
+    const lastSample = rows.length > 5
+      ? rows.slice(-3).map((r, idx) => {
+          const i = rows.length - 3 + idx;
+          return {
+            position: i + 1,
+            block: buckets[i].block,
+            agency_name: buckets[i].agency_name,
+            to_email: r.to_email,
+            send_at: r.send_at,
+          };
+        })
+      : [];
+
+    if (dryRun) {
+      return jsonResponse({
+        ok: true,
+        dryRun: true,
+        wouldSchedule: rows.length,
+        days: daysNeeded,
+        dailyCap,
+        templateName,
+        orderingValid,
+        firstViolationIndex,
+        sendAtMonotonic,
+        blocks: {
+          block1: buckets.filter((b) => b.block === 1).length,
+          block2: buckets.filter((b) => b.block === 2).length,
+          block3: buckets.filter((b) => b.block === 3).length,
+        },
+        previewSample,
+        lastSample,
+        windowStartIso: rows[0]?.send_at ?? null,
+        windowEndIso: rows[rows.length - 1]?.send_at ?? null,
       });
     }
 
