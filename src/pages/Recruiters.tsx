@@ -941,9 +941,52 @@ const Recruiters = () => {
   const [scheduleRunning, setScheduleRunning] = useState(false);
   const [scheduleBlocks, setScheduleBlocks] = useState<number[] | null>(null);
   const [scheduleDailyCap, setScheduleDailyCap] = useState(50);
+  const [dryRunRunning, setDryRunRunning] = useState(false);
+  type DryRunResult = {
+    wouldSchedule: number;
+    days: number;
+    dailyCap: number;
+    templateName: string | null;
+    orderingValid: boolean;
+    firstViolationIndex: number | null;
+    sendAtMonotonic: boolean;
+    blocks: { block1: number; block2: number; block3: number };
+    previewSample: Array<{ position: number; block: number; agency_name: string | null; to_email: string; send_at: string }>;
+    lastSample: Array<{ position: number; block: number; agency_name: string | null; to_email: string; send_at: string }>;
+    windowStartIso: string | null;
+    windowEndIso: string | null;
+  };
+  const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const openScheduleDialog = (blocks: number[] | null) => {
     setScheduleBlocks(blocks);
+    setDryRunResult(null);
     setScheduleOpen(true);
+  };
+  const runDryRun = async () => {
+    setDryRunRunning(true);
+    setDryRunResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("recruiter-schedule-outreach", {
+        body: {
+          dailyCap: scheduleDailyCap,
+          dryRun: true,
+          ...(scheduleBlocks ? { blocks: scheduleBlocks } : {}),
+        },
+      });
+      if (error) throw error;
+      const d = data as { ok?: boolean; error?: string } & Partial<DryRunResult>;
+      if (!d?.ok) throw new Error(d?.error ?? "Dry run failed");
+      setDryRunResult(d as DryRunResult);
+      if (!d.orderingValid) {
+        toast.error(`Block ordering violation at position ${(d.firstViolationIndex ?? 0) + 1}`);
+      } else {
+        toast.success(`Dry run OK — ${d.wouldSchedule ?? 0} emails across ${d.days ?? 0} day(s)`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Dry run failed");
+    } finally {
+      setDryRunRunning(false);
+    }
   };
   const runSchedule = async () => {
     setScheduleRunning(true);
