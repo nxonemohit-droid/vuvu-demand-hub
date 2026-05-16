@@ -941,9 +941,52 @@ const Recruiters = () => {
   const [scheduleRunning, setScheduleRunning] = useState(false);
   const [scheduleBlocks, setScheduleBlocks] = useState<number[] | null>(null);
   const [scheduleDailyCap, setScheduleDailyCap] = useState(50);
+  const [dryRunRunning, setDryRunRunning] = useState(false);
+  type DryRunResult = {
+    wouldSchedule: number;
+    days: number;
+    dailyCap: number;
+    templateName: string | null;
+    orderingValid: boolean;
+    firstViolationIndex: number | null;
+    sendAtMonotonic: boolean;
+    blocks: { block1: number; block2: number; block3: number };
+    previewSample: Array<{ position: number; block: number; agency_name: string | null; to_email: string; send_at: string }>;
+    lastSample: Array<{ position: number; block: number; agency_name: string | null; to_email: string; send_at: string }>;
+    windowStartIso: string | null;
+    windowEndIso: string | null;
+  };
+  const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
   const openScheduleDialog = (blocks: number[] | null) => {
     setScheduleBlocks(blocks);
+    setDryRunResult(null);
     setScheduleOpen(true);
+  };
+  const runDryRun = async () => {
+    setDryRunRunning(true);
+    setDryRunResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("recruiter-schedule-outreach", {
+        body: {
+          dailyCap: scheduleDailyCap,
+          dryRun: true,
+          ...(scheduleBlocks ? { blocks: scheduleBlocks } : {}),
+        },
+      });
+      if (error) throw error;
+      const d = data as { ok?: boolean; error?: string } & Partial<DryRunResult>;
+      if (!d?.ok) throw new Error(d?.error ?? "Dry run failed");
+      setDryRunResult(d as DryRunResult);
+      if (!d.orderingValid) {
+        toast.error(`Block ordering violation at position ${(d.firstViolationIndex ?? 0) + 1}`);
+      } else {
+        toast.success(`Dry run OK — ${d.wouldSchedule ?? 0} emails across ${d.days ?? 0} day(s)`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Dry run failed");
+    } finally {
+      setDryRunRunning(false);
+    }
   };
   const runSchedule = async () => {
     setScheduleRunning(true);
@@ -1196,10 +1239,45 @@ const Recruiters = () => {
             <div className="text-xs text-muted-foreground">
               Send window: 08:00–19:00 Europe/Belgrade. Emails are spaced evenly inside the window. The global 200/day cap stays in place — staggering only applies to this batch.
             </div>
+            {dryRunResult && (
+              <div className={`rounded-md border p-3 text-xs space-y-2 ${dryRunResult.orderingValid && dryRunResult.sendAtMonotonic ? "border-emerald-500/40 bg-emerald-500/5" : "border-destructive/50 bg-destructive/5"}`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm">Dry run preview · nothing was written</span>
+                  <span className="text-muted-foreground">{dryRunResult.wouldSchedule} emails · {dryRunResult.days} day(s)</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded border border-emerald-500/40 bg-emerald-500/5 p-1.5"><div className="text-[10px] uppercase text-muted-foreground">Block 1</div><div className="font-semibold">{dryRunResult.blocks.block1}</div></div>
+                  <div className="rounded border border-amber-500/40 bg-amber-500/5 p-1.5"><div className="text-[10px] uppercase text-muted-foreground">Block 2</div><div className="font-semibold">{dryRunResult.blocks.block2}</div></div>
+                  <div className="rounded border border-muted bg-muted/30 p-1.5"><div className="text-[10px] uppercase text-muted-foreground">Block 3</div><div className="font-semibold">{dryRunResult.blocks.block3}</div></div>
+                </div>
+                <div className="space-y-0.5">
+                  <div>{dryRunResult.orderingValid ? "✓ Block 1 → 2 → 3 ordering valid" : `✗ Ordering violation at position ${(dryRunResult.firstViolationIndex ?? 0) + 1}`}</div>
+                  <div>{dryRunResult.sendAtMonotonic ? "✓ send_at is monotonically increasing" : "✗ send_at is not monotonic"}</div>
+                  {dryRunResult.windowStartIso && (
+                    <div className="text-muted-foreground">Window: {new Date(dryRunResult.windowStartIso).toLocaleString()} → {new Date(dryRunResult.windowEndIso ?? dryRunResult.windowStartIso).toLocaleString()}</div>
+                  )}
+                </div>
+                {dryRunResult.previewSample.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-muted-foreground">First {dryRunResult.previewSample.length}:</div>
+                    {dryRunResult.previewSample.map((p) => (
+                      <div key={`f-${p.position}`} className="flex gap-2 font-mono text-[11px]"><span className="w-8 text-muted-foreground">#{p.position}</span><span className="w-6">B{p.block}</span><span className="flex-1 truncate">{p.agency_name ?? "—"} · {p.to_email}</span><span className="text-muted-foreground">{new Date(p.send_at).toLocaleString()}</span></div>
+                    ))}
+                    {dryRunResult.lastSample.length > 0 && <div className="text-muted-foreground pt-1">Last {dryRunResult.lastSample.length}:</div>}
+                    {dryRunResult.lastSample.map((p) => (
+                      <div key={`l-${p.position}`} className="flex gap-2 font-mono text-[11px]"><span className="w-8 text-muted-foreground">#{p.position}</span><span className="w-6">B{p.block}</span><span className="flex-1 truncate">{p.agency_name ?? "—"} · {p.to_email}</span><span className="text-muted-foreground">{new Date(p.send_at).toLocaleString()}</span></div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setScheduleOpen(false)} disabled={scheduleRunning}>Cancel</Button>
-            <Button onClick={runSchedule} disabled={scheduleRunning}>
+            <Button variant="outline" onClick={runDryRun} disabled={scheduleRunning || dryRunRunning}>
+              {dryRunRunning ? "Validating…" : "Dry run"}
+            </Button>
+            <Button onClick={runSchedule} disabled={scheduleRunning || dryRunRunning}>
               {scheduleRunning ? "Scheduling…" : "Schedule now"}
             </Button>
           </DialogFooter>
