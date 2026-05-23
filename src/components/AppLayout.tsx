@@ -70,6 +70,7 @@ const navItems = [
   { to: "/campaign", label: "Campaign", icon: BarChart3 },
   { to: "/candidates", label: "Candidates", icon: Users },
   { to: "/runs", label: "Discovery Runs", icon: PlayCircle },
+  { to: "/settings/discovery", label: "Discovery Settings", icon: Settings, adminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings, adminOnly: true },
 ];
 
