@@ -13,6 +13,7 @@ import {
   Send,
   Mail,
   BarChart3,
+  Globe2,
 } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ const VArrowLogo = ({ className }: { className?: string }) => {
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/demand", label: "Demand Intelligence", icon: Radar },
+  { to: "/local-hiring", label: "Local Hiring", icon: Globe2 },
   { to: "/leads", label: "Leads", icon: Briefcase },
   { to: "/recruiters", label: "Recruiters", icon: Building2 },
   { to: "/mail", label: "Mail / Outreach", icon: Mail },
