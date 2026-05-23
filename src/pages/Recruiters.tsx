@@ -1476,10 +1476,21 @@ const Recruiters = () => {
                       <div className="text-xs text-muted-foreground">→ {r.operating_eu_country ?? "—"}</div>
                     </TableCell>
                     <TableCell className="text-xs">
-                      {r.contact_email && <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{r.contact_email}</div>}
+                      {r.contact_email && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          <span>{r.contact_email}</span>
+                          <EmailSourceBadge source={r.email_source} enriched={r.email_enriched} />
+                        </div>
+                      )}
+                      {!r.contact_email && (
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Mail className="h-3 w-3" /> <span>no email</span>
+                          <EmailSourceBadge source="missing" enriched={false} />
+                        </div>
+                      )}
                       {r.contact_phone && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{r.contact_phone}</div>}
                       {r.contact_linkedin && <div className="flex items-center gap-1"><Linkedin className="h-3 w-3" />profile</div>}
-                      {!r.contact_email && !r.contact_phone && !r.contact_linkedin && <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
