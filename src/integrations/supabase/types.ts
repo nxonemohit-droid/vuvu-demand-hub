@@ -41,6 +41,78 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_emails: {
+        Row: {
+          body_html: string | null
+          body_text: string | null
+          campaign_id: string
+          click_count: number
+          created_at: string
+          email_to: string
+          error: string | null
+          id: string
+          open_count: number
+          recruiter_id: string | null
+          resend_message_id: string | null
+          scheduled_for: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          body_html?: string | null
+          body_text?: string | null
+          campaign_id: string
+          click_count?: number
+          created_at?: string
+          email_to: string
+          error?: string | null
+          id?: string
+          open_count?: number
+          recruiter_id?: string | null
+          resend_message_id?: string | null
+          scheduled_for?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          body_html?: string | null
+          body_text?: string | null
+          campaign_id?: string
+          click_count?: number
+          created_at?: string
+          email_to?: string
+          error?: string | null
+          id?: string
+          open_count?: number
+          recruiter_id?: string | null
+          resend_message_id?: string | null
+          scheduled_for?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_emails_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_emails_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       candidates: {
         Row: {
           available_from: string | null
@@ -474,6 +546,66 @@ export type Database = {
           last_seen_at?: string
           token?: string
           zero_result_count?: number
+        }
+        Relationships: []
+      }
+      email_campaigns: {
+        Row: {
+          body_template: string | null
+          created_at: string
+          created_by: string | null
+          daily_limit: number
+          failed_count: number
+          id: string
+          name: string
+          resend_batch_id: string | null
+          send_window_end_hour: number
+          send_window_start_hour: number
+          sent_count: number
+          start_date: string | null
+          status: string
+          subject_template: string | null
+          timezone: string
+          total_recipients: number
+          updated_at: string
+        }
+        Insert: {
+          body_template?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_limit?: number
+          failed_count?: number
+          id?: string
+          name: string
+          resend_batch_id?: string | null
+          send_window_end_hour?: number
+          send_window_start_hour?: number
+          sent_count?: number
+          start_date?: string | null
+          status?: string
+          subject_template?: string | null
+          timezone?: string
+          total_recipients?: number
+          updated_at?: string
+        }
+        Update: {
+          body_template?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_limit?: number
+          failed_count?: number
+          id?: string
+          name?: string
+          resend_batch_id?: string | null
+          send_window_end_hour?: number
+          send_window_start_hour?: number
+          sent_count?: number
+          start_date?: string | null
+          status?: string
+          subject_template?: string | null
+          timezone?: string
+          total_recipients?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1020,9 +1152,11 @@ export type Database = {
           discovery_tier: number | null
           email_delivery_status: string | null
           email_delivery_updated_at: string | null
+          email_enriched: boolean
           email_error: string | null
           email_last_event: string | null
           email_sent_at: string | null
+          email_source: string
           email_status: string
           excluded_reason: string | null
           hq_city: string | null
@@ -1043,6 +1177,7 @@ export type Database = {
           status: string
           trades: string[]
           updated_at: string
+          website: string | null
           whatsapp_followup_at: string | null
           whatsapp_status: string | null
           worker_collar: string | null
@@ -1061,9 +1196,11 @@ export type Database = {
           discovery_tier?: number | null
           email_delivery_status?: string | null
           email_delivery_updated_at?: string | null
+          email_enriched?: boolean
           email_error?: string | null
           email_last_event?: string | null
           email_sent_at?: string | null
+          email_source?: string
           email_status?: string
           excluded_reason?: string | null
           hq_city?: string | null
@@ -1084,6 +1221,7 @@ export type Database = {
           status?: string
           trades?: string[]
           updated_at?: string
+          website?: string | null
           whatsapp_followup_at?: string | null
           whatsapp_status?: string | null
           worker_collar?: string | null
@@ -1102,9 +1240,11 @@ export type Database = {
           discovery_tier?: number | null
           email_delivery_status?: string | null
           email_delivery_updated_at?: string | null
+          email_enriched?: boolean
           email_error?: string | null
           email_last_event?: string | null
           email_sent_at?: string | null
+          email_source?: string
           email_status?: string
           excluded_reason?: string | null
           hq_city?: string | null
@@ -1125,6 +1265,7 @@ export type Database = {
           status?: string
           trades?: string[]
           updated_at?: string
+          website?: string | null
           whatsapp_followup_at?: string | null
           whatsapp_status?: string | null
           worker_collar?: string | null
