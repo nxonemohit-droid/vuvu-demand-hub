@@ -162,10 +162,9 @@ Deno.serve(async (req) => {
     const { data: boards, error: bErr } = await q.order("priority");
     if (bErr) return json({ error: bErr.message }, 500);
 
-    const summary: Array<Record<string, unknown>> = [];
     const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0);
 
-    for (const board of boards ?? []) {
+    const processBoard = async (board: any) => {
       let leadsFound = 0;
       let leadsReposted = 0;
       let leadsRejected = 0;
@@ -180,8 +179,7 @@ Deno.serve(async (req) => {
       const cap = board.daily_cap ?? 75;
       const remaining = Math.max(0, cap - (todayCount ?? 0));
       if (remaining === 0) {
-        summary.push({ board: board.board_domain, leads: 0, skipped: "daily_cap" });
-        continue;
+        return { board: board.board_domain, leads: 0, skipped: "daily_cap" };
       }
 
       const queries: string[] = (board.search_queries?.length ? board.search_queries : ["radnik", "worker", "job"]) as string[];
