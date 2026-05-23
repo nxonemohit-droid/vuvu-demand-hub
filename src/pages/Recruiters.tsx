@@ -2106,3 +2106,14 @@ const Recruiters = () => {
 };
 
 export default Recruiters;
+
+function EmailSourceBadge({ source, enriched }: { source?: string | null; enriched?: boolean | null }) {
+  const src = (source ?? "").toLowerCase();
+  if (src === "verified") {
+    return <Badge className="text-[9px] px-1 py-0 bg-emerald-600 hover:bg-emerald-600 text-white">verified</Badge>;
+  }
+  if (src === "guessed" || enriched) {
+    return <Badge className="text-[9px] px-1 py-0 bg-amber-500 hover:bg-amber-500 text-white">guessed</Badge>;
+  }
+  return <Badge className="text-[9px] px-1 py-0 bg-destructive hover:bg-destructive text-white">missing</Badge>;
+}
