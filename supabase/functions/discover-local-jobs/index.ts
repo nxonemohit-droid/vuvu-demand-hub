@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
             const { data: rs, error: rsErr } = await admin
               .from("raw_signals")
               .insert({
-                source: "firecrawl_search" as never,
+                source: "classifieds" as never,
                 source_url: url,
                 source_id: board.id,
                 raw_text: md?.slice?.(0, 8000) ?? null,
@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
 
             // create demand_lead immediately
             const { error: dlErr } = await admin.from("demand_leads").insert({
-              source: "firecrawl_search" as never,
+              source: "classifieds" as never,
               source_url: url,
               raw_signal_id: rs?.id,
               employer_name: payload.employer_name,
