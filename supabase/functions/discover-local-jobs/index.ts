@@ -309,10 +309,22 @@ Deno.serve(async (req) => {
         total_leads_found: (board.total_leads_found ?? 0) + leadsFound,
       }).eq("id", board.id);
 
-      summary.push({ board: board.board_domain, leads: leadsFound, reposts: leadsReposted, rejected: leadsRejected, errors: errors.length });
-    }
+      return { board: board.board_domain, leads: leadsFound, reposts: leadsReposted, rejected: leadsRejected, errors: errors.length };
+    };
 
-    return json({ ok: true, boards_scanned: boards?.length ?? 0, summary });
+    // Run boards in parallel chunks of 5 to maximize throughput within the timeout
+    const summary: Array<Record<string, unknown>> = [];
+    const allBoards = boards ?? [];
+    const CHUNK = 5;
+    for (let i = 0; i < allBoards.length; i += CHUNK) {
+      const chunk = allBoards.slice(i, i + CHUNK);
+      const results = await Promise.all(chunk.map((b) => processBoard(b).catch((e) => ({
+        board: b.board_domain, error: e instanceof Error ? e.message : String(e),
+      }))));
+      summary.push(...results);
+    }
+    const totalLeads = summary.reduce((a, s) => a + (Number(s.leads) || 0), 0);
+    return json({ ok: true, boards_scanned: allBoards.length, total_leads: totalLeads, summary });
   } catch (e) {
     console.error("discover-local-jobs error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
