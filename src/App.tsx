@@ -20,6 +20,7 @@ import ArchivedLeads from "./pages/ArchivedLeads.tsx";
 import Recruiters from "./pages/Recruiters.tsx";
 import Campaign from "./pages/Campaign.tsx";
 import Mail from "./pages/Mail.tsx";
+import LocalHiring from "./pages/LocalHiring.tsx";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="/runs" element={<DiscoveryRuns />} />
             <Route path="/demand" element={<DemandIntelligence />} />
             <Route path="/demand/:id" element={<DemandLeadDetail />} />
+            <Route path="/local-hiring" element={<LocalHiring />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

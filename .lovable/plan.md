@@ -1,105 +1,129 @@
-## What this delivers
 
-1. Remove every recruiter lead with no email AND no phone AND no LinkedIn.
-2. Group the rest into 3 priority blocks based on contact channels available.
-3. Auto-schedule outreach for all 3 blocks at 50 emails/day in priority order.
-4. Tighten the discovery pipeline so only blue-collar recruiters/companies are surfaced.
+# Local Job-Board Lead Discovery Engine
 
----
+Build a country-by-country scraper that pulls live job postings from the **native** job boards of each Balkan/EU market, extracts the hiring employer, enriches contact details, and only surfaces a lead in the dashboard when **both an email AND a phone number** are available.
 
-## 1. Hard-delete no-contact leads
+## 1. Curated local board list (per country)
 
-A new admin-only edge function `recruiter-cleanup` will:
-- Delete every `recruiter_leads` row where `contact_email`, `contact_phone`, AND `contact_linkedin` are all empty/null.
-- Return the deleted count.
-- Triggered by a "Clean up no-contact leads" button in the Recruiters page header (admin only), with a confirmation dialog.
+We already have `COUNTRY_META` in `supabase/functions/_shared/constants.ts`. We'll expand and lock the per-country "primary local boards" — these are the ones that actually publish blue-collar/operational hiring with employer contact info.
 
-## 2. Three priority blocks
+| Country | Primary local boards |
+|---|---|
+| Serbia | poslovi.infostud.com, helloworld.rs, poslovi.rs |
+| Croatia | mojposao.net, posao.hr, moj-posao.net |
+| Slovenia | mojedelo.com, optius.com, zaposlitev.net |
+| Bosnia | posao.ba, kolektiv.ba, boljiposao.com |
+| Montenegro | posao.me, poslovi.me |
+| N. Macedonia | vrabotuvanje.com.mk, mojakariera.com.mk |
+| Albania | duapune.com, njoftime.com (Punë) |
+| Bulgaria | jobs.bg, zaplata.bg, rabota.bg |
+| Romania | ejobs.ro, bestjobs.eu, hipo.ro |
+| Hungary | profession.hu, jobline.hu |
+| Poland | pracuj.pl, olx.pl/praca, gowork.pl |
+| Czechia | jobs.cz, prace.cz |
+| Slovakia | profesia.sk, kariera.sk |
+| Germany | stepstone.de, arbeitsagentur.de, meinestadt.de/jobs |
+| Austria | karriere.at, stepstone.at |
+| Netherlands | nationalevacaturebank.nl, werk.nl |
+| Greece | kariera.gr, skywalker.gr, jobfind.gr |
+| Italy | infojobs.it, subito.it/offerte-lavoro |
+| Spain | infojobs.net, tablondeanuncios.com |
+| Portugal | net-empregos.com, sapo.pt/emprego |
+| Cyprus | ergodotisi.com, carierista.com |
 
-Definitions (per your answer):
+User can edit/add boards via Settings → Sources later.
 
-| Block | Criteria | Priority |
-|-------|----------|----------|
-| Block 1 | Email + Phone + LinkedIn | Highest |
-| Block 2 | Email + exactly one of (Phone OR LinkedIn) | Medium |
-| Block 3 | Email only | Lowest |
+## 2. Architecture
 
-A new memoized "Outreach blocks" panel on the Recruiters page shows each block's count, with-email validity, and a one-click "Schedule outreach for this block" button. Filters to view leads in each block are also added.
-
-## 3. Auto-schedule at 50/day (this batch only)
-
-- Global `email_send_settings.daily_cap` stays at 200 (untouched).
-- A new edge function `recruiter-schedule-outreach` will:
-  - Take an optional template selection (defaults to most recent template).
-  - Build the lead list in priority order: Block 1 → Block 2 → Block 3.
-  - Skip leads already in `scheduled_emails` (pending/sent), already suppressed, or with invalid emails.
-  - Render subject + body per lead using template variables (agency_name, contact_name, hq_country, etc.).
-  - Insert into `scheduled_emails` with `send_at` staggered: 50 rows scheduled for today's send window start, next 50 for tomorrow, etc., respecting the configured send window timezone (`Europe/Belgrade` 08:00–19:00).
-  - Distribute the 50/day evenly across the send window.
-- The existing `process-scheduled-emails` cron (already running) will pick them up — no change needed there.
-- UI surface:
-  - "Schedule 50/day outreach" button on the new Outreach blocks panel.
-  - Confirmation dialog showing: total leads to schedule, days needed (ceil(total/50)), template preview.
-  - Toast on completion: "Scheduled X emails across Y days".
-
-## 4. Blue-collar-only discovery filter
-
-Two layers (per your answer — both query exclusions and LLM gate):
-
-**A. Query-level exclusions** in `recruiter-discover/index.ts`:
-- Append a shared block of negative terms to every Tier 0–6 query:
-  `-software -developer -engineer -"IT recruitment" -finance -accounting -marketing -"sales executive" -doctor -nurse -lawyer -teacher -designer -"white collar" -"office staff" -"executive search" -"head hunter" -SaaS -fintech -consulting`
-- (Trades list stays as-is — already blue-collar.)
-
-**B. LLM extractor gate** in the JSON schema sent to Firecrawl scrape:
-- Add `worker_collar` field to `RECRUITER_SCHEMA` with enum `["blue", "white", "mixed", "unknown"]` and a description anchoring to manual labour, trades, factory, hospitality, drivers, construction, etc.
-- In `processOne`, after `is_recruiter` check, also reject when `worker_collar === "white"`. Allow `blue`, `mixed`, `unknown` (keep loose to avoid false negatives).
-- Persist `worker_collar` into `recruiter_leads` as a new column so the UI can filter/badge it.
-
-**C. Schema change**:
-- New column `recruiter_leads.worker_collar text` (nullable), indexed.
-- Recruiters page: new filter dropdown (`All / Blue-collar / Mixed / Unknown`) defaulting to "Blue-collar + Mixed + Unknown" (i.e., hide white).
-
----
-
-## Technical details
-
-**Database migration**
-```sql
-ALTER TABLE public.recruiter_leads
-  ADD COLUMN IF NOT EXISTS worker_collar text;
-CREATE INDEX IF NOT EXISTS recruiter_leads_worker_collar_idx
-  ON public.recruiter_leads (worker_collar);
+```text
+                 ┌─────────────────────────┐
+   cron (daily) →│  discover-local-jobs    │  (orchestrator edge fn)
+                 │  per country × board    │
+                 └──────────┬──────────────┘
+                            │  fans out per board
+            ┌───────────────┴───────────────┐
+            ▼                               ▼
+   adapter-firecrawl                adapter-apify
+   (search + scrape any              (board-specific actor
+    public board with markdown)        when available)
+            │                               │
+            └──────────────┬────────────────┘
+                           ▼
+                 raw_signals  (existing table)
+                           ▼
+                 structure-leads (LLM extraction)
+                           ▼
+                 demand_leads (existing table)
+                           ▼
+            enrich-contacts (NEW pipeline)
+                ├─ Hunter.io  (email by domain + name)
+                ├─ Apollo / Snov fallback
+                ├─ enrich-email (already exists, pattern guesser)
+                └─ phone scraper (firecrawl scrape company site
+                                  + regex for +XX phone numbers)
+                           ▼
+            qualified_leads VIEW  (email IS NOT NULL
+                                  AND phone IS NOT NULL)
+                           ▼
+              Dashboard "Local Hiring" page
 ```
 
-**New edge functions** (CORS-enabled, service-role, admin-only via JWT check):
-- `recruiter-cleanup` — POST, deletes no-contact leads, returns `{deleted}`.
-- `recruiter-schedule-outreach` — POST `{templateId?, dailyCap?:50}`, returns `{scheduled, days}`.
+## 3. Data model changes (small)
 
-**Edge function edits**
-- `recruiter-discover/index.ts`:
-  - Add `EXCLUDE_WHITE_COLLAR` constant; append to every query string in `buildQueries`.
-  - Extend `RECRUITER_SCHEMA` with `worker_collar` enum.
-  - Reject `worker_collar === "white"` in `processOne`.
-  - Persist `worker_collar: extracted.worker_collar ?? null` on insert (preserve on update).
+- `demand_leads`: add `discovered_board text`, `posted_at_local timestamptz`, `local_lang text`, `phone_enriched bool`, `email_enriched bool`, `contact_qualified bool` (generated from email + phone presence).
+- New table `source_boards`(country, board_domain, type ['firecrawl'|'apify_actor'|'rss'], actor_id, enabled, last_run_at, success_rate) — replaces the hardcoded `COUNTRY_META.boards` so it's editable from UI.
+- New view `qualified_local_leads` = `demand_leads WHERE contact_qualified = true AND discovered_board IS NOT NULL`.
 
-**Frontend (`src/pages/Recruiters.tsx`)**
-- New `outreachBlocks` useMemo computing the 3 buckets.
-- New "Outreach blocks" Card panel with counts + per-block Schedule button.
-- "Clean up no-contact leads" admin button (with confirm dialog).
-- "Schedule 50/day outreach" master button → calls `recruiter-schedule-outreach` with the full prioritized list.
-- New worker-collar filter dropdown.
-- Refresh `rows` after each action.
+## 4. Scraping strategy per board
 
-**No changes needed to**
-- `process-scheduled-emails` (already enforces daily_cap, send window, per-domain cap).
-- `email_send_settings` (global cap stays at 200; scheduling itself caps at 50/day).
-- Any other discovery providers.
+For each board we'll pick the cheapest viable path:
 
----
+1. **Firecrawl `/search`** with `site:<board>` + role keyword (welder, nurse, driver…) and `tbs=qdr:w` for last-week postings. Cheapest, works on 90% of boards.
+2. **Firecrawl `/scrape`** on each result URL with our existing `FIRECRAWL_JOB_SCHEMA` to pull title, company, city, contact_email, contact_phone, posted_at.
+3. **Apify actor** when a board is JS-heavy or geo-walled (pracuj.pl, jobs.bg, stepstone.de) — use existing `adapter-apify` pattern; we register `actor_id` per board in `source_boards`.
+4. Respect robots.txt; throttle 1 req/2s per domain.
 
-## Out of scope (flag for later if you want)
+## 5. Contact enrichment pipeline (NEW edge fn `enrich-contacts`)
 
-- Retroactively re-classifying existing leads as blue/white. New runs only — existing rows get `worker_collar = null` and remain visible under "Unknown".
-- Drip/follow-up sequences. Each lead gets exactly one outreach email in this batch.
-- Per-domain cap tuning (stays at 25/day per domain).
+Run after `structure-leads` populates `demand_leads`. For each lead missing email or phone:
+
+1. Resolve company domain (reuse logic from `enrich-email`).
+2. **Email**: try Hunter.io domain search → fallback Apollo → fallback pattern guess.
+3. **Phone**: Firecrawl-scrape the company homepage + `/contact`, regex `\+?\d[\d\s().-]{7,}` filtered by country dial code; pick the most frequent.
+4. Write back `contact_email`, `contact_phone`, set `email_enriched` / `phone_enriched`.
+5. `contact_qualified` flips true only when **both** are present and email passes basic MX check (DNS lookup from edge fn).
+
+**New secrets needed (we'll request when build starts):**
+- `HUNTER_API_KEY` (primary email finder)
+- `APOLLO_API_KEY` (optional fallback)
+
+If user prefers, we can skip Apollo and only use Hunter + pattern guess + site-scrape.
+
+## 6. Dashboard UI — new page `Local Hiring`
+
+Route: `/local-hiring`, added to sidebar under Demand Intelligence.
+
+- **Filters**: country (multi), board (multi), role keyword, posted-within (24h / 7d / 30d), only-qualified toggle (default ON).
+- **Table columns**: Company · Country · City · Role · Posted · Email · Phone · Board · Score · Actions (View, Push to Outreach).
+- **Hard filter**: by default only rows where `contact_qualified = true` are shown. A "Show unqualified" switch reveals the rest in a muted style with a "Try Enrich" button per row.
+- **Bulk actions**: Enrich selected, Push to Campaign, Export CSV.
+- **Per-row drawer**: full job post markdown, all extracted fields, enrichment audit trail.
+
+## 7. Scheduling
+
+- pg_cron job `discover-local-jobs-daily` at 06:00 UTC: iterates `source_boards WHERE enabled = true`, queues per-board discovery.
+- pg_cron job `enrich-contacts-hourly`: scans `demand_leads WHERE contact_qualified = false` (limit 200/run).
+- Manual triggers from the Local Hiring page: "Run discovery now (country X)" and "Re-enrich selected".
+
+## 8. Rollout phases
+
+1. **Phase 1 (this build)**: schema + `source_boards` seeded with table above, `discover-local-jobs` edge fn using Firecrawl search/scrape, `enrich-contacts` with Hunter + pattern-guess + site-phone-scrape, qualified view, new dashboard page with strict email+phone gating, daily cron.
+2. **Phase 2 (later)**: per-board Apify actors for the JS-heavy boards (pracuj.pl, jobs.bg, stepstone), Apollo fallback, LinkedIn company-page enrichment via existing LinkedIn-Official actor for decision-maker name.
+3. **Phase 3 (later)**: auto-push qualified leads into the existing Voynova outreach campaign engine.
+
+## 9. Open questions before build
+
+- Confirm Hunter.io as the email finder (cheapest, 50 free/mo, then $34/mo for 500). OK to request the API key?
+- Should "qualified" require a **valid** phone (libphonenumber parse + country match), or just any digit string ≥ 8 chars?
+- Daily volume cap per country to control Firecrawl spend? (suggest 50 postings/country/day to start.)
+- Include white-collar postings or filter strictly to blue-collar trades (welder, driver, nurse, caregiver, construction, hospitality, factory, warehouse)?
