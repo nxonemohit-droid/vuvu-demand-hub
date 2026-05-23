@@ -1478,6 +1478,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_source_spend: {
+        Args: { _amount: number; _source_id: string }
+        Returns: number
+      }
       is_team_member: { Args: { _user_id: string }; Returns: boolean }
       restore_archived_lead: { Args: { _archived_id: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
