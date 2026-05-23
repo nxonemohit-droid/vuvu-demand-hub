@@ -135,37 +135,28 @@ function buildOutreachDraft(r: RecruiterRow) {
   const hqCountry = r.hq_country || "your region";
   const firstName = r.contact_name ? r.contact_name.split(" ")[0] : "there";
   const subject = `Voynova \u00d7 {{agency_name}} \u2014 Strategic EU Blue-Collar Workforce Partnership`;
-  const body = `Hi {{first_name}},
-
-I hope this message finds you well. My name is Mohit Gururani, Founder & Managing Director of Voynova Global Solutions \u2014 a compliance-first, AI-powered international workforce mobility company headquartered in Greater Noida, India.
-
-We specialise in end-to-end blue-collar and semi-skilled worker placements from India, Nepal, and Bangladesh into verified EU employers \u2014 covering Serbia, Romania, Croatia, Hungary, and expanding markets across the Balkans. We are currently operating with live employer orders in {{eu_country}}, and we are actively seeking credible, well-networked recruitment agencies in {{hq_country}} to partner with.
-
-When I came across {{agency_name}} and your expertise in the {{trade}} sector, I felt a genuine synergy. Here is what a partnership with Voynova would look like:
-
-\u2705 Pre-screened, trade-certified candidates ready for deployment
-\u2705 Full visa sponsorship coordination and work permit handling
-\u2705 End-to-end onboarding, documentation, and post-arrival support
-\u2705 Transparent, ethical recruitment \u2014 zero worker fees model
-\u2705 AI-powered candidate matching via our proprietary platform
-\u2705 Revenue-sharing model for referring agencies
-
-We are not a job board. We are a full-service global workforce mobility partner \u2014 from sourcing to visa to day-one arrival, we manage everything so your clients get workforce, not paperwork.
-
-To learn more about us before our call, here are our key resources:
-\ud83c\udf10 Website: https://www.voynovaglobal.com
-\ud83d\udcbc Company Profile (LinkedIn): https://in.linkedin.com/company/voynova-global-solutions-private-limited
-
-I would love to schedule a 20-minute discovery call this week to explore how we can collaborate on your active {{trade}} orders in {{eu_country}}. Even if you do not have an immediate need, I am confident that one conversation will open a long-term, recurring revenue stream for your agency.
-
-Looking forward to connecting.
-
-Warm regards,
-Mohit Gururani
-Founder & Managing Director
-Voynova Global Solutions Pvt. Ltd.
-\ud83d\udce7 mohit@voynovaglobal.com
-\ud83c\udf10 www.voynovaglobal.com
+  const body = `Hi {{first_name}},<br><br>
+I hope this message finds you well. My name is Mohit Gururani, Founder & Managing Director of Voynova Global Solutions \u2014 a compliance-first, AI-powered international workforce mobility company headquartered in Greater Noida, India.<br><br>
+We specialise in end-to-end blue-collar and semi-skilled worker placements from India, Nepal, and Bangladesh into verified EU employers \u2014 covering Serbia, Romania, Croatia, Hungary, and expanding markets across the Balkans. We are currently operating with live employer orders in {{eu_country}}, and we are actively seeking credible, well-networked recruitment agencies in {{hq_country}} to partner with.<br><br>
+When I came across {{agency_name}} and your expertise in the {{trade}} sector, I felt a genuine synergy. Here is what a partnership with Voynova would look like:<br><br>
+\u2705 Pre-screened, trade-certified candidates ready for deployment<br>
+\u2705 Full visa sponsorship coordination and work permit handling<br>
+\u2705 End-to-end onboarding, documentation, and post-arrival support<br>
+\u2705 Transparent, ethical recruitment \u2014 zero worker fees model<br>
+\u2705 AI-powered candidate matching via our proprietary platform<br>
+\u2705 Revenue-sharing model for referring agencies<br><br>
+We are not a job board. We are a full-service global workforce mobility partner \u2014 from sourcing to visa to day-one arrival, we manage everything so your clients get workforce, not paperwork.<br><br>
+To learn more about us before our call, here are our key resources:<br><br>
+\ud83c\udf10 Website: https://www.voynovaglobal.com<br>
+\ud83d\udcbc Company Profile (LinkedIn): https://in.linkedin.com/company/voynova-global-solutions-private-limited<br><br>
+I would love to schedule a 20-minute discovery call this week to explore how we can collaborate on your active {{trade}} orders in {{eu_country}}. Even if you do not have an immediate need, I am confident that one conversation will open a long-term, recurring revenue stream for your agency.<br><br>
+Looking forward to connecting.<br><br>
+Warm regards,<br>
+Mohit Gururani<br>
+Founder & Managing Director<br>
+Voynova Global Solutions Pvt. Ltd.<br>
+\ud83d\udce7 mohit@voynovaglobal.com<br>
+\ud83c\udf10 www.voynovaglobal.com<br>
 \ud83d\udcbc LinkedIn: https://in.linkedin.com/company/voynova-global-solutions-private-limited`;
   return { subject, body };
 }
