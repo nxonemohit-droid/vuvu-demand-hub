@@ -224,6 +224,36 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_discovery_summary: {
+        Row: {
+          breakdown: Json
+          countries_count: number
+          date: string
+          hot_count: number
+          qualified_count: number
+          total_found: number
+          updated_at: string
+        }
+        Insert: {
+          breakdown?: Json
+          countries_count?: number
+          date: string
+          hot_count?: number
+          qualified_count?: number
+          total_found?: number
+          updated_at?: string
+        }
+        Update: {
+          breakdown?: Json
+          countries_count?: number
+          date?: string
+          hot_count?: number
+          qualified_count?: number
+          total_found?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       demand_leads: {
         Row: {
           ai_rationale: string | null
@@ -240,19 +270,26 @@ export type Database = {
           discovered_board_domain: string | null
           duplicate_of: string | null
           email_enriched: boolean
+          email_source: string
           employer_name: string | null
           enrichment_attempts: number
           id: string
+          is_direct_employer: boolean
           last_enriched_at: string | null
+          lead_score: number
           local_lang: string | null
           matched_keywords: string[] | null
           normalized_demand_id: string | null
           notes: string | null
+          outreach_queued: boolean
+          outreach_queued_at: string | null
+          phone_e164: string | null
           phone_enriched: boolean
           posted_at_local: string | null
           priority: Database["public"]["Enums"]["priority_tag"]
           quality_score: number
           raw_signal_id: string | null
+          repost_count: number
           review_status: string
           role: string
           salary_currency: string | null
@@ -260,6 +297,7 @@ export type Database = {
           salary_min: number | null
           score: number | null
           score_breakdown: Json
+          score_components: Json
           sector_tags: string[]
           snoozed_until: string | null
           source: Database["public"]["Enums"]["demand_source"]
@@ -267,8 +305,10 @@ export type Database = {
           sponsorship_signals: string[]
           target_audience_type: string | null
           tier: string | null
+          trade_category: string | null
           updated_at: string
           urgency_score: number
+          vacancy_count: number
           visa_sponsorship: boolean
           worker_origin_focus: string[]
         }
@@ -287,19 +327,26 @@ export type Database = {
           discovered_board_domain?: string | null
           duplicate_of?: string | null
           email_enriched?: boolean
+          email_source?: string
           employer_name?: string | null
           enrichment_attempts?: number
           id?: string
+          is_direct_employer?: boolean
           last_enriched_at?: string | null
+          lead_score?: number
           local_lang?: string | null
           matched_keywords?: string[] | null
           normalized_demand_id?: string | null
           notes?: string | null
+          outreach_queued?: boolean
+          outreach_queued_at?: string | null
+          phone_e164?: string | null
           phone_enriched?: boolean
           posted_at_local?: string | null
           priority?: Database["public"]["Enums"]["priority_tag"]
           quality_score?: number
           raw_signal_id?: string | null
+          repost_count?: number
           review_status?: string
           role: string
           salary_currency?: string | null
@@ -307,6 +354,7 @@ export type Database = {
           salary_min?: number | null
           score?: number | null
           score_breakdown?: Json
+          score_components?: Json
           sector_tags?: string[]
           snoozed_until?: string | null
           source: Database["public"]["Enums"]["demand_source"]
@@ -314,8 +362,10 @@ export type Database = {
           sponsorship_signals?: string[]
           target_audience_type?: string | null
           tier?: string | null
+          trade_category?: string | null
           updated_at?: string
           urgency_score?: number
+          vacancy_count?: number
           visa_sponsorship?: boolean
           worker_origin_focus?: string[]
         }
@@ -334,19 +384,26 @@ export type Database = {
           discovered_board_domain?: string | null
           duplicate_of?: string | null
           email_enriched?: boolean
+          email_source?: string
           employer_name?: string | null
           enrichment_attempts?: number
           id?: string
+          is_direct_employer?: boolean
           last_enriched_at?: string | null
+          lead_score?: number
           local_lang?: string | null
           matched_keywords?: string[] | null
           normalized_demand_id?: string | null
           notes?: string | null
+          outreach_queued?: boolean
+          outreach_queued_at?: string | null
+          phone_e164?: string | null
           phone_enriched?: boolean
           posted_at_local?: string | null
           priority?: Database["public"]["Enums"]["priority_tag"]
           quality_score?: number
           raw_signal_id?: string | null
+          repost_count?: number
           review_status?: string
           role?: string
           salary_currency?: string | null
@@ -354,6 +411,7 @@ export type Database = {
           salary_min?: number | null
           score?: number | null
           score_breakdown?: Json
+          score_components?: Json
           sector_tags?: string[]
           snoozed_until?: string | null
           source?: Database["public"]["Enums"]["demand_source"]
@@ -361,8 +419,10 @@ export type Database = {
           sponsorship_signals?: string[]
           target_audience_type?: string | null
           tier?: string | null
+          trade_category?: string | null
           updated_at?: string
           urgency_score?: number
+          vacancy_count?: number
           visa_sponsorship?: boolean
           worker_origin_focus?: string[]
         }
@@ -551,6 +611,42 @@ export type Database = {
           started_at?: string | null
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      discovery_keywords: {
+        Row: {
+          category: string | null
+          created_at: string
+          enabled: boolean
+          id: string
+          keyword: string
+          kind: string
+          lang: string
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          keyword: string
+          kind: string
+          lang?: string
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          keyword?: string
+          kind?: string
+          lang?: string
+          updated_at?: string
+          weight?: number
         }
         Relationships: []
       }
@@ -1491,6 +1587,7 @@ export type Database = {
           country: string
           country_iso2: string
           created_at: string
+          daily_cap: number
           enabled: boolean
           id: string
           lang: string | null
@@ -1499,6 +1596,7 @@ export type Database = {
           last_success_at: string | null
           notes: string | null
           priority: number
+          search_queries: string[]
           total_leads_found: number
           total_runs: number
           updated_at: string
@@ -1511,6 +1609,7 @@ export type Database = {
           country: string
           country_iso2: string
           created_at?: string
+          daily_cap?: number
           enabled?: boolean
           id?: string
           lang?: string | null
@@ -1519,6 +1618,7 @@ export type Database = {
           last_success_at?: string | null
           notes?: string | null
           priority?: number
+          search_queries?: string[]
           total_leads_found?: number
           total_runs?: number
           updated_at?: string
@@ -1531,6 +1631,7 @@ export type Database = {
           country?: string
           country_iso2?: string
           created_at?: string
+          daily_cap?: number
           enabled?: boolean
           id?: string
           lang?: string | null
@@ -1539,6 +1640,7 @@ export type Database = {
           last_success_at?: string | null
           notes?: string | null
           priority?: number
+          search_queries?: string[]
           total_leads_found?: number
           total_runs?: number
           updated_at?: string
@@ -1879,6 +1981,10 @@ export type Database = {
       compute_demand_lead_quality_score: {
         Args: { _lead: Database["public"]["Tables"]["demand_leads"]["Row"] }
         Returns: number
+      }
+      compute_lead_score: {
+        Args: { _lead: Database["public"]["Tables"]["demand_leads"]["Row"] }
+        Returns: Json
       }
       compute_quality_score: {
         Args: {
