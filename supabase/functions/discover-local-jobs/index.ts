@@ -172,6 +172,8 @@ Deno.serve(async (req) => {
       let leadsReposted = 0;
       let leadsRejected = 0;
       const errors: string[] = [];
+      let expansionUsed = false;
+      let expansionAdded = 0;
 
       // enforce daily cap
       const { count: todayCount } = await admin
@@ -187,9 +189,13 @@ Deno.serve(async (req) => {
 
       const queries: string[] = (board.search_queries?.length ? board.search_queries : ["radnik", "worker", "job"]) as string[];
       let processed = 0;
+      const triedQueries = new Set<string>();
 
-      for (const kw of queries) {
-        if (processed >= remaining) break;
+      const runQueries = async (qs: string[]) => {
+        for (const kw of qs) {
+          if (processed >= remaining) break;
+          if (triedQueries.has(kw)) continue;
+          triedQueries.add(kw);
         try {
           const query = `site:${board.board_domain} ${kw}`;
           const results = await firecrawlSearch(FIRECRAWL_API_KEY, query, perBoardLimit);
@@ -302,6 +308,42 @@ Deno.serve(async (req) => {
         } catch (e) {
           errors.push(e instanceof Error ? e.message : String(e));
         }
+        }
+      };
+
+      await runQueries(queries);
+
+      // Automatic keyword expansion: if board yielded fewer than `expansionThreshold`
+      // leads, ask the LLM for stronger country-specific blue-collar queries and rerun.
+      if (
+        expansionEnabled &&
+        !expansionUsed &&
+        processed < remaining &&
+        (leadsFound + leadsReposted) < expansionThreshold &&
+        LOVABLE_API_KEY
+      ) {
+        expansionUsed = true;
+        try {
+          const expanded = await generateExpansionKeywords({
+            apiKey: LOVABLE_API_KEY,
+            boardDomain: board.board_domain,
+            country: board.country,
+            lang: board.lang,
+            existing: queries,
+            targetCount: 15,
+          });
+          const fresh = expanded.filter((k) => !triedQueries.has(k));
+          if (fresh.length) {
+            expansionAdded = fresh.length;
+            await runQueries(fresh);
+            const merged = Array.from(new Set([...(queries ?? []), ...fresh])).slice(0, 80);
+            await admin.from("source_boards")
+              .update({ search_queries: merged })
+              .eq("id", board.id);
+          }
+        } catch (e) {
+          errors.push("expansion: " + (e instanceof Error ? e.message : String(e)));
+        }
       }
 
       await admin.from("source_boards").update({
@@ -312,7 +354,15 @@ Deno.serve(async (req) => {
         total_leads_found: (board.total_leads_found ?? 0) + leadsFound,
       }).eq("id", board.id);
 
-      return { board: board.board_domain, leads: leadsFound, reposts: leadsReposted, rejected: leadsRejected, errors: errors.length };
+      return {
+        board: board.board_domain,
+        leads: leadsFound,
+        reposts: leadsReposted,
+        rejected: leadsRejected,
+        errors: errors.length,
+        expansion_used: expansionUsed,
+        expansion_added: expansionAdded,
+      };
     };
 
     // Run boards in parallel chunks of 5 to maximize throughput within the timeout
