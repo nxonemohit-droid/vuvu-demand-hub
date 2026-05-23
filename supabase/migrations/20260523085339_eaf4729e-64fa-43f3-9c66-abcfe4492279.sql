@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.increment_source_spend(text, numeric) FROM authenticated;
