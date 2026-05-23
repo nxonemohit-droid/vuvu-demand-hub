@@ -210,14 +210,13 @@ Deno.serve(async (req) => {
     }).eq("id", job.id);
     await logRunEvent(supa, job.id, "signals.persisted", `Inserted ${inserted}`, { items: items.length, cost_usd: costUsd });
 
-    // Increment per-source monthly spend so the dispatcher can pause sources
-    // that have burnt their slice of the budget.
+    // Increment per-source monthly spend atomically (RPC avoids the
+    // read-modify-write race when two runs finish at the same time).
     if (costUsd && costUsd > 0) {
-      const newSpend = Number(source.monthly_spend_usd ?? 0) + costUsd;
-      await supa.from("source_registry").update({
-        monthly_spend_usd: newSpend,
-        updated_at: new Date().toISOString(),
-      }).eq("id", source.id);
+      await supa.rpc("increment_source_spend", {
+        _source_id: source.id,
+        _amount: costUsd,
+      });
     }
 
     return jsonResponse({ ok: true, items: items.length, inserted });

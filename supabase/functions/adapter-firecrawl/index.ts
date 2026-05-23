@@ -30,6 +30,27 @@ const FIRECRAWL_BASE = "https://api.firecrawl.dev/v2";
 const DEEP_CRAWL_LIMIT = 400;
 const DEEP_CRAWL_DEPTH = 4;
 
+// Rough Firecrawl unit costs (USD). Used only to keep
+// source_registry.monthly_spend_usd ticking so dispatcher budgets enforce.
+// /scrape ≈ 1 credit, /map ≈ 1 credit, /crawl pages billed per page on completion.
+const FC_COST_PER_SCRAPE = 0.002;
+const FC_COST_PER_MAP = 0.002;
+const FC_COST_PER_CRAWL_QUEUE = 0.01; // queue cost; per-page tracked via webhook
+
+async function trackFirecrawlSpend(
+  supa: ReturnType<typeof adminClient>,
+  sourceId: string,
+  amountUsd: number,
+) {
+  if (amountUsd <= 0) return;
+  try {
+    await supa.rpc("increment_source_spend", {
+      _source_id: sourceId,
+      _amount: amountUsd,
+    });
+  } catch (_) { /* never fail the job over accounting */ }
+}
+
 type FcResp = { success?: boolean; data?: any; id?: string; error?: string; [k: string]: any };
 
 async function fc(path: string, body: unknown, method: "POST" | "GET" = "POST"): Promise<FcResp> {
@@ -152,6 +173,7 @@ Deno.serve(async (req) => {
       const page = (res as any).data ?? res;
       pageCount = 1;
       if (await persistScrapedPage(supa, sjob, source, page)) inserted++;
+      await trackFirecrawlSpend(supa, source.id, FC_COST_PER_SCRAPE);
     } else if (intent === "map" || source.source_family === "company_site") {
       // Map → pick career URLs → kick deep async crawl(s).
       const rootDomain = extractDomain(targetUrl);
@@ -206,6 +228,7 @@ Deno.serve(async (req) => {
 
       // scrape_job stays "running" — webhook flips it to succeeded on completion.
       await logRunEvent(supa, sjob.id, "firecrawl.crawl.queued", `crawl ${firecrawlJobId}`, { crawlRoot });
+      await trackFirecrawlSpend(supa, source.id, FC_COST_PER_MAP + FC_COST_PER_CRAWL_QUEUE);
       if (company) {
         await supa.from("companies").update({ last_crawled_at: new Date().toISOString() }).eq("id", company.id);
       }
@@ -220,6 +243,7 @@ Deno.serve(async (req) => {
       const page = (res as any).data ?? res;
       pageCount = 1;
       if (await persistScrapedPage(supa, sjob, source, page)) inserted++;
+      await trackFirecrawlSpend(supa, source.id, FC_COST_PER_SCRAPE);
     }
 
     await supa.from("scrape_jobs").update({

@@ -41,7 +41,9 @@ function extractDomains(url?: string | null, employer?: string | null, country?:
   return Array.from(out).slice(0, 4);
 }
 
-async function runActor(actorId: string, input: unknown, timeoutMs = 35_000) {
+// vdrmota~contact-info-scraper crawls multiple URLs and regularly needs >35s
+// to settle. Default 90s and let the platform return what it has so far.
+async function runActor(actorId: string, input: unknown, timeoutMs = 90_000) {
   const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${Math.floor(timeoutMs / 1000)}`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs + 5000);
@@ -108,8 +110,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     const body = await req.json().catch(() => ({}));
-    // Hard cap: with ~35s per actor + a few domain attempts, 4 leads keeps us safely under the 150s edge limit.
-    const limit: number = Math.min(Number(body.limit ?? 4), 4);
+    // Background work has a ~140s budget; one actor call now budgets 90s, so
+    // process leads strictly serially. Limit to 2 per invocation.
+    const limit: number = Math.min(Number(body.limit ?? 2), 2);
     const actorId: string = body.actor_id ?? DEFAULT_HUNTER_ACTOR;
     const leadIds: string[] | undefined = body.lead_ids;
 
@@ -129,7 +132,7 @@ Deno.serve(async (req) => {
 
     // Run the slow enrichment loop in the background so the HTTP request returns immediately.
     const work = async () => {
-      const deadline = Date.now() + 140_000; // leave a small safety margin under 150s
+      const deadline = Date.now() + 280_000; // generous; runs in background
       for (const lead of leads ?? []) {
         if (Date.now() > deadline) break;
       const domains = extractDomains(lead.source_url, lead.employer_name, (lead as any).country);
@@ -150,8 +153,8 @@ Deno.serve(async (req) => {
               { url: `https://${domain}/contact` },
               { url: `https://${domain}/careers` },
             ],
-            maxDepth: 2,
-            maxRequestsPerStartUrl: 8,
+            maxDepth: 1,
+            maxRequestsPerStartUrl: 4,
           });
           const arr = Array.isArray(items) ? items : [];
           totalItems += arr.length;
