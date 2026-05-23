@@ -232,17 +232,24 @@ export type Database = {
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
+          contact_qualified: boolean | null
           country: string
           created_at: string
           demand_size: number | null
+          discovered_board: string | null
+          discovered_board_domain: string | null
           duplicate_of: string | null
+          email_enriched: boolean
           employer_name: string | null
           enrichment_attempts: number
           id: string
           last_enriched_at: string | null
+          local_lang: string | null
           matched_keywords: string[] | null
           normalized_demand_id: string | null
           notes: string | null
+          phone_enriched: boolean
+          posted_at_local: string | null
           priority: Database["public"]["Enums"]["priority_tag"]
           quality_score: number
           raw_signal_id: string | null
@@ -272,17 +279,24 @@ export type Database = {
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          contact_qualified?: boolean | null
           country: string
           created_at?: string
           demand_size?: number | null
+          discovered_board?: string | null
+          discovered_board_domain?: string | null
           duplicate_of?: string | null
+          email_enriched?: boolean
           employer_name?: string | null
           enrichment_attempts?: number
           id?: string
           last_enriched_at?: string | null
+          local_lang?: string | null
           matched_keywords?: string[] | null
           normalized_demand_id?: string | null
           notes?: string | null
+          phone_enriched?: boolean
+          posted_at_local?: string | null
           priority?: Database["public"]["Enums"]["priority_tag"]
           quality_score?: number
           raw_signal_id?: string | null
@@ -312,17 +326,24 @@ export type Database = {
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
+          contact_qualified?: boolean | null
           country?: string
           created_at?: string
           demand_size?: number | null
+          discovered_board?: string | null
+          discovered_board_domain?: string | null
           duplicate_of?: string | null
+          email_enriched?: boolean
           employer_name?: string | null
           enrichment_attempts?: number
           id?: string
           last_enriched_at?: string | null
+          local_lang?: string | null
           matched_keywords?: string[] | null
           normalized_demand_id?: string | null
           notes?: string | null
+          phone_enriched?: boolean
+          posted_at_local?: string | null
           priority?: Database["public"]["Enums"]["priority_tag"]
           quality_score?: number
           raw_signal_id?: string | null
@@ -365,6 +386,13 @@ export type Database = {
             columns: ["duplicate_of"]
             isOneToOne: false
             referencedRelation: "demand_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_leads_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "qualified_local_leads"
             referencedColumns: ["id"]
           },
           {
@@ -421,6 +449,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "demand_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_matches_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "qualified_local_leads"
             referencedColumns: ["id"]
           },
         ]
@@ -1447,6 +1482,69 @@ export type Database = {
           },
         ]
       }
+      source_boards: {
+        Row: {
+          apify_actor_id: string | null
+          board_domain: string
+          board_name: string | null
+          board_type: string
+          country: string
+          country_iso2: string
+          created_at: string
+          enabled: boolean
+          id: string
+          lang: string | null
+          last_error: string | null
+          last_run_at: string | null
+          last_success_at: string | null
+          notes: string | null
+          priority: number
+          total_leads_found: number
+          total_runs: number
+          updated_at: string
+        }
+        Insert: {
+          apify_actor_id?: string | null
+          board_domain: string
+          board_name?: string | null
+          board_type?: string
+          country: string
+          country_iso2: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          lang?: string | null
+          last_error?: string | null
+          last_run_at?: string | null
+          last_success_at?: string | null
+          notes?: string | null
+          priority?: number
+          total_leads_found?: number
+          total_runs?: number
+          updated_at?: string
+        }
+        Update: {
+          apify_actor_id?: string | null
+          board_domain?: string
+          board_name?: string | null
+          board_type?: string
+          country?: string
+          country_iso2?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          lang?: string | null
+          last_error?: string | null
+          last_run_at?: string | null
+          last_success_at?: string | null
+          notes?: string | null
+          priority?: number
+          total_leads_found?: number
+          total_runs?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       source_registry: {
         Row: {
           actor_or_endpoint: string | null
@@ -1553,6 +1651,193 @@ export type Database = {
           sent_today: number | null
         }
         Relationships: []
+      }
+      qualified_local_leads: {
+        Row: {
+          ai_rationale: string | null
+          city: string | null
+          company_id: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          contact_qualified: boolean | null
+          country: string | null
+          created_at: string | null
+          demand_size: number | null
+          discovered_board: string | null
+          discovered_board_domain: string | null
+          duplicate_of: string | null
+          email_enriched: boolean | null
+          employer_name: string | null
+          enrichment_attempts: number | null
+          id: string | null
+          last_enriched_at: string | null
+          local_lang: string | null
+          matched_keywords: string[] | null
+          normalized_demand_id: string | null
+          notes: string | null
+          phone_enriched: boolean | null
+          posted_at_local: string | null
+          priority: Database["public"]["Enums"]["priority_tag"] | null
+          quality_score: number | null
+          raw_signal_id: string | null
+          review_status: string | null
+          role: string | null
+          salary_currency: string | null
+          salary_max: number | null
+          salary_min: number | null
+          score: number | null
+          score_breakdown: Json | null
+          sector_tags: string[] | null
+          snoozed_until: string | null
+          source: Database["public"]["Enums"]["demand_source"] | null
+          source_url: string | null
+          sponsorship_signals: string[] | null
+          target_audience_type: string | null
+          tier: string | null
+          updated_at: string | null
+          urgency_score: number | null
+          visa_sponsorship: boolean | null
+          worker_origin_focus: string[] | null
+        }
+        Insert: {
+          ai_rationale?: string | null
+          city?: string | null
+          company_id?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_qualified?: boolean | null
+          country?: string | null
+          created_at?: string | null
+          demand_size?: number | null
+          discovered_board?: string | null
+          discovered_board_domain?: string | null
+          duplicate_of?: string | null
+          email_enriched?: boolean | null
+          employer_name?: string | null
+          enrichment_attempts?: number | null
+          id?: string | null
+          last_enriched_at?: string | null
+          local_lang?: string | null
+          matched_keywords?: string[] | null
+          normalized_demand_id?: string | null
+          notes?: string | null
+          phone_enriched?: boolean | null
+          posted_at_local?: string | null
+          priority?: Database["public"]["Enums"]["priority_tag"] | null
+          quality_score?: number | null
+          raw_signal_id?: string | null
+          review_status?: string | null
+          role?: string | null
+          salary_currency?: string | null
+          salary_max?: number | null
+          salary_min?: number | null
+          score?: number | null
+          score_breakdown?: Json | null
+          sector_tags?: string[] | null
+          snoozed_until?: string | null
+          source?: Database["public"]["Enums"]["demand_source"] | null
+          source_url?: string | null
+          sponsorship_signals?: string[] | null
+          target_audience_type?: string | null
+          tier?: string | null
+          updated_at?: string | null
+          urgency_score?: number | null
+          visa_sponsorship?: boolean | null
+          worker_origin_focus?: string[] | null
+        }
+        Update: {
+          ai_rationale?: string | null
+          city?: string | null
+          company_id?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_qualified?: boolean | null
+          country?: string | null
+          created_at?: string | null
+          demand_size?: number | null
+          discovered_board?: string | null
+          discovered_board_domain?: string | null
+          duplicate_of?: string | null
+          email_enriched?: boolean | null
+          employer_name?: string | null
+          enrichment_attempts?: number | null
+          id?: string | null
+          last_enriched_at?: string | null
+          local_lang?: string | null
+          matched_keywords?: string[] | null
+          normalized_demand_id?: string | null
+          notes?: string | null
+          phone_enriched?: boolean | null
+          posted_at_local?: string | null
+          priority?: Database["public"]["Enums"]["priority_tag"] | null
+          quality_score?: number | null
+          raw_signal_id?: string | null
+          review_status?: string | null
+          role?: string | null
+          salary_currency?: string | null
+          salary_max?: number | null
+          salary_min?: number | null
+          score?: number | null
+          score_breakdown?: Json | null
+          sector_tags?: string[] | null
+          snoozed_until?: string | null
+          source?: Database["public"]["Enums"]["demand_source"] | null
+          source_url?: string | null
+          sponsorship_signals?: string[] | null
+          target_audience_type?: string | null
+          tier?: string | null
+          updated_at?: string | null
+          urgency_score?: number | null
+          visa_sponsorship?: boolean | null
+          worker_origin_focus?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_demand_stats"
+            referencedColumns: ["company_id"]
+          },
+          {
+            foreignKeyName: "demand_leads_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "demand_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_leads_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "qualified_local_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_leads_normalized_demand_id_fkey"
+            columns: ["normalized_demand_id"]
+            isOneToOne: false
+            referencedRelation: "normalized_demand"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_leads_raw_signal_id_fkey"
+            columns: ["raw_signal_id"]
+            isOneToOne: false
+            referencedRelation: "raw_signals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       source_quality_stats: {
         Row: {
