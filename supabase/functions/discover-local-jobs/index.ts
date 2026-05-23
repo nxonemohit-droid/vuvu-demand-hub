@@ -149,6 +149,9 @@ Deno.serve(async (req) => {
     const countries: string[] | undefined = body?.countries;
     const perBoardLimit: number = Math.min(Math.max(Number(body?.per_board_limit) || 15, 1), 30);
     const deepScrape: boolean = body?.deep_scrape === true; // off by default for speed
+    const expansionThreshold: number = Math.max(0, Number(body?.expansion_threshold) || 50);
+    const expansionEnabled: boolean = body?.expansion_enabled !== false; // on by default
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     // load keywords
     const { data: kwRows } = await admin
