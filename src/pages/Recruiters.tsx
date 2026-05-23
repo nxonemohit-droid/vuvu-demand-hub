@@ -1196,10 +1196,22 @@ const Recruiters = () => {
             </div>
           </div>
           {isAdmin && (
-            <Button size="sm" onClick={() => openScheduleDialog(null)} disabled={outreachTotal === 0}>
-              <Send className="h-4 w-4 mr-1.5" />
-              Schedule {scheduleDailyCap}/day outreach ({outreachTotal})
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={runEnrichEmails}
+                disabled={enrichRunning}
+                title="Guess emails for agencies with missing/placeholder contact emails"
+              >
+                <Mail className="h-4 w-4 mr-1.5" />
+                {enrichRunning ? "Enriching…" : "Enrich Emails"}
+              </Button>
+              <Button size="sm" onClick={() => openScheduleDialog(null)} disabled={outreachTotal === 0}>
+                <Send className="h-4 w-4 mr-1.5" />
+                Schedule {scheduleDailyCap}/day outreach ({outreachTotal})
+              </Button>
+            </div>
           )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
