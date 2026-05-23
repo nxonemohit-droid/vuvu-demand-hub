@@ -91,6 +91,7 @@ type RecruiterRow = {
   discovery_tier?: number | null;
 };
 
+
 type DiscoveryJob = {
   id: string;
   kind: string;
