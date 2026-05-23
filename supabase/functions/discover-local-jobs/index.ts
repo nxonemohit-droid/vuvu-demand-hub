@@ -147,7 +147,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const countries: string[] | undefined = body?.countries;
-    const perBoardLimit: number = Math.min(Math.max(Number(body?.per_board_limit) || 8, 1), 20);
+    const perBoardLimit: number = Math.min(Math.max(Number(body?.per_board_limit) || 15, 1), 30);
+    const deepScrape: boolean = body?.deep_scrape === true; // off by default for speed
 
     // load keywords
     const { data: kwRows } = await admin
@@ -161,10 +162,9 @@ Deno.serve(async (req) => {
     const { data: boards, error: bErr } = await q.order("priority");
     if (bErr) return json({ error: bErr.message }, 500);
 
-    const summary: Array<Record<string, unknown>> = [];
     const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0);
 
-    for (const board of boards ?? []) {
+    const processBoard = async (board: any) => {
       let leadsFound = 0;
       let leadsReposted = 0;
       let leadsRejected = 0;
@@ -179,8 +179,7 @@ Deno.serve(async (req) => {
       const cap = board.daily_cap ?? 75;
       const remaining = Math.max(0, cap - (todayCount ?? 0));
       if (remaining === 0) {
-        summary.push({ board: board.board_domain, leads: 0, skipped: "daily_cap" });
-        continue;
+        return { board: board.board_domain, leads: 0, skipped: "daily_cap" };
       }
 
       const queries: string[] = (board.search_queries?.length ? board.search_queries : ["radnik", "worker", "job"]) as string[];
@@ -202,26 +201,30 @@ Deno.serve(async (req) => {
               .from("raw_signals").select("id").eq("fingerprint", fp).maybeSingle();
             if (existingSignal) continue;
 
-            const scraped = await firecrawlScrape(FIRECRAWL_API_KEY, url);
-            const parsed = scraped?.json ?? {};
-            const md = scraped?.markdown ?? hit?.description ?? "";
+            let parsed: Record<string, unknown> = {};
+            let md: string = hit?.description ?? hit?.snippet ?? "";
+            if (deepScrape) {
+              const scraped = await firecrawlScrape(FIRECRAWL_API_KEY, url);
+              parsed = (scraped?.json ?? {}) as Record<string, unknown>;
+              md = (scraped?.markdown ?? md ?? "") as string;
+            }
 
-            if (parsed?.is_job_posting === false) { leadsRejected++; continue; }
+            if ((parsed as { is_job_posting?: boolean })?.is_job_posting === false) { leadsRejected++; continue; }
 
-            const title = String(parsed?.role_title ?? hit?.title ?? "");
-            const desc = String(parsed?.summary ?? md ?? "");
+            const title = String((parsed as any)?.role_title ?? hit?.title ?? "");
+            const desc = String((parsed as any)?.summary ?? md ?? "");
 
             // white-collar filter
             if (isWhiteCollar(title, whiteCollarWords)) { leadsRejected++; continue; }
 
-            const tradeCat = detectTradeCategory(title, desc);
-            if (!tradeCat) { leadsRejected++; continue; }
+            // Detect trade; if none, keep as 'other' so we don't lose volume
+            const tradeCat = detectTradeCategory(title, desc) ?? "other";
 
-            const direct = detectDirectEmployer(title + " " + (parsed?.company_name ?? "") + " " + desc, agencyWords);
-            const vacancy = Math.max(Number(parsed?.headcount) || 0, extractVacancyCount(desc, vacancyPhrases));
-            const employer = parsed?.company_name ?? hit?.title ?? null;
+            const direct = detectDirectEmployer(title + " " + ((parsed as any)?.company_name ?? "") + " " + desc, agencyWords);
+            const vacancy = Math.max(Number((parsed as any)?.headcount) || 0, extractVacancyCount(desc, vacancyPhrases));
+            const employer = (parsed as any)?.company_name ?? hit?.title ?? null;
             const employerNorm = normEmployer(employer);
-            const country = parsed?.country ?? board.country;
+            const country = (parsed as any)?.country ?? board.country;
 
             // smart dedup: same employer + country + trade within 30d → repost
             if (employerNorm) {
@@ -270,24 +273,24 @@ Deno.serve(async (req) => {
               employer_name: employer,
               role: title || kw,
               country,
-              city: parsed?.city ?? null,
-              contact_email: parsed?.contact_email ?? null,
-              contact_phone: parsed?.contact_phone ?? null,
-              salary_min: parsed?.salary_min ?? null,
-              salary_max: parsed?.salary_max ?? null,
-              salary_currency: parsed?.salary_currency ?? null,
-              demand_size: parsed?.headcount ?? null,
+              city: (parsed as any)?.city ?? null,
+              contact_email: (parsed as any)?.contact_email ?? null,
+              contact_phone: (parsed as any)?.contact_phone ?? null,
+              salary_min: (parsed as any)?.salary_min ?? null,
+              salary_max: (parsed as any)?.salary_max ?? null,
+              salary_currency: (parsed as any)?.salary_currency ?? null,
+              demand_size: (parsed as any)?.headcount ?? null,
               vacancy_count: vacancy || 1,
               trade_category: tradeCat,
               is_direct_employer: direct,
-              notes: parsed?.summary ?? null,
+              notes: (parsed as any)?.summary ?? desc?.slice(0, 500) ?? null,
               discovered_board: board.board_name ?? board.board_domain,
               discovered_board_domain: board.board_domain,
               local_lang: board.lang,
-              posted_at_local: parsed?.posted_at ? safeDate(parsed.posted_at) : null,
+              posted_at_local: (parsed as any)?.posted_at ? safeDate((parsed as any).posted_at) : null,
               matched_keywords: [kw, tradeCat],
               review_status: "new",
-              email_source: parsed?.contact_email ? "scraped" : "missing",
+              email_source: (parsed as any)?.contact_email ? "scraped" : "missing",
             });
             if (dlErr) { errors.push(dlErr.message); continue; }
             leadsFound++;
@@ -306,10 +309,22 @@ Deno.serve(async (req) => {
         total_leads_found: (board.total_leads_found ?? 0) + leadsFound,
       }).eq("id", board.id);
 
-      summary.push({ board: board.board_domain, leads: leadsFound, reposts: leadsReposted, rejected: leadsRejected, errors: errors.length });
-    }
+      return { board: board.board_domain, leads: leadsFound, reposts: leadsReposted, rejected: leadsRejected, errors: errors.length };
+    };
 
-    return json({ ok: true, boards_scanned: boards?.length ?? 0, summary });
+    // Run boards in parallel chunks of 5 to maximize throughput within the timeout
+    const summary: Array<Record<string, unknown>> = [];
+    const allBoards = boards ?? [];
+    const CHUNK = 5;
+    for (let i = 0; i < allBoards.length; i += CHUNK) {
+      const chunk = allBoards.slice(i, i + CHUNK);
+      const results = await Promise.all(chunk.map((b) => processBoard(b).catch((e) => ({
+        board: b.board_domain, error: e instanceof Error ? e.message : String(e),
+      }))));
+      summary.push(...results);
+    }
+    const totalLeads = summary.reduce((a, s) => a + (Number(s.leads) || 0), 0);
+    return json({ ok: true, boards_scanned: allBoards.length, total_leads: totalLeads, summary });
   } catch (e) {
     console.error("discover-local-jobs error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
