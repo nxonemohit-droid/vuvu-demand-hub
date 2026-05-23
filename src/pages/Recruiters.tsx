@@ -970,7 +970,7 @@ const Recruiters = () => {
       const d = data as { ok?: boolean; scanned?: number; enriched?: number; already_ok?: number; error?: string };
       if (!d?.ok) throw new Error(d?.error ?? "Enrichment failed");
       toast.success(`Enriched ${d.enriched ?? 0} / ${d.scanned ?? 0} (already valid: ${d.already_ok ?? 0})`);
-      await reload();
+      await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Enrichment failed");
     } finally {
