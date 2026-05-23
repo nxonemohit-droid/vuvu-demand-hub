@@ -391,3 +391,57 @@ function safeDate(v: unknown): string | null {
     return d.toISOString();
   } catch { return null; }
 }
+
+async function generateExpansionKeywords(opts: {
+  apiKey: string;
+  boardDomain: string;
+  country: string | null;
+  lang: string | null;
+  existing: string[];
+  targetCount: number;
+}): Promise<string[]> {
+  const { apiKey, boardDomain, country, lang, existing, targetCount } = opts;
+  const sys = `You generate localized search keywords for scraping blue-collar job
+postings (welders, drivers, construction workers, warehouse, factory, hospitality,
+caregiving, cleaning, security, agriculture, logistics) from a specific local
+job board. Return ONLY a JSON array of ${targetCount} short keyword strings (1-4
+words each) in the LOCAL LANGUAGE of the country. Use realistic phrases a hiring
+employer would post (e.g. "tražimo vozača", "angajăm muncitori", "potrzebny
+spawacz"). No duplicates. No keywords from the EXCLUDE list. No JSON wrappers,
+no explanations — just the array.`;
+  const user = `Board: ${boardDomain}
+Country: ${country ?? "unknown"}
+Language: ${lang ?? "local"}
+EXCLUDE (already tried): ${JSON.stringify((existing ?? []).slice(0, 60))}`;
+
+  const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ],
+    }),
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`lovable ai ${r.status}: ${txt.slice(0, 200)}`);
+  }
+  const j = await r.json();
+  const content: string = j?.choices?.[0]?.message?.content ?? "";
+  // Extract JSON array from the response
+  const match = content.match(/\[[\s\S]*\]/);
+  if (!match) return [];
+  try {
+    const arr = JSON.parse(match[0]);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((x) => String(x).trim())
+      .filter((x) => x.length > 1 && x.length < 80)
+      .slice(0, targetCount);
+  } catch {
+    return [];
+  }
+}
