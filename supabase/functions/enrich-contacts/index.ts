@@ -20,6 +20,36 @@ const COUNTRY_TO_ISO: Record<string, string> = {
   Spain: "ES", Portugal: "PT", Cyprus: "CY",
 };
 
+// Min/max national digit lengths (excluding country code)
+const PHONE_LEN_BY_ISO: Record<string, [number, number]> = {
+  RS: [8, 9], HR: [8, 9], SI: [8, 8], BA: [8, 8], ME: [8, 8], MK: [8, 8],
+  AL: [9, 9], BG: [8, 9], RO: [9, 9], HU: [8, 9], PL: [9, 9], CZ: [9, 9], SK: [9, 9],
+  DE: [10, 11], AT: [10, 11], NL: [9, 9], GR: [10, 10], IT: [9, 10], ES: [9, 9],
+  PT: [9, 9], CY: [8, 8],
+};
+
+function normalizeE164(raw: string, iso: string | null): string | null {
+  if (!raw) return null;
+  let digits = raw.replace(/[^\d+]/g, "");
+  if (!digits) return null;
+  const dial = iso ? DIAL_BY_ISO[iso] : null;
+  if (digits.startsWith("00")) digits = "+" + digits.slice(2);
+  if (!digits.startsWith("+")) {
+    if (dial && digits.startsWith(dial.slice(1))) digits = "+" + digits;
+    else if (dial && digits.startsWith("0")) digits = dial + digits.slice(1);
+    else if (dial) digits = dial + digits;
+    else digits = "+" + digits;
+  }
+  if (!/^\+\d{8,16}$/.test(digits)) return null;
+  if (iso && dial) {
+    if (!digits.startsWith(dial)) return null;
+    const local = digits.slice(dial.length);
+    const range = PHONE_LEN_BY_ISO[iso];
+    if (range && (local.length < range[0] || local.length > range[1])) return null;
+  }
+  return digits;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -155,20 +185,35 @@ Deno.serve(async (req) => {
       if (!lead.contact_email) {
         const fromPage = extractEmails(pageText).find((e) => domain && e.endsWith("@" + domain));
         let chosen = fromPage ?? null;
-        if (!chosen && domain) chosen = await hunterDomainSearch(domain);
-        if (!chosen && domain) chosen = guessEmail(domain);
+        let source: string = "missing";
+        if (chosen) source = "scraped";
+        if (!chosen && domain) {
+          chosen = await hunterDomainSearch(domain);
+          if (chosen) source = "hunter";
+        }
+        if (!chosen && domain) {
+          chosen = guessEmail(domain);
+          if (chosen) source = "guessed";
+        }
         if (chosen) {
           update.contact_email = chosen;
           update.email_enriched = true;
+          update.email_source = source;
         }
       }
 
-      if (!lead.contact_phone) {
-        const phones = extractPhones(pageText, dial);
-        if (phones[0]) {
-          update.contact_phone = phones[0];
+      const rawCandidates = extractPhones(pageText, dial);
+      let validPhone: string | null = null;
+      for (const candidate of rawCandidates) {
+        const e164 = normalizeE164(candidate, iso);
+        if (e164) { validPhone = e164; break; }
+      }
+      if (validPhone) {
+        if (!lead.contact_phone) {
+          update.contact_phone = validPhone;
           update.phone_enriched = true;
         }
+        update.phone_e164 = validPhone;
       }
 
       update.last_enriched_at = new Date().toISOString();
