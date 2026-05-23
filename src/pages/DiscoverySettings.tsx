@@ -91,7 +91,7 @@ function KeywordEditor({ kind }: { kind: string }) {
       if (!newKw.trim()) throw new Error("Keyword required");
       const { error } = await supabase
         .from("discovery_keywords" as never)
-        .insert({ kind, lang: newLang, keyword: newKw.trim() });
+        .insert({ kind, lang: newLang, keyword: newKw.trim() } as never);
       if (error) throw error;
     },
     onSuccess: () => { setNewKw(""); qc.invalidateQueries({ queryKey: ["discovery_keywords", kind] }); toast.success("Added"); },
@@ -100,7 +100,7 @@ function KeywordEditor({ kind }: { kind: string }) {
 
   const toggle = useMutation({
     mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
-      const { error } = await supabase.from("discovery_keywords" as never).update({ enabled }).eq("id", id);
+      const { error } = await supabase.from("discovery_keywords" as never).update({ enabled } as never).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["discovery_keywords", kind] }),
@@ -172,7 +172,7 @@ function BoardEditor() {
 
   const upd = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<Board> }) => {
-      const { error } = await supabase.from("source_boards" as never).update(patch).eq("id", id);
+      const { error } = await supabase.from("source_boards" as never).update(patch as never).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["source_boards_admin"] }); toast.success("Updated"); },
