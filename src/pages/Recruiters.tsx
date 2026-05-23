@@ -89,6 +89,9 @@ type RecruiterRow = {
   email_last_event?: string | null;
   email_error?: string | null;
   discovery_tier?: number | null;
+  email_enriched?: boolean | null;
+  email_source?: string | null;
+  website?: string | null;
 };
 
 
