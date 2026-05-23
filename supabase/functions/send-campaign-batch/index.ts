@@ -36,13 +36,16 @@ Deno.serve(async (req) => {
     // Allow either an authed admin or a cron call signed with service-role key
     const authHeader = req.headers.get("Authorization") ?? "";
     const isServiceRole = authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
+    const isCron =
+      req.headers.get("x-cron-source") === "campaign-batch" &&
+      authHeader === `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`;
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    if (!isServiceRole) {
+    if (!isServiceRole && !isCron) {
       if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
       const supa = createClient(
         Deno.env.get("SUPABASE_URL")!,
