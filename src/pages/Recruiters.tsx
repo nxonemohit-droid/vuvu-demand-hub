@@ -89,7 +89,11 @@ type RecruiterRow = {
   email_last_event?: string | null;
   email_error?: string | null;
   discovery_tier?: number | null;
+  email_enriched?: boolean | null;
+  email_source?: string | null;
+  website?: string | null;
 };
+
 
 type DiscoveryJob = {
   id: string;
@@ -954,6 +958,25 @@ const Recruiters = () => {
   const [scheduleRunning, setScheduleRunning] = useState(false);
   const [scheduleBlocks, setScheduleBlocks] = useState<number[] | null>(null);
   const [scheduleDailyCap, setScheduleDailyCap] = useState(50);
+  const [enrichRunning, setEnrichRunning] = useState(false);
+
+  const runEnrichEmails = async () => {
+    setEnrichRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("enrich-email", {
+        body: { mode: "bulk", limit: 500 },
+      });
+      if (error) throw error;
+      const d = data as { ok?: boolean; scanned?: number; enriched?: number; already_ok?: number; error?: string };
+      if (!d?.ok) throw new Error(d?.error ?? "Enrichment failed");
+      toast.success(`Enriched ${d.enriched ?? 0} / ${d.scanned ?? 0} (already valid: ${d.already_ok ?? 0})`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Enrichment failed");
+    } finally {
+      setEnrichRunning(false);
+    }
+  };
   const [dryRunRunning, setDryRunRunning] = useState(false);
   type DryRunResult = {
     wouldSchedule: number;
@@ -1192,10 +1215,22 @@ const Recruiters = () => {
             </div>
           </div>
           {isAdmin && (
-            <Button size="sm" onClick={() => openScheduleDialog(null)} disabled={outreachTotal === 0}>
-              <Send className="h-4 w-4 mr-1.5" />
-              Schedule {scheduleDailyCap}/day outreach ({outreachTotal})
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={runEnrichEmails}
+                disabled={enrichRunning}
+                title="Guess emails for agencies with missing/placeholder contact emails"
+              >
+                <Mail className="h-4 w-4 mr-1.5" />
+                {enrichRunning ? "Enriching…" : "Enrich Emails"}
+              </Button>
+              <Button size="sm" onClick={() => openScheduleDialog(null)} disabled={outreachTotal === 0}>
+                <Send className="h-4 w-4 mr-1.5" />
+                Schedule {scheduleDailyCap}/day outreach ({outreachTotal})
+              </Button>
+            </div>
           )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1472,10 +1507,21 @@ const Recruiters = () => {
                       <div className="text-xs text-muted-foreground">→ {r.operating_eu_country ?? "—"}</div>
                     </TableCell>
                     <TableCell className="text-xs">
-                      {r.contact_email && <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{r.contact_email}</div>}
+                      {r.contact_email && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          <span>{r.contact_email}</span>
+                          <EmailSourceBadge source={r.email_source} enriched={r.email_enriched} />
+                        </div>
+                      )}
+                      {!r.contact_email && (
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Mail className="h-3 w-3" /> <span>no email</span>
+                          <EmailSourceBadge source="missing" enriched={false} />
+                        </div>
+                      )}
                       {r.contact_phone && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{r.contact_phone}</div>}
                       {r.contact_linkedin && <div className="flex items-center gap-1"><Linkedin className="h-3 w-3" />profile</div>}
-                      {!r.contact_email && !r.contact_phone && !r.contact_linkedin && <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -2091,3 +2137,14 @@ const Recruiters = () => {
 };
 
 export default Recruiters;
+
+function EmailSourceBadge({ source, enriched }: { source?: string | null; enriched?: boolean | null }) {
+  const src = (source ?? "").toLowerCase();
+  if (src === "verified") {
+    return <Badge className="text-[9px] px-1 py-0 bg-emerald-600 hover:bg-emerald-600 text-white">verified</Badge>;
+  }
+  if (src === "guessed" || enriched) {
+    return <Badge className="text-[9px] px-1 py-0 bg-amber-500 hover:bg-amber-500 text-white">guessed</Badge>;
+  }
+  return <Badge className="text-[9px] px-1 py-0 bg-destructive hover:bg-destructive text-white">missing</Badge>;
+}
