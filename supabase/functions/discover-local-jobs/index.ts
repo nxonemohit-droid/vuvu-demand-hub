@@ -149,6 +149,9 @@ Deno.serve(async (req) => {
     const countries: string[] | undefined = body?.countries;
     const perBoardLimit: number = Math.min(Math.max(Number(body?.per_board_limit) || 15, 1), 30);
     const deepScrape: boolean = body?.deep_scrape === true; // off by default for speed
+    const expansionThreshold: number = Math.max(0, Number(body?.expansion_threshold) || 50);
+    const expansionEnabled: boolean = body?.expansion_enabled !== false; // on by default
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     // load keywords
     const { data: kwRows } = await admin
@@ -169,6 +172,8 @@ Deno.serve(async (req) => {
       let leadsReposted = 0;
       let leadsRejected = 0;
       const errors: string[] = [];
+      let expansionUsed = false;
+      let expansionAdded = 0;
 
       // enforce daily cap
       const { count: todayCount } = await admin
@@ -184,9 +189,13 @@ Deno.serve(async (req) => {
 
       const queries: string[] = (board.search_queries?.length ? board.search_queries : ["radnik", "worker", "job"]) as string[];
       let processed = 0;
+      const triedQueries = new Set<string>();
 
-      for (const kw of queries) {
-        if (processed >= remaining) break;
+      const runQueries = async (qs: string[]) => {
+        for (const kw of qs) {
+          if (processed >= remaining) break;
+          if (triedQueries.has(kw)) continue;
+          triedQueries.add(kw);
         try {
           const query = `site:${board.board_domain} ${kw}`;
           const results = await firecrawlSearch(FIRECRAWL_API_KEY, query, perBoardLimit);
@@ -299,6 +308,42 @@ Deno.serve(async (req) => {
         } catch (e) {
           errors.push(e instanceof Error ? e.message : String(e));
         }
+        }
+      };
+
+      await runQueries(queries);
+
+      // Automatic keyword expansion: if board yielded fewer than `expansionThreshold`
+      // leads, ask the LLM for stronger country-specific blue-collar queries and rerun.
+      if (
+        expansionEnabled &&
+        !expansionUsed &&
+        processed < remaining &&
+        (leadsFound + leadsReposted) < expansionThreshold &&
+        LOVABLE_API_KEY
+      ) {
+        expansionUsed = true;
+        try {
+          const expanded = await generateExpansionKeywords({
+            apiKey: LOVABLE_API_KEY,
+            boardDomain: board.board_domain,
+            country: board.country,
+            lang: board.lang,
+            existing: queries,
+            targetCount: 15,
+          });
+          const fresh = expanded.filter((k) => !triedQueries.has(k));
+          if (fresh.length) {
+            expansionAdded = fresh.length;
+            await runQueries(fresh);
+            const merged = Array.from(new Set([...(queries ?? []), ...fresh])).slice(0, 80);
+            await admin.from("source_boards")
+              .update({ search_queries: merged })
+              .eq("id", board.id);
+          }
+        } catch (e) {
+          errors.push("expansion: " + (e instanceof Error ? e.message : String(e)));
+        }
       }
 
       await admin.from("source_boards").update({
@@ -309,7 +354,15 @@ Deno.serve(async (req) => {
         total_leads_found: (board.total_leads_found ?? 0) + leadsFound,
       }).eq("id", board.id);
 
-      return { board: board.board_domain, leads: leadsFound, reposts: leadsReposted, rejected: leadsRejected, errors: errors.length };
+      return {
+        board: board.board_domain,
+        leads: leadsFound,
+        reposts: leadsReposted,
+        rejected: leadsRejected,
+        errors: errors.length,
+        expansion_used: expansionUsed,
+        expansion_added: expansionAdded,
+      };
     };
 
     // Run boards in parallel chunks of 5 to maximize throughput within the timeout
@@ -337,4 +390,58 @@ function safeDate(v: unknown): string | null {
     if (isNaN(d.getTime())) return null;
     return d.toISOString();
   } catch { return null; }
+}
+
+async function generateExpansionKeywords(opts: {
+  apiKey: string;
+  boardDomain: string;
+  country: string | null;
+  lang: string | null;
+  existing: string[];
+  targetCount: number;
+}): Promise<string[]> {
+  const { apiKey, boardDomain, country, lang, existing, targetCount } = opts;
+  const sys = `You generate localized search keywords for scraping blue-collar job
+postings (welders, drivers, construction workers, warehouse, factory, hospitality,
+caregiving, cleaning, security, agriculture, logistics) from a specific local
+job board. Return ONLY a JSON array of ${targetCount} short keyword strings (1-4
+words each) in the LOCAL LANGUAGE of the country. Use realistic phrases a hiring
+employer would post (e.g. "tražimo vozača", "angajăm muncitori", "potrzebny
+spawacz"). No duplicates. No keywords from the EXCLUDE list. No JSON wrappers,
+no explanations — just the array.`;
+  const user = `Board: ${boardDomain}
+Country: ${country ?? "unknown"}
+Language: ${lang ?? "local"}
+EXCLUDE (already tried): ${JSON.stringify((existing ?? []).slice(0, 60))}`;
+
+  const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ],
+    }),
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`lovable ai ${r.status}: ${txt.slice(0, 200)}`);
+  }
+  const j = await r.json();
+  const content: string = j?.choices?.[0]?.message?.content ?? "";
+  // Extract JSON array from the response
+  const match = content.match(/\[[\s\S]*\]/);
+  if (!match) return [];
+  try {
+    const arr = JSON.parse(match[0]);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((x) => String(x).trim())
+      .filter((x) => x.length > 1 && x.length < 80)
+      .slice(0, targetCount);
+  } catch {
+    return [];
+  }
 }
