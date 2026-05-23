@@ -958,6 +958,25 @@ const Recruiters = () => {
   const [scheduleRunning, setScheduleRunning] = useState(false);
   const [scheduleBlocks, setScheduleBlocks] = useState<number[] | null>(null);
   const [scheduleDailyCap, setScheduleDailyCap] = useState(50);
+  const [enrichRunning, setEnrichRunning] = useState(false);
+
+  const runEnrichEmails = async () => {
+    setEnrichRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("enrich-email", {
+        body: { mode: "bulk", limit: 500 },
+      });
+      if (error) throw error;
+      const d = data as { ok?: boolean; scanned?: number; enriched?: number; already_ok?: number; error?: string };
+      if (!d?.ok) throw new Error(d?.error ?? "Enrichment failed");
+      toast.success(`Enriched ${d.enriched ?? 0} / ${d.scanned ?? 0} (already valid: ${d.already_ok ?? 0})`);
+      await reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Enrichment failed");
+    } finally {
+      setEnrichRunning(false);
+    }
+  };
   const [dryRunRunning, setDryRunRunning] = useState(false);
   type DryRunResult = {
     wouldSchedule: number;
