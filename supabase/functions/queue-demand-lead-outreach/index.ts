@@ -109,6 +109,10 @@ Deno.serve(async (req) => {
     const startHourUtc: number = Number.isFinite(body?.start_hour_utc) ? body.start_hour_utc : 7; // ~08:00 Belgrade winter
     const endHourUtc: number = Number.isFinite(body?.end_hour_utc) ? body.end_hour_utc : 17; // ~19:00 Belgrade
     const dailyCap: number = Number.isFinite(body?.daily_cap) ? body.daily_cap : 200;
+    // Optional explicit pacing override (e.g. 180 = 3-minute gap between sends)
+    const intervalOverride: number | null = Number.isFinite(body?.interval_seconds)
+      ? Math.max(30, Math.floor(body.interval_seconds))
+      : null;
 
     // 1. Load template
     const { data: tpl, error: tplErr } = await admin
@@ -156,7 +160,11 @@ Deno.serve(async (req) => {
     const rows: any[] = [];
 
     const windowHours = Math.max(1, endHourUtc - startHourUtc);
-    const intervalSec = Math.max(30, Math.floor((windowHours * 3600) / dailyCap));
+    const intervalSec = intervalOverride ?? Math.max(30, Math.floor((windowHours * 3600) / dailyCap));
+    // When pacing is explicit, recompute how many fit per send window day.
+    const effectiveDailyCap = intervalOverride
+      ? Math.max(1, Math.floor((windowHours * 3600) / intervalSec))
+      : dailyCap;
 
     // Snap a candidate time into the next in-window slot.
     const snapToWindow = (t: Date): Date => {
@@ -213,8 +221,8 @@ Deno.serve(async (req) => {
         trade_category: trade,
       };
 
-      const dayOffset = Math.floor(queuedIndex / dailyCap);
-      const slotInDay = queuedIndex % dailyCap;
+      const dayOffset = Math.floor(queuedIndex / effectiveDailyCap);
+      const slotInDay = queuedIndex % effectiveDailyCap;
       const sendAt = new Date(firstSlot.getTime() + dayOffset * 86_400_000 + slotInDay * intervalSec * 1000);
 
       // Clean up any stray "x, x" duplicates (e.g. when city == country)
@@ -260,8 +268,8 @@ Deno.serve(async (req) => {
         first_send_at: rows[0]?.send_at ?? null,
         last_send_at: rows[rows.length - 1]?.send_at ?? null,
         interval_seconds: intervalSec,
-        daily_cap: dailyCap,
-        estimated_days: Math.max(1, Math.ceil(rows.length / dailyCap)),
+        daily_cap: effectiveDailyCap,
+        estimated_days: Math.max(1, Math.ceil(rows.length / effectiveDailyCap)),
         samples,
       });
     }
@@ -286,8 +294,8 @@ Deno.serve(async (req) => {
       first_send_at: rows[0]?.send_at ?? null,
       last_send_at: rows[rows.length - 1]?.send_at ?? null,
       interval_seconds: intervalSec,
-      daily_cap: dailyCap,
-      estimated_days: Math.max(1, Math.ceil(inserted / dailyCap)),
+      daily_cap: effectiveDailyCap,
+      estimated_days: Math.max(1, Math.ceil(inserted / effectiveDailyCap)),
     });
   } catch (e) {
     console.error("queue-demand-lead-outreach", e);
