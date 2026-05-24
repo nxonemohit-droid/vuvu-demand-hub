@@ -111,7 +111,8 @@ export function QueueDemandOutreachCard() {
             and the{" "}
             <a href="https://voy-nova-profiles.live/company-profile" target="_blank" rel="noreferrer" className="underline">
               company profile
-            </a>.
+            </a>. Signed by{" "}
+            <strong>Mohit Gururani, Founder & CEO</strong>.
           </p>
         </div>
         <div className="flex gap-2">
