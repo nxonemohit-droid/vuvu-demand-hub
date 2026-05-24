@@ -103,6 +103,8 @@ export default function LeadDetail() {
   const [newChannel, setNewChannel] = useState<string>("note");
   const [newNote, setNewNote] = useState("");
   const [savingLog, setSavingLog] = useState(false);
+  const [confirmEmailOpen, setConfirmEmailOpen] = useState(false);
+  const [confirmWhatsappOpen, setConfirmWhatsappOpen] = useState(false);
 
   const loadLog = async () => {
     if (!id) return;
