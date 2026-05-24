@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Mail, MessageCircle, Send, Plus, Loader2 } from "lucide-react";
+import { EmailQueueStatusPanel } from "./EmailQueueStatusPanel";
 
 function todayIso() { return new Date().toISOString().slice(0, 10); }
 
@@ -119,6 +120,10 @@ export function OutreachCommandCenter({ onJump }: { onJump: (tab: string) => voi
             <MessageCircle className="h-4 w-4 mr-2" /> Open WhatsApp queue
           </Button>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <EmailQueueStatusPanel />
       </div>
     </Card>
   );
