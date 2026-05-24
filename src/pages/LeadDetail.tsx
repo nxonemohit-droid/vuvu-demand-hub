@@ -9,6 +9,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -93,6 +103,8 @@ export default function LeadDetail() {
   const [newChannel, setNewChannel] = useState<string>("note");
   const [newNote, setNewNote] = useState("");
   const [savingLog, setSavingLog] = useState(false);
+  const [confirmEmailOpen, setConfirmEmailOpen] = useState(false);
+  const [confirmWhatsappOpen, setConfirmWhatsappOpen] = useState(false);
 
   const loadLog = async () => {
     if (!id) return;
@@ -359,7 +371,7 @@ export default function LeadDetail() {
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
-                onClick={sendEmailDirect}
+                onClick={() => setConfirmEmailOpen(true)}
                 disabled={!primaryEmail || !outreach || sendingEmail}
                 className="bg-primary"
               >
@@ -369,19 +381,12 @@ export default function LeadDetail() {
               <Button
                 size="sm"
                 variant="outline"
-                asChild
                 disabled={!waHref}
+                onClick={() => setConfirmWhatsappOpen(true)}
                 className="border-emerald-500/50 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
               >
-                <a
-                  href={waHref || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => waHref && logWhatsappClick()}
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  {waNumber ? "Send WhatsApp" : "No phone"}
-                </a>
+                <MessageCircle className="h-4 w-4 mr-2" />
+                {waNumber ? "Send WhatsApp" : "No phone"}
               </Button>
               <Button
                 size="sm"
@@ -680,6 +685,68 @@ export default function LeadDetail() {
           </div>
         </Card>
       </div>
+
+      {/* Confirm Send Email */}
+      <AlertDialog open={confirmEmailOpen} onOpenChange={setConfirmEmailOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send email now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will queue an outreach email to{" "}
+              <span className="font-medium text-foreground">{primaryEmail}</span>{" "}
+              and trigger the send immediately.
+              <br />
+              Subject: <span className="italic">{outreach?.subject}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmEmailOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmEmailOpen(false);
+                sendEmailDirect();
+              }}
+              disabled={sendingEmail}
+            >
+              {sendingEmail ? "Sending…" : "Send email"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Open WhatsApp */}
+      <AlertDialog open={confirmWhatsappOpen} onOpenChange={setConfirmWhatsappOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Open WhatsApp?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will open WhatsApp Web for{" "}
+              <span className="font-medium text-foreground">+{waNumber}</span> with
+              the outreach message pre-filled.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmWhatsappOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  setConfirmWhatsappOpen(false);
+                  logWhatsappClick();
+                }}
+              >
+                Open WhatsApp
+              </a>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
