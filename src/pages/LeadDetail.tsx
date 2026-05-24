@@ -475,6 +475,33 @@ export default function LeadDetail() {
               </Button>
             </div>
           </div>
+
+          {(emailStatus || whatsappStatus) && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {emailStatus && (
+                <LiveStatusPill
+                  kind="email"
+                  status={emailStatus.status}
+                  label={`Email → ${emailStatus.to}`}
+                  detail={
+                    emailStatus.status === "failed"
+                      ? emailStatus.error ?? "Send failed"
+                      : new Date(emailStatus.updatedAt).toLocaleTimeString("en-GB")
+                  }
+                  onDismiss={() => setEmailStatus(null)}
+                />
+              )}
+              {whatsappStatus && (
+                <LiveStatusPill
+                  kind="whatsapp"
+                  status="sent"
+                  label={`WhatsApp opened → +${whatsappStatus.number}`}
+                  detail={`at ${new Date(whatsappStatus.at).toLocaleTimeString("en-GB")}`}
+                  onDismiss={() => setWhatsappStatus(null)}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
 
