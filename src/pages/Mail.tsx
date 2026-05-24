@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { QueueDemandOutreachCard } from "@/components/outreach/QueueDemandOutreachCard";
 import { WhatsAppOutreachCard } from "@/components/outreach/WhatsAppOutreachCard";
+import { OutreachCommandCenter } from "@/components/outreach/OutreachCommandCenter";
 
 type Lead = {
   id: string;
@@ -190,6 +191,7 @@ const Mail = () => {
     bounced: number; replied: number; suppressed: number;
   } | null>(null);
   const [newSuppression, setNewSuppression] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("compose");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -542,7 +544,9 @@ const Mail = () => {
         </Button>
       </header>
 
-      <Tabs defaultValue="compose" className="space-y-4">
+      <OutreachCommandCenter onJump={(t) => setActiveTab(t)} />
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="compose"><MailIcon className="h-3.5 w-3.5 mr-1.5" />Compose</TabsTrigger>
           <TabsTrigger value="demand"><Megaphone className="h-3.5 w-3.5 mr-1.5" />Demand emails</TabsTrigger>
