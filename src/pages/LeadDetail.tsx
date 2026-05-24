@@ -213,6 +213,65 @@ export default function LeadDetail() {
     toast.success("Added to Outreach");
   };
 
+  const primaryPhone = lead?.contact_phone ?? "";
+  const waNumber = primaryPhone.replace(/[^\d]/g, "");
+  const waText = outreach
+    ? `${outreach.body}`.replace(/\n{2,}/g, "\n\n")
+    : "";
+  const waHref = waNumber && waText
+    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waText)}`
+    : "";
+
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const sendEmailDirect = async () => {
+    if (!lead || !outreach || !primaryEmail) {
+      toast.error("No email address for this lead");
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error: insErr } = await supabase.from("scheduled_emails").insert({
+        lead_id: lead.id,
+        to_email: primaryEmail,
+        subject: outreach.subject,
+        body: outreach.body,
+        send_at: new Date().toISOString(),
+        status: "pending",
+        template_name: "voynova_demand_outreach",
+        created_by: userData.user?.id ?? null,
+      });
+      if (insErr) throw insErr;
+      const { error: fnErr } = await supabase.functions.invoke("process-scheduled-emails", { body: {} });
+      if (fnErr) throw fnErr;
+      await supabase.from("lead_outreach_log").insert({
+        lead_id: lead.id,
+        channel: "email",
+        note: `Sent direct from lead page → ${primaryEmail}`,
+        user_id: userData.user?.id ?? null,
+      });
+      toast.success(`Email sent to ${primaryEmail}`);
+      loadLog();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "Failed to send email");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const logWhatsappClick = async () => {
+    if (!lead) return;
+    const { data: userData } = await supabase.auth.getUser();
+    await supabase.from("lead_outreach_log").insert({
+      lead_id: lead.id,
+      channel: "whatsapp",
+      note: `Opened WhatsApp Web → +${waNumber}`,
+      user_id: userData.user?.id ?? null,
+    });
+    loadLog();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
