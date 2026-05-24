@@ -29,6 +29,7 @@ import {
 import { QueueDemandOutreachCard } from "@/components/outreach/QueueDemandOutreachCard";
 import { WhatsAppOutreachCard } from "@/components/outreach/WhatsAppOutreachCard";
 import { OutreachCommandCenter } from "@/components/outreach/OutreachCommandCenter";
+import { MailWalkthrough } from "@/components/outreach/MailWalkthrough";
 
 type Lead = {
   id: string;
