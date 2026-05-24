@@ -731,17 +731,15 @@ export default function LeadDetail() {
             <AlertDialogCancel onClick={() => setConfirmWhatsappOpen(false)}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction
-              asChild
-              onClick={() => {
-                setConfirmWhatsappOpen(false);
-                logWhatsappClick();
-              }}
-            >
+            <AlertDialogAction asChild>
               <a
                 href={waHref}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => {
+                  setConfirmWhatsappOpen(false);
+                  logWhatsappClick();
+                }}
               >
                 Open WhatsApp
               </a>
