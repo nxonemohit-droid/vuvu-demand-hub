@@ -908,3 +908,75 @@ function ContactButton({
     </a>
   );
 }
+
+function LiveStatusPill({
+  kind,
+  status,
+  label,
+  detail,
+  onDismiss,
+}: {
+  kind: "email" | "whatsapp";
+  status: "queued" | "sending" | "sent" | "failed" | "cancelled";
+  label: string;
+  detail?: string;
+  onDismiss?: () => void;
+}) {
+  const tone =
+    status === "sent"
+      ? "border-emerald-500/40 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+      : status === "failed"
+        ? "border-destructive/40 bg-destructive/10 text-destructive"
+        : status === "cancelled"
+          ? "border-muted-foreground/30 bg-muted text-muted-foreground"
+          : "border-primary/30 bg-primary/5 text-primary";
+
+  const icon =
+    status === "sent" ? (
+      <CheckCircle2 className="h-3.5 w-3.5" />
+    ) : status === "failed" ? (
+      <XCircle className="h-3.5 w-3.5" />
+    ) : status === "queued" ? (
+      <Clock className="h-3.5 w-3.5" />
+    ) : status === "cancelled" ? (
+      <XCircle className="h-3.5 w-3.5" />
+    ) : (
+      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+    );
+
+  const verb =
+    kind === "whatsapp"
+      ? "Opened"
+      : status === "queued"
+        ? "Queued"
+        : status === "sending"
+          ? "Sending"
+          : status === "sent"
+            ? "Sent"
+            : status === "failed"
+              ? "Failed"
+              : "Cancelled";
+
+  return (
+    <div
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${tone}`}
+      role="status"
+      aria-live="polite"
+    >
+      {icon}
+      <span className="uppercase tracking-wide text-[10px]">{verb}</span>
+      <span className="font-normal truncate max-w-[260px]">{label}</span>
+      {detail && <span className="opacity-70 font-normal">· {detail}</span>}
+      {onDismiss && (status === "sent" || status === "failed" || status === "cancelled") && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="ml-1 opacity-60 hover:opacity-100"
+          aria-label="Dismiss status"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  );
+}
