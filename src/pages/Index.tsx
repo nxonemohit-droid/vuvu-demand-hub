@@ -20,6 +20,7 @@ import {
 } from "recharts";
 import { LeadCard } from "@/components/leads/LeadCard";
 import { enrichMany, LEAD_SELECT_COLUMNS, type RawLead, type Lead } from "@/lib/lead-shape";
+import { OutreachOverview } from "@/components/dashboard/OutreachOverview";
 
 type Stats = { leads: number; highPriority: number; candidates: number; signals: number };
 type RunRow = {
