@@ -217,7 +217,8 @@ Deno.serve(async (req) => {
             if (deepScrape) {
               const scraped = await firecrawlScrape(FIRECRAWL_API_KEY, url);
               parsed = (scraped?.json ?? {}) as Record<string, unknown>;
-              md = (scraped?.markdown ?? md ?? "") as string;
+              const rawMd = (scraped?.markdown ?? md ?? "") as string;
+              md = typeof rawMd === "string" ? rawMd.slice(0, 4000) : "";
             }
 
             if ((parsed as { is_job_posting?: boolean })?.is_job_posting === false) { leadsRejected++; continue; }
