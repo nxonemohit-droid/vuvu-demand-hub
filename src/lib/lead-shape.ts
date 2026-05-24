@@ -23,6 +23,8 @@ export type RawLead = {
   contact_email: string | null;
   contact_name: string | null;
   contact_phone: string | null;
+  phone_e164?: string | null;
+  whatsapp_number?: string | null;
   source_url: string | null;
   created_at: string;
   demand_size: number | null;
@@ -43,7 +45,7 @@ export type Lead = RawLead & {
 };
 
 export const LEAD_SELECT_COLUMNS =
-  "id,employer_name,role,country,city,priority,score,urgency_score,quality_score,contact_email,contact_name,contact_phone,source_url,created_at,demand_size,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)";
+  "id,employer_name,role,country,city,priority,score,urgency_score,quality_score,contact_email,contact_name,contact_phone,phone_e164,whatsapp_number,source_url,created_at,demand_size,worker_origin_focus,target_audience_type,sector_tags,raw_signals(payload)";
 
 /* ---------------- pickers ---------------- */
 
