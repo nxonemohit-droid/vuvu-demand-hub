@@ -23,6 +23,9 @@ type QueueResult = {
   skipped_same_email_dedup: number;
   first_send_at: string | null;
   last_send_at: string | null;
+  interval_seconds?: number;
+  daily_cap?: number;
+  estimated_days?: number;
   samples?: Array<{ to_email: string; subject: string; body: string; send_at: string }>;
 };
 
@@ -174,6 +177,13 @@ export function QueueDemandOutreachCard() {
             <div className="text-muted-foreground">
               First send: {new Date(preview.first_send_at).toLocaleString()} · Last send:{" "}
               {preview.last_send_at ? new Date(preview.last_send_at).toLocaleString() : "—"}
+            </div>
+          )}
+          {preview.interval_seconds && (
+            <div className="text-muted-foreground">
+              Pace: 1 email every {Math.round(preview.interval_seconds)}s ·{" "}
+              {preview.daily_cap}/day · ~{preview.estimated_days} day
+              {preview.estimated_days === 1 ? "" : "s"} to finish
             </div>
           )}
         </div>
