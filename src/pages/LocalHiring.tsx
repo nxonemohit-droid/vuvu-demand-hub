@@ -20,8 +20,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Loader2, RefreshCw, Sparkles, Mail, Phone, ExternalLink, Globe2,
-  Send, Download, Flame, Filter,
+  Send, Download, Flame, Filter, FileSpreadsheet, FileText,
 } from "lucide-react";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { QueueDemandOutreachCard } from "@/components/outreach/QueueDemandOutreachCard";
 import { EnrichEmailsCard } from "@/components/outreach/EnrichEmailsCard";
 import { WhatsAppOutreachCard } from "@/components/outreach/WhatsAppOutreachCard";
@@ -106,6 +109,25 @@ function toCsv(rows: Lead[]): string {
     l.posted_at_local ?? l.created_at, l.source_url,
   ].map(esc).join(","));
   return [head.join(","), ...lines].join("\n");
+}
+
+function toExportRows(rows: Lead[]) {
+  return rows.map((l) => ({
+    Score: l.lead_score,
+    Company: l.employer_name ?? "",
+    Role: l.role,
+    Trade: l.trade_category ?? "",
+    Country: l.country,
+    City: l.city ?? "",
+    Email: l.contact_email ?? "",
+    Phone: l.phone_e164 ?? l.contact_phone ?? "",
+    Vacancies: l.vacancy_count,
+    "Direct Employer": l.is_direct_employer ? "Yes" : "No",
+    Reposts: l.repost_count,
+    Board: l.discovered_board ?? "",
+    "Posted At": l.posted_at_local ?? l.created_at,
+    "Source URL": l.source_url ?? "",
+  }));
 }
 
 export default function LocalHiring() {
