@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Mail, MessageCircle, Send, Plus, Loader2, Info } from "lucide-react";
+import { Mail, MessageCircle, Send, Plus, Loader2, Info, RotateCcw, Trash2 } from "lucide-react";
 import { EmailQueueStatusPanel } from "./EmailQueueStatusPanel";
 
 function todayIso() { return new Date().toISOString().slice(0, 10); }
@@ -54,6 +54,62 @@ export function OutreachCommandCenter({ onJump }: { onJump: (tab: string) => voi
     },
     onSuccess: (d) => { toast.success(`Processed: ${d?.sent ?? d?.processed ?? "ok"}`); qc.invalidateQueries(); },
     onError: (e: any) => toast.error(e?.message ?? "Send failed"),
+  });
+
+  const todayStart = `${todayIso()}T00:00:00Z`;
+
+  const retryFailed = useMutation({
+    mutationFn: async () => {
+      const { data: em, error: e1 } = await supabase
+        .from("scheduled_emails")
+        .update({ status: "pending", attempts: 0, error: null, send_at: new Date().toISOString() })
+        .eq("status", "failed")
+        .gte("updated_at", todayStart)
+        .select("id");
+      if (e1) throw e1;
+      const { data: wa, error: e2 } = await (supabase as any)
+        .from("whatsapp_outreach")
+        .update({ status: "pending", error: null })
+        .eq("status", "failed")
+        .eq("queue_date", todayIso())
+        .select("id");
+      if (e2 && e2.code !== "42P01") throw e2;
+      return { emails: em?.length ?? 0, wa: wa?.length ?? 0 };
+    },
+    onSuccess: (d) => {
+      toast.success(`Retrying ${d.emails} emails + ${d.wa} WhatsApp`);
+      qc.invalidateQueries();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
+  });
+
+  const clearToday = useMutation({
+    mutationFn: async () => {
+      if (!confirm("Cancel ALL pending demand emails and WhatsApp queued today? This cannot be undone.")) {
+        throw new Error("cancelled");
+      }
+      const { data: em, error: e1 } = await supabase
+        .from("scheduled_emails")
+        .update({ status: "cancelled", error: "cleared by user" })
+        .eq("status", "pending")
+        .eq("template_name", "voynova_demand_outreach")
+        .gte("created_at", todayStart)
+        .select("id");
+      if (e1) throw e1;
+      const { data: wa, error: e2 } = await (supabase as any)
+        .from("whatsapp_outreach")
+        .update({ status: "cancelled" })
+        .eq("status", "pending")
+        .eq("queue_date", todayIso())
+        .select("id");
+      if (e2 && e2.code !== "42P01") throw e2;
+      return { emails: em?.length ?? 0, wa: wa?.length ?? 0 };
+    },
+    onSuccess: (d) => {
+      toast.success(`Cleared ${d.emails} emails + ${d.wa} WhatsApp from today`);
+      qc.invalidateQueries();
+    },
+    onError: (e: any) => { if (e?.message !== "cancelled") toast.error(e?.message ?? "Clear failed"); },
   });
 
   const s = stats.data;
@@ -165,6 +221,38 @@ export function OutreachCommandCenter({ onJump }: { onJump: (tab: string) => voi
 
         <div className="mt-4">
           <EmailQueueStatusPanel />
+        </div>
+
+        <div className="mt-3 rounded-lg border border-dashed bg-background/60 p-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Stuck?</span> One-click recovery for today's queues.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={() => retryFailed.mutate()} disabled={retryFailed.isPending}>
+                    {retryFailed.isPending ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5 mr-2" />}
+                    Retry failed
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  Resets every email and WhatsApp message that failed today back to pending so the next send pass tries them again.
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={() => clearToday.mutate()} disabled={clearToday.isPending}>
+                    {clearToday.isPending ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-2" />}
+                    Clear today's queue
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  Cancels every pending demand email and WhatsApp message queued today. Already-sent messages are not affected. Use this when something looks stuck and you want a clean slate.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
         </div>
       </Card>
     </TooltipProvider>
