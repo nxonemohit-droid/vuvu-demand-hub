@@ -789,6 +789,14 @@ const Mail = () => {
       </div>
         </TabsContent>
 
+        <TabsContent value="demand">
+          <QueueDemandOutreachCard />
+        </TabsContent>
+
+        <TabsContent value="whatsapp">
+          <WhatsAppOutreachCard />
+        </TabsContent>
+
         <TabsContent value="scheduled">
           <Card><CardContent className="pt-6">
             <div className="rounded-md border max-h-[600px] overflow-auto">
