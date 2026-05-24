@@ -12,15 +12,23 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Play, Pause, Plus, Send, RefreshCw, ChevronRight, Mail, AlertTriangle, CheckCircle2,
+  MessageCircle, Linkedin, Users, ExternalLink,
 } from "lucide-react";
+import { pickLeadPhone } from "@/lib/phone";
+
+type Channel = "email" | "whatsapp" | "linkedin";
+type LeadSource = "recruiter" | "demand";
 
 type Campaign = {
   id: string;
   name: string;
   status: "draft" | "active" | "paused" | "completed";
+  channel: Channel;
+  lead_source: LeadSource;
   total_recipients: number;
   sent_count: number;
   failed_count: number;
@@ -38,8 +46,13 @@ type CampaignEmail = {
   id: string;
   campaign_id: string;
   recruiter_id: string | null;
-  email_to: string;
-  subject: string;
+  demand_lead_id: string | null;
+  channel: Channel;
+  email_to: string | null;
+  to_phone: string | null;
+  to_linkedin: string | null;
+  subject: string | null;
+  body_html: string | null;
   status: "pending" | "sent" | "failed" | "bounced" | "skipped";
   scheduled_for: string | null;
   sent_at: string | null;
@@ -49,17 +62,49 @@ type CampaignEmail = {
   error: string | null;
 };
 
-type Lead = {
+type RecruiterLead = {
   id: string;
   agency_name: string;
   contact_name: string | null;
   contact_email: string | null;
+  contact_phone: string | null;
+  contact_linkedin: string | null;
   hq_country: string | null;
   operating_eu_country: string | null;
   trades: string[] | null;
   quality_score: number | null;
   email_status: string;
   email_source: string | null;
+};
+
+type DemandLead = {
+  id: string;
+  employer_name: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  phone_e164: string | null;
+  whatsapp_number: string | null;
+  country: string | null;
+  city: string | null;
+  role: string | null;
+  trade_category: string | null;
+  quality_score: number | null;
+  outreach_queued: boolean | null;
+};
+
+type AnyRecipient = {
+  lead_id: string;
+  source: LeadSource;
+  display_name: string;
+  email: string | null;
+  phone: string | null;
+  phone_e164: string | null;
+  linkedin: string | null;
+  country: string | null;
+  meta: string;
+  quality: number;
+  already_contacted: boolean;
 };
 
 const DEFAULT_SUBJECT =
@@ -79,11 +124,25 @@ const DEFAULT_BODY =
   `\ud83d\udce7 mohit@voynovaglobal.com<br>` +
   `\ud83c\udf10 www.voynovaglobal.com`;
 
+const DEFAULT_WA_MESSAGE =
+  `Hi {{first_name}}, this is Mohit from Voynova Global Solutions.\n\n` +
+  `We help employers in {{eu_country}} hire pre-vetted blue-collar workers (welders, drivers, construction, factory) from India, Nepal & Bangladesh \u2014 fully compliance-managed, visa + deployment included.\n\n` +
+  `Saw your hiring for {{role}} at {{agency_name}}. Open to a 10-min chat this week?`;
+
+const DEFAULT_LINKEDIN_NOTE =
+  `Hi {{first_name}} \u2014 reaching out from Voynova Global Solutions. We supply pre-vetted blue-collar workers (welders, drivers, construction) to EU employers from India / Nepal / Bangladesh with full visa + compliance support. Saw your role for {{role}} \u2014 worth a 10-min chat?`;
+
 const STATUS_TONE: Record<Campaign["status"], string> = {
   draft: "bg-muted text-foreground",
   active: "bg-emerald-600 text-white hover:bg-emerald-600",
   paused: "bg-amber-500 text-white hover:bg-amber-500",
   completed: "bg-blue-600 text-white hover:bg-blue-600",
+};
+
+const CHANNEL_META: Record<Channel, { label: string; Icon: typeof Mail; tone: string }> = {
+  email:    { label: "Email",    Icon: Mail,          tone: "bg-primary/15 text-primary" },
+  whatsapp: { label: "WhatsApp", Icon: MessageCircle, tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  linkedin: { label: "LinkedIn", Icon: Linkedin,      tone: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
 };
 
 const fmtDate = (iso: string | null) =>
