@@ -158,12 +158,36 @@ Deno.serve(async (req) => {
     const windowHours = Math.max(1, endHourUtc - startHourUtc);
     const intervalSec = Math.max(30, Math.floor((windowHours * 3600) / dailyCap));
 
-    // First send slot = today at startHourUtc if still in future, else tomorrow.
+    // Snap a candidate time into the next in-window slot.
+    const snapToWindow = (t: Date): Date => {
+      const d = new Date(t);
+      const h = d.getUTCHours();
+      if (h < startHourUtc) {
+        d.setUTCHours(startHourUtc, 0, 0, 0);
+      } else if (h >= endHourUtc) {
+        d.setUTCDate(d.getUTCDate() + 1);
+        d.setUTCHours(startHourUtc, 0, 0, 0);
+      }
+      return d;
+    };
+
+    // Continue after the latest already-pending send_at so a re-queue never collides.
+    const { data: lastPending } = await admin
+      .from("scheduled_emails")
+      .select("send_at")
+      .eq("template_name", templateName)
+      .eq("status", "pending")
+      .order("send_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     const now = new Date();
-    const firstSlot = new Date(now);
-    firstSlot.setUTCHours(startHourUtc, 0, 0, 0);
-    if (firstSlot.getTime() <= now.getTime() + 60_000) {
-      firstSlot.setUTCDate(firstSlot.getUTCDate() + 1);
+    let firstSlot: Date;
+    if (lastPending?.send_at) {
+      firstSlot = snapToWindow(new Date(new Date(lastPending.send_at).getTime() + intervalSec * 1000));
+    } else {
+      // Start now if we're in the send window, otherwise jump to the next window opening.
+      firstSlot = snapToWindow(new Date(now.getTime() + 60_000));
     }
 
     let queuedIndex = 0;
@@ -235,6 +259,9 @@ Deno.serve(async (req) => {
         skipped_same_email_dedup: skippedSameEmail,
         first_send_at: rows[0]?.send_at ?? null,
         last_send_at: rows[rows.length - 1]?.send_at ?? null,
+        interval_seconds: intervalSec,
+        daily_cap: dailyCap,
+        estimated_days: Math.max(1, Math.ceil(rows.length / dailyCap)),
         samples,
       });
     }
@@ -258,6 +285,9 @@ Deno.serve(async (req) => {
       skipped_same_email_dedup: skippedSameEmail,
       first_send_at: rows[0]?.send_at ?? null,
       last_send_at: rows[rows.length - 1]?.send_at ?? null,
+      interval_seconds: intervalSec,
+      daily_cap: dailyCap,
+      estimated_days: Math.max(1, Math.ceil(inserted / dailyCap)),
     });
   } catch (e) {
     console.error("queue-demand-lead-outreach", e);
