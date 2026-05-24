@@ -128,20 +128,27 @@ Deno.serve(async (req) => {
         contact_name: firstName(lead.contact_name) || "Hiring Manager",
         employer_name: lead.employer_name?.trim() || "your company",
         role: lead.role?.toLowerCase().trim() || "skilled workers",
-        country: lead.country || "",
-        city: lead.city || lead.country || "your region",
-        trade_category: lead.trade_category || "blue-collar",
+        country: (lead.country && lead.country.trim()) || "Europe",
+        city: (lead.city && lead.city.trim()) || (lead.country && lead.country.trim()) || "your region",
+        trade_category: (lead.trade_category && lead.trade_category.trim()) || "blue-collar",
       };
 
       const dayOffset = Math.floor(queuedIndex / dailyCap);
       const slotInDay = queuedIndex % dailyCap;
       const sendAt = new Date(firstSlot.getTime() + dayOffset * 86_400_000 + slotInDay * intervalSec * 1000);
 
+      // Clean up any stray "x, x" duplicates (e.g. when city == country)
+      const cleanSubject = render(tpl.subject, vars).replace(/\s+,/g, ",").replace(/,\s*,/g, ",");
+      const cleanBody = render(tpl.body, vars)
+        .replace(/\s+,/g, ",")
+        .replace(/,\s*,/g, ",")
+        .replace(/in ([^,\n]+), \1\b/gi, "in $1");
+
       rows.push({
         lead_id: lead.id,
         to_email: email,
-        subject: render(tpl.subject, vars),
-        body: render(tpl.body, vars),
+        subject: cleanSubject,
+        body: cleanBody,
         send_at: sendAt.toISOString(),
         status: "pending",
         template_name: templateName,
