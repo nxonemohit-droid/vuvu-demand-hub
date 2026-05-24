@@ -545,6 +545,8 @@ const Mail = () => {
       <Tabs defaultValue="compose" className="space-y-4">
         <TabsList>
           <TabsTrigger value="compose"><MailIcon className="h-3.5 w-3.5 mr-1.5" />Compose</TabsTrigger>
+          <TabsTrigger value="demand"><Megaphone className="h-3.5 w-3.5 mr-1.5" />Demand emails</TabsTrigger>
+          <TabsTrigger value="whatsapp"><MessageCircle className="h-3.5 w-3.5 mr-1.5" />WhatsApp</TabsTrigger>
           <TabsTrigger value="scheduled"><Clock className="h-3.5 w-3.5 mr-1.5" />Scheduled ({scheduled.filter(s => s.status === "pending").length})</TabsTrigger>
           <TabsTrigger value="suppressions"><ShieldOff className="h-3.5 w-3.5 mr-1.5" />Suppressions ({suppressions.length})</TabsTrigger>
           <TabsTrigger value="analytics"><BarChart3 className="h-3.5 w-3.5 mr-1.5" />Analytics</TabsTrigger>
