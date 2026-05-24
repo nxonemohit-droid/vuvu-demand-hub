@@ -371,7 +371,7 @@ export default function LeadDetail() {
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
-                onClick={sendEmailDirect}
+                onClick={() => setConfirmEmailOpen(true)}
                 disabled={!primaryEmail || !outreach || sendingEmail}
                 className="bg-primary"
               >
@@ -381,19 +381,12 @@ export default function LeadDetail() {
               <Button
                 size="sm"
                 variant="outline"
-                asChild
                 disabled={!waHref}
+                onClick={() => setConfirmWhatsappOpen(true)}
                 className="border-emerald-500/50 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
               >
-                <a
-                  href={waHref || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => waHref && logWhatsappClick()}
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  {waNumber ? "Send WhatsApp" : "No phone"}
-                </a>
+                <MessageCircle className="h-4 w-4 mr-2" />
+                {waNumber ? "Send WhatsApp" : "No phone"}
               </Button>
               <Button
                 size="sm"
