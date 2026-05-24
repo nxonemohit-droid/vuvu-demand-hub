@@ -60,7 +60,7 @@ import {
   type RawLead,
 } from "@/lib/lead-shape";
 import { buildOutreachTemplate } from "@/lib/lead-outreach";
-import { pickLeadPhone, parsePhone } from "@/lib/phone";
+import { pickLeadPhone } from "@/lib/phone";
 import { LeadCrmCard } from "@/components/leads/LeadCrmCard";
 
 type ContactLogEntry = {
