@@ -29,6 +29,7 @@ import {
 import { QueueDemandOutreachCard } from "@/components/outreach/QueueDemandOutreachCard";
 import { WhatsAppOutreachCard } from "@/components/outreach/WhatsAppOutreachCard";
 import { OutreachCommandCenter } from "@/components/outreach/OutreachCommandCenter";
+import { MailWalkthrough } from "@/components/outreach/MailWalkthrough";
 
 type Lead = {
   id: string;
@@ -539,9 +540,12 @@ const Mail = () => {
             Pick recipients, choose or write a template, preview and send personalised emails in bulk.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => { loadLeads(); loadTemplates(); loadOps(); }}>
-          <RefreshCw className="h-4 w-4 mr-1.5" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <MailWalkthrough />
+          <Button variant="outline" size="sm" onClick={() => { loadLeads(); loadTemplates(); loadOps(); }}>
+            <RefreshCw className="h-4 w-4 mr-1.5" /> Refresh
+          </Button>
+        </div>
       </header>
 
       <OutreachCommandCenter onJump={(t) => setActiveTab(t)} />
