@@ -152,20 +152,34 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const ids: string[] | undefined = body?.ids;
     const limit = Math.min(Math.max(Number(body?.limit) || 50, 1), 200);
+    const emailOnly: boolean = body?.email_only === true;
+    const maxAttempts: number = Number.isFinite(body?.max_attempts) ? body.max_attempts : 2;
 
-    let q = admin.from("demand_leads")
-      .select("id, employer_name, source_url, country, contact_email, contact_phone, discovered_board_domain")
-      .or("contact_email.is.null,contact_phone.is.null")
-      .not("discovered_board_domain", "is", null)
-      .limit(limit);
-    if (ids?.length) q = admin.from("demand_leads")
-      .select("id, employer_name, source_url, country, contact_email, contact_phone, discovered_board_domain")
-      .in("id", ids);
+    const selectCols =
+      "id, employer_name, source_url, country, contact_email, contact_phone, discovered_board_domain, enrichment_attempts";
+    let q;
+    if (ids?.length) {
+      q = admin.from("demand_leads").select(selectCols).in("id", ids);
+    } else {
+      q = admin.from("demand_leads").select(selectCols);
+      if (emailOnly) {
+        q = q.or("contact_email.is.null,contact_email.eq.");
+      } else {
+        q = q.or("contact_email.is.null,contact_phone.is.null");
+      }
+      // Need *some* anchor for derivation
+      q = q
+        .or("employer_name.not.is.null,source_url.not.is.null,discovered_board_domain.not.is.null")
+        .lte("enrichment_attempts", maxAttempts)
+        .order("lead_score", { ascending: false })
+        .limit(limit);
+    }
 
     const { data: leads, error } = await q;
     if (error) return json({ error: error.message }, 500);
 
     let enriched = 0;
+    let emailsFound = 0;
     const details: Array<Record<string, unknown>> = [];
 
     for (const lead of leads ?? []) {
@@ -217,16 +231,17 @@ Deno.serve(async (req) => {
       }
 
       update.last_enriched_at = new Date().toISOString();
-      update.enrichment_attempts = 1;
+      update.enrichment_attempts = (lead.enrichment_attempts ?? 0) + 1;
 
       if (Object.keys(update).length > 1) {
         await admin.from("demand_leads").update(update).eq("id", lead.id);
         if (update.contact_email && update.contact_phone) enriched++;
+        if (update.contact_email && !lead.contact_email) emailsFound++;
       }
       details.push({ id: lead.id, domain, ...update });
     }
 
-    return json({ ok: true, processed: leads?.length ?? 0, enriched, details });
+    return json({ ok: true, processed: leads?.length ?? 0, enriched, emails_found: emailsFound, details });
   } catch (e) {
     console.error("enrich-contacts error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
