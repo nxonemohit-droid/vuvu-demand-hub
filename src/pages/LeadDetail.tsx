@@ -359,6 +359,32 @@ export default function LeadDetail() {
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
+                onClick={sendEmailDirect}
+                disabled={!primaryEmail || !outreach || sendingEmail}
+                className="bg-primary"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                {sendingEmail ? "Sending…" : "Send email now"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                asChild
+                disabled={!waHref}
+                className="border-emerald-500/50 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+              >
+                <a
+                  href={waHref || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => waHref && logWhatsappClick()}
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  {waNumber ? "Send WhatsApp" : "No phone"}
+                </a>
+              </Button>
+              <Button
+                size="sm"
                 variant="outline"
                 onClick={() => primaryEmail && copy(primaryEmail, "Email")}
                 disabled={!primaryEmail}
