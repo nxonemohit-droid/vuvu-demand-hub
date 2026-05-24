@@ -114,7 +114,9 @@ export function parsePhone(
 
   const iso2: CountryCode | undefined =
     typeof defaultCountry === "string"
-      ? countryToIso2(defaultCountry)
+      ? defaultCountry.length === 2
+        ? (defaultCountry.toUpperCase() as CountryCode)
+        : countryToIso2(defaultCountry)
       : (defaultCountry ?? undefined);
 
   try {
