@@ -151,6 +151,8 @@ Deno.serve(async (req) => {
     const deepScrape: boolean = body?.deep_scrape === true; // off by default for speed
     const expansionThreshold: number = Math.max(0, Number(body?.expansion_threshold) || 50);
     const expansionEnabled: boolean = body?.expansion_enabled !== false; // on by default
+    const maxBoards: number = Math.min(Math.max(Number(body?.max_boards) || 6, 1), 20);
+    const concurrency: number = Math.min(Math.max(Number(body?.concurrency) || 2, 1), 4);
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     // load keywords
@@ -215,7 +217,8 @@ Deno.serve(async (req) => {
             if (deepScrape) {
               const scraped = await firecrawlScrape(FIRECRAWL_API_KEY, url);
               parsed = (scraped?.json ?? {}) as Record<string, unknown>;
-              md = (scraped?.markdown ?? md ?? "") as string;
+              const rawMd = (scraped?.markdown ?? md ?? "") as string;
+              md = typeof rawMd === "string" ? rawMd.slice(0, 4000) : "";
             }
 
             if ((parsed as { is_job_posting?: boolean })?.is_job_posting === false) { leadsRejected++; continue; }
@@ -365,12 +368,11 @@ Deno.serve(async (req) => {
       };
     };
 
-    // Run boards in parallel chunks of 5 to maximize throughput within the timeout
+    // Run boards in small parallel chunks; cap total boards per invocation to avoid OOM.
     const summary: Array<Record<string, unknown>> = [];
-    const allBoards = boards ?? [];
-    const CHUNK = 5;
-    for (let i = 0; i < allBoards.length; i += CHUNK) {
-      const chunk = allBoards.slice(i, i + CHUNK);
+    const allBoards = (boards ?? []).slice(0, maxBoards);
+    for (let i = 0; i < allBoards.length; i += concurrency) {
+      const chunk = allBoards.slice(i, i + concurrency);
       const results = await Promise.all(chunk.map((b) => processBoard(b).catch((e) => ({
         board: b.board_domain, error: e instanceof Error ? e.message : String(e),
       }))));
