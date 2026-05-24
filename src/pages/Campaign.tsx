@@ -233,9 +233,9 @@ const CampaignPage = () => {
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Email Campaigns</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Outreach Campaigns</h1>
           <p className="text-sm text-muted-foreground">
-            Resend-powered drip campaigns. Default cap: 100 emails / day, 9 AM \u2013 5 PM IST.
+            Multi-channel campaigns (Email, WhatsApp, LinkedIn) targeting recruiter agencies or demand leads. Daily-capped, drip-scheduled.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -250,7 +250,20 @@ const CampaignPage = () => {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">All campaigns ({campaigns.length})</CardTitle>
+          <CardTitle className="text-base flex items-center gap-3 flex-wrap">
+            <span>All campaigns ({campaigns.length})</span>
+            <div className="flex gap-1.5 text-xs font-normal text-muted-foreground">
+              {(["email","whatsapp","linkedin"] as Channel[]).map((ch) => {
+                const n = campaigns.filter((c) => c.channel === ch).length;
+                const M = CHANNEL_META[ch];
+                return (
+                  <Badge key={ch} variant="outline" className="gap-1">
+                    <M.Icon className="h-3 w-3" /> {M.label} \u00b7 {n}
+                  </Badge>
+                );
+              })}
+            </div>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border overflow-x-auto">
@@ -258,6 +271,8 @@ const CampaignPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Channel</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>Daily limit</TableHead>
@@ -269,9 +284,16 @@ const CampaignPage = () => {
                 {campaigns.map((c) => {
                   const pct = c.total_recipients > 0
                     ? Math.round((c.sent_count / c.total_recipients) * 100) : 0;
+                  const CM = CHANNEL_META[c.channel ?? "email"];
                   return (
                     <TableRow key={c.id} className="cursor-pointer" onClick={() => setSelected(c)}>
                       <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell>
+                        <Badge className={`gap-1 ${CM.tone}`} variant="secondary">
+                          <CM.Icon className="h-3 w-3" /> {CM.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs capitalize text-muted-foreground">{c.lead_source ?? "recruiter"}</TableCell>
                       <TableCell>
                         <Badge className={STATUS_TONE[c.status]}>{c.status}</Badge>
                       </TableCell>
@@ -294,9 +316,14 @@ const CampaignPage = () => {
                       <TableCell className="text-sm">{fmtDate(c.start_date)}</TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1 flex-wrap">
-                          {c.status === "draft" && (
+                          {c.status === "draft" && c.channel === "email" && (
                             <Button size="sm" variant="outline" disabled={busy === c.id} onClick={() => launch(c)}>
                               <Play className="h-3.5 w-3.5 mr-1" /> Launch
+                            </Button>
+                          )}
+                          {c.status === "draft" && c.channel !== "email" && (
+                            <Button size="sm" variant="outline" disabled={busy === c.id} onClick={() => activateManual(c)}>
+                              <Play className="h-3.5 w-3.5 mr-1" /> Activate
                             </Button>
                           )}
                           {(c.status === "active" || c.status === "paused") && (
@@ -306,9 +333,15 @@ const CampaignPage = () => {
                                 : <><Play className="h-3.5 w-3.5 mr-1" /> Resume</>}
                             </Button>
                           )}
-                          <Button size="sm" disabled={busy === c.id || c.status !== "active"} onClick={() => sendTodayBatch(c)}>
-                            <Send className="h-3.5 w-3.5 mr-1" /> Send batch
-                          </Button>
+                          {c.channel === "email" ? (
+                            <Button size="sm" disabled={busy === c.id || c.status !== "active"} onClick={() => sendTodayBatch(c)}>
+                              <Send className="h-3.5 w-3.5 mr-1" /> Send batch
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="secondary" disabled={c.status === "draft"} onClick={() => setSelected(c)}>
+                              <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open queue
+                            </Button>
+                          )}
                           <Button size="sm" variant="ghost" onClick={() => setSelected(c)}>
                             <ChevronRight className="h-4 w-4" />
                           </Button>
@@ -322,7 +355,7 @@ const CampaignPage = () => {
                 })}
                 {campaigns.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
                       {loading ? "Loading\u2026" : "No campaigns yet. Click \u201cCreate Campaign\u201d to get started."}
                     </TableCell>
                   </TableRow>
