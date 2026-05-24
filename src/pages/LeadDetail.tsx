@@ -353,12 +353,12 @@ export default function LeadDetail() {
   const logWhatsappClick = async () => {
     if (!lead) return;
     const at = new Date().toISOString();
-    setWhatsappStatus({ number: waNumber, at });
+    setWhatsappStatus({ number: parsedPhone?.e164 ?? `+${waNumber}`, at });
     const { data: userData } = await supabase.auth.getUser();
     await supabase.from("lead_outreach_log").insert({
       lead_id: lead.id,
       channel: "whatsapp",
-      note: `Opened WhatsApp Web → +${waNumber}`,
+      note: `Opened WhatsApp Web → ${parsedPhone?.e164 ?? `+${waNumber}`}`,
       user_id: userData.user?.id ?? null,
     });
     loadLog();
@@ -466,7 +466,11 @@ export default function LeadDetail() {
                 className="border-emerald-500/50 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
               >
                 <MessageCircle className="h-4 w-4 mr-2" />
-                {waNumber ? "Send WhatsApp" : "No phone"}
+                {waNumber
+                  ? waValid
+                    ? "Send WhatsApp"
+                    : "Send WhatsApp (unverified)"
+                  : "No phone"}
               </Button>
               <Button
                 size="sm"
@@ -604,12 +608,12 @@ export default function LeadDetail() {
                 {e}
               </ContactButton>
             ))}
-            {lead.contact_phone && (
+            {(parsedPhone || lead.contact_phone) && (
               <ContactButton
-                href={`tel:${lead.contact_phone}`}
+                href={`tel:${parsedPhone?.e164 ?? lead.contact_phone}`}
                 icon={<Phone className="h-4 w-4" />}
               >
-                {lead.contact_phone}
+                {waDisplay || lead.contact_phone}
               </ContactButton>
             )}
             {lead.website_url && (
@@ -830,7 +834,15 @@ export default function LeadDetail() {
             <AlertDialogTitle>Open WhatsApp?</AlertDialogTitle>
             <AlertDialogDescription>
               This will open WhatsApp Web for{" "}
-              <span className="font-medium text-foreground">+{waNumber}</span> with
+              <span className="font-medium text-foreground">
+                {parsedPhone?.display ?? `+${waNumber}`}
+              </span>
+              {!waValid && (
+                <span className="ml-1 text-amber-600 dark:text-amber-400">
+                  (could not verify format — message may not deliver)
+                </span>
+              )}{" "}
+              with
               the outreach message pre-filled.
             </AlertDialogDescription>
           </AlertDialogHeader>
