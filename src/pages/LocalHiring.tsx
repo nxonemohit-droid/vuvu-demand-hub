@@ -22,6 +22,7 @@ import {
   Loader2, RefreshCw, Sparkles, Mail, Phone, ExternalLink, Globe2,
   Send, Download, Flame, Filter,
 } from "lucide-react";
+import { QueueDemandOutreachCard } from "@/components/outreach/QueueDemandOutreachCard";
 
 type Lead = {
   id: string;
@@ -307,6 +308,8 @@ export default function LocalHiring() {
           </div>
         </Card>
       )}
+
+      <QueueDemandOutreachCard />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Boards configured" value={boardsQ.data?.length ?? 0} />
