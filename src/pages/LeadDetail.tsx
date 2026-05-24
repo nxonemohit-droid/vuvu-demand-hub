@@ -60,6 +60,7 @@ import {
   type RawLead,
 } from "@/lib/lead-shape";
 import { buildOutreachTemplate } from "@/lib/lead-outreach";
+import { pickLeadPhone, parsePhone } from "@/lib/phone";
 import { LeadCrmCard } from "@/components/leads/LeadCrmCard";
 
 type ContactLogEntry = {
@@ -240,14 +241,28 @@ export default function LeadDetail() {
     toast.success("Added to Outreach");
   };
 
-  const primaryPhone = lead?.contact_phone ?? "";
-  const waNumber = primaryPhone.replace(/[^\d]/g, "");
+  const parsedPhone = useMemo(
+    () =>
+      lead
+        ? pickLeadPhone({
+            phone_e164: lead.phone_e164 ?? null,
+            whatsapp_number: lead.whatsapp_number ?? null,
+            contact_phone: lead.contact_phone ?? null,
+            country: lead.country,
+          })
+        : null,
+    [lead],
+  );
+  const waNumber = parsedPhone?.waDigits ?? "";
+  const waDisplay = parsedPhone?.display ?? lead?.contact_phone ?? "";
+  const waValid = !!parsedPhone?.valid;
   const waText = outreach
     ? `${outreach.body}`.replace(/\n{2,}/g, "\n\n")
     : "";
-  const waHref = waNumber && waText
-    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waText)}`
-    : "";
+  const waHref =
+    waNumber && waText
+      ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waText)}`
+      : "";
 
   const [sendingEmail, setSendingEmail] = useState(false);
   const sendEmailDirect = async () => {
