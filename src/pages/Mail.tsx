@@ -24,8 +24,10 @@ import { toast } from "sonner";
 import {
   Send, Save, Eye, FileText, Search, RefreshCw, Trash2, Plus, CheckCircle2, XCircle, Beaker,
   Clock, ShieldOff, BarChart3, Settings as SettingsIcon, Mail as MailIcon, Ban, X,
-  Download, Layers,
+  Download, Layers, MessageCircle, Megaphone,
 } from "lucide-react";
+import { QueueDemandOutreachCard } from "@/components/outreach/QueueDemandOutreachCard";
+import { WhatsAppOutreachCard } from "@/components/outreach/WhatsAppOutreachCard";
 
 type Lead = {
   id: string;
