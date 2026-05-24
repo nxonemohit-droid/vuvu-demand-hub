@@ -95,26 +95,34 @@ function extractPhones(text: string, dialCode?: string): string[] {
   return [...new Set(cleaned)];
 }
 
-async function scrapeText(apiKey: string, url: string): Promise<string> {
+async function scrapeText(apiKey: string, url: string, timeoutMs = 12000): Promise<string> {
   try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);
     const r = await fetch(`${FIRECRAWL_V2}/scrape`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: false }),
+      signal: ctl.signal,
     });
+    clearTimeout(timer);
     if (!r.ok) return "";
     const j = await r.json();
     return j?.data?.markdown ?? j?.markdown ?? "";
   } catch { return ""; }
 }
 
-async function hunterDomainSearch(domain: string): Promise<string | null> {
+async function hunterDomainSearch(domain: string, timeoutMs = 8000): Promise<string | null> {
   const key = Deno.env.get("HUNTER_API_KEY");
   if (!key) return null;
   try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);
     const r = await fetch(
       `https://api.hunter.io/v2/domain-search?domain=${domain}&limit=1&api_key=${key}`,
+      { signal: ctl.signal },
     );
+    clearTimeout(timer);
     if (!r.ok) return null;
     const j = await r.json();
     return j?.data?.emails?.[0]?.value ?? null;
@@ -151,7 +159,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const ids: string[] | undefined = body?.ids;
-    const limit = Math.min(Math.max(Number(body?.limit) || 50, 1), 200);
+    const limit = Math.min(Math.max(Number(body?.limit) || 10, 1), 50);
+    const concurrency = Math.min(Math.max(Number(body?.concurrency) || 6, 1), 12);
     const emailOnly: boolean = body?.email_only === true;
     const maxAttempts: number = Number.isFinite(body?.max_attempts) ? body.max_attempts : 2;
 
@@ -182,7 +191,7 @@ Deno.serve(async (req) => {
     let emailsFound = 0;
     const details: Array<Record<string, unknown>> = [];
 
-    for (const lead of leads ?? []) {
+    const processLead = async (lead: any) => {
       const iso = COUNTRY_TO_ISO[lead.country ?? ""] ?? null;
       const dial = iso ? DIAL_BY_ISO[iso] : undefined;
       const update: Record<string, unknown> = {};
@@ -239,7 +248,19 @@ Deno.serve(async (req) => {
         if (update.contact_email && !lead.contact_email) emailsFound++;
       }
       details.push({ id: lead.id, domain, ...update });
-    }
+    };
+
+    // Run with bounded concurrency
+    const queue = [...(leads ?? [])];
+    const workers = Array.from({ length: concurrency }, async () => {
+      while (queue.length) {
+        const lead = queue.shift();
+        if (!lead) break;
+        try { await processLead(lead); }
+        catch (e) { console.error("lead enrich failed", lead.id, e); }
+      }
+    });
+    await Promise.all(workers);
 
     return json({ ok: true, processed: leads?.length ?? 0, enriched, emails_found: emailsFound, details });
   } catch (e) {
