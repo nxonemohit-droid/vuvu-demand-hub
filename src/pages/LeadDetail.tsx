@@ -685,6 +685,70 @@ export default function LeadDetail() {
           </div>
         </Card>
       </div>
+
+      {/* Confirm Send Email */}
+      <AlertDialog open={confirmEmailOpen} onOpenChange={setConfirmEmailOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send email now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will queue an outreach email to{" "}
+              <span className="font-medium text-foreground">{primaryEmail}</span>{" "}
+              and trigger the send immediately.
+              <br />
+              Subject: <span className="italic">{outreach?.subject}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmEmailOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmEmailOpen(false);
+                sendEmailDirect();
+              }}
+              disabled={sendingEmail}
+            >
+              {sendingEmail ? "Sending…" : "Send email"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Open WhatsApp */}
+      <AlertDialog open={confirmWhatsappOpen} onOpenChange={setConfirmWhatsappOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Open WhatsApp?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will open WhatsApp Web for{" "}
+              <span className="font-medium text-foreground">+{waNumber}</span> with
+              the outreach message pre-filled.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmWhatsappOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              asChild
+              onClick={() => {
+                setConfirmWhatsappOpen(false);
+                logWhatsappClick();
+              }}
+            >
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open WhatsApp
+              </a>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
