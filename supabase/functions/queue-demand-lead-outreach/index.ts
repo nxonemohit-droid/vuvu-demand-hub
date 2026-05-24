@@ -31,6 +31,57 @@ function firstName(full: string | null | undefined): string {
   return t ? titleize(t) : "";
 }
 
+// Map a role/sector haystack into a coarse trade category.
+const TRADE_MAP: Array<{ cat: string; kws: string[] }> = [
+  { cat: "welding", kws: ["weld", "fabricat", "mig", "tig", "boilermaker"] },
+  { cat: "construction", kws: ["construct", "civil", "mason", "concret", "scaffold", "carpenter", "plaster", "tiler", "rebar", "steel fixer", "shuttering"] },
+  { cat: "driving", kws: ["driver", "trucker", "hgv", "cdl", "delivery driver", "chauffeur"] },
+  { cat: "electrical", kws: ["electric", "wiring", "electrician"] },
+  { cat: "plumbing", kws: ["plumb", "pipefitter", "pipe fitter"] },
+  { cat: "mechanical", kws: ["mechanic", "fitter", "millwright", "hvac", "technician"] },
+  { cat: "warehouse", kws: ["warehouse", "picker", "packer", "forklift", "loader"] },
+  { cat: "factory", kws: ["factory", "production", "assembly", "machine operator", "operator"] },
+  { cat: "hospitality", kws: ["hotel", "kitchen", "chef", "waiter", "waitress", "housekeep", "restaurant", "barista"] },
+  { cat: "agriculture", kws: ["farm", "harvest", "agricultur", "greenhouse"] },
+  { cat: "logistics", kws: ["logistic", "courier", "dispatch"] },
+  { cat: "healthcare", kws: ["nurse", "caregiver", "carer", "healthcare"] },
+  { cat: "cleaning", kws: ["clean", "janitor", "housekeep"] },
+];
+
+function deriveTradeCategory(
+  role: string | null | undefined,
+  sectorTags: string[] | null | undefined,
+  matchedKeywords: string[] | null | undefined,
+  notes: string | null | undefined,
+): string {
+  const hay = [
+    role ?? "",
+    (sectorTags ?? []).join(" "),
+    (matchedKeywords ?? []).join(" "),
+    notes ?? "",
+  ].join(" ").toLowerCase();
+  for (const { cat, kws } of TRADE_MAP) {
+    if (kws.some((k) => hay.includes(k))) return cat;
+  }
+  return "";
+}
+
+function deriveRole(
+  role: string | null | undefined,
+  sectorTags: string[] | null | undefined,
+  matchedKeywords: string[] | null | undefined,
+  trade: string,
+): string {
+  const r = (role ?? "").trim();
+  if (r) return r.toLowerCase();
+  const fromSector = (sectorTags ?? []).find((s) => s && s.trim().length > 1);
+  if (fromSector) return fromSector.toLowerCase();
+  const fromKw = (matchedKeywords ?? []).find((s) => s && s.trim().length > 1);
+  if (fromKw) return fromKw.toLowerCase();
+  if (trade) return `skilled ${trade} workers`;
+  return "skilled workers";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -86,7 +137,7 @@ Deno.serve(async (req) => {
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await admin
         .from("demand_leads")
-        .select("id, employer_name, role, country, city, contact_email, contact_name, trade_category")
+        .select("id, employer_name, role, country, city, contact_email, contact_name, trade_category, sector_tags, matched_keywords, notes")
         .not("contact_email", "is", null)
         .neq("contact_email", "")
         .order("lead_score", { ascending: false })
@@ -124,13 +175,18 @@ Deno.serve(async (req) => {
       if (seenEmails.has(email)) { skippedSameEmail++; continue; }
       seenEmails.add(email);
 
+      const trade =
+        (lead.trade_category && lead.trade_category.trim()) ||
+        deriveTradeCategory(lead.role, lead.sector_tags, lead.matched_keywords, lead.notes) ||
+        "blue-collar";
+      const derivedRole = deriveRole(lead.role, lead.sector_tags, lead.matched_keywords, trade);
       const vars: Record<string, string> = {
         contact_name: firstName(lead.contact_name) || "Hiring Manager",
         employer_name: lead.employer_name?.trim() || "your company",
-        role: lead.role?.toLowerCase().trim() || "skilled workers",
+        role: derivedRole,
         country: (lead.country && lead.country.trim()) || "Europe",
         city: (lead.city && lead.city.trim()) || (lead.country && lead.country.trim()) || "your region",
-        trade_category: (lead.trade_category && lead.trade_category.trim()) || "blue-collar",
+        trade_category: trade,
       };
 
       const dayOffset = Math.floor(queuedIndex / dailyCap);
@@ -157,6 +213,19 @@ Deno.serve(async (req) => {
     }
 
     if (dryRun) {
+      // Pick a few representative samples: highest score, mid, last
+      const sampleIdx = rows.length === 0
+        ? []
+        : Array.from(new Set([0, Math.floor(rows.length / 2), rows.length - 1]));
+      const samples = sampleIdx.map((i) => {
+        const r = rows[i];
+        return {
+          to_email: r.to_email,
+          subject: r.subject,
+          body: r.body,
+          send_at: r.send_at,
+        };
+      });
       return json({
         dry_run: true,
         candidates: leads.length,
@@ -166,7 +235,7 @@ Deno.serve(async (req) => {
         skipped_same_email_dedup: skippedSameEmail,
         first_send_at: rows[0]?.send_at ?? null,
         last_send_at: rows[rows.length - 1]?.send_at ?? null,
-        sample: rows.slice(0, 2),
+        samples,
       });
     }
 

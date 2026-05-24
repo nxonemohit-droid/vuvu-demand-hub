@@ -23,6 +23,7 @@ type QueueResult = {
   skipped_same_email_dedup: number;
   first_send_at: string | null;
   last_send_at: string | null;
+  samples?: Array<{ to_email: string; subject: string; body: string; send_at: string }>;
 };
 
 export function QueueDemandOutreachCard() {
@@ -175,6 +176,35 @@ export function QueueDemandOutreachCard() {
               {preview.last_send_at ? new Date(preview.last_send_at).toLocaleString() : "—"}
             </div>
           )}
+        </div>
+      )}
+
+      {preview?.samples && preview.samples.length > 0 && (
+        <div className="mt-4 space-y-3">
+          <div className="text-sm font-medium flex items-center gap-2">
+            <Badge variant="outline">Personalisation preview</Badge>
+            <span className="text-muted-foreground">
+              {preview.samples.length} sample email{preview.samples.length === 1 ? "" : "s"} (first / middle / last)
+            </span>
+          </div>
+          <div className="grid gap-3">
+            {preview.samples.map((s, i) => (
+              <div key={i} className="rounded-md border bg-background/80 p-3 text-sm">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="font-mono text-xs text-muted-foreground truncate">
+                    To: {s.to_email}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(s.send_at).toLocaleString()}
+                  </div>
+                </div>
+                <div className="font-semibold mb-2">{s.subject}</div>
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground/90 max-h-72 overflow-auto">
+                  {s.body}
+                </pre>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </Card>
