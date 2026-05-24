@@ -15,7 +15,7 @@ type Stats = {
   enrichable: number;
 };
 
-const BATCH = 25;
+const BATCH = 10;
 
 export function EnrichEmailsCard() {
   const qc = useQueryClient();
@@ -55,7 +55,7 @@ export function EnrichEmailsCard() {
 
   async function runBatch() {
     const { data, error } = await supabase.functions.invoke("enrich-contacts", {
-      body: { email_only: true, limit: BATCH, max_attempts: 2 },
+      body: { email_only: true, limit: BATCH, max_attempts: 2, concurrency: 6 },
     });
     if (error) throw error;
     return data as { processed: number; emails_found: number };
