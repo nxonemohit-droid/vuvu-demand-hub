@@ -42,6 +42,10 @@ import {
   Activity,
   StickyNote,
   MessageCircle,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Clock,
 } from "lucide-react";
 import { countryFlag } from "@/lib/country-flags";
 import {
@@ -105,6 +109,17 @@ export default function LeadDetail() {
   const [savingLog, setSavingLog] = useState(false);
   const [confirmEmailOpen, setConfirmEmailOpen] = useState(false);
   const [confirmWhatsappOpen, setConfirmWhatsappOpen] = useState(false);
+
+  type EmailLiveStatus = {
+    id: string;
+    to: string;
+    status: "queued" | "sending" | "sent" | "failed" | "cancelled";
+    error?: string | null;
+    updatedAt: string;
+  };
+  type WhatsappLiveStatus = { number: string; at: string };
+  const [emailStatus, setEmailStatus] = useState<EmailLiveStatus | null>(null);
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsappLiveStatus | null>(null);
 
   const loadLog = async () => {
     if (!id) return;
@@ -241,9 +256,15 @@ export default function LeadDetail() {
       return;
     }
     setSendingEmail(true);
+    setEmailStatus({
+      id: "",
+      to: primaryEmail,
+      status: "queued",
+      updatedAt: new Date().toISOString(),
+    });
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const { error: insErr } = await supabase.from("scheduled_emails").insert({
+      const { data: inserted, error: insErr } = await supabase.from("scheduled_emails").insert({
         lead_id: lead.id,
         to_email: primaryEmail,
         subject: outreach.subject,
@@ -252,8 +273,17 @@ export default function LeadDetail() {
         status: "pending",
         template_name: "voynova_demand_outreach",
         created_by: userData.user?.id ?? null,
-      });
+      }).select("id").maybeSingle();
       if (insErr) throw insErr;
+      const scheduledId = inserted?.id as string | undefined;
+      if (scheduledId) {
+        setEmailStatus({
+          id: scheduledId,
+          to: primaryEmail,
+          status: "sending",
+          updatedAt: new Date().toISOString(),
+        });
+      }
       const { error: fnErr } = await supabase.functions.invoke("process-scheduled-emails", { body: {} });
       if (fnErr) throw fnErr;
       await supabase.from("lead_outreach_log").insert({
@@ -264,16 +294,51 @@ export default function LeadDetail() {
       });
       toast.success(`Email sent to ${primaryEmail}`);
       loadLog();
+      if (scheduledId) pollEmailStatus(scheduledId, primaryEmail);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Failed to send email");
+      setEmailStatus((prev) =>
+        prev
+          ? { ...prev, status: "failed", error: e?.message ?? "Send failed", updatedAt: new Date().toISOString() }
+          : prev,
+      );
     } finally {
       setSendingEmail(false);
     }
   };
 
+  const pollEmailStatus = async (scheduledId: string, to: string) => {
+    const deadline = Date.now() + 45_000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const { data, error } = await supabase
+        .from("scheduled_emails")
+        .select("status, error, updated_at, sent_at")
+        .eq("id", scheduledId)
+        .maybeSingle();
+      if (error || !data) continue;
+      const raw = String(data.status ?? "").toLowerCase();
+      let mapped: EmailLiveStatus["status"] = "sending";
+      if (raw === "sent" || data.sent_at) mapped = "sent";
+      else if (raw === "failed" || raw === "error") mapped = "failed";
+      else if (raw === "cancelled") mapped = "cancelled";
+      else if (raw === "pending") mapped = "queued";
+      setEmailStatus({
+        id: scheduledId,
+        to,
+        status: mapped,
+        error: (data as any).error ?? null,
+        updatedAt: (data as any).updated_at ?? new Date().toISOString(),
+      });
+      if (mapped === "sent" || mapped === "failed" || mapped === "cancelled") return;
+    }
+  };
+
   const logWhatsappClick = async () => {
     if (!lead) return;
+    const at = new Date().toISOString();
+    setWhatsappStatus({ number: waNumber, at });
     const { data: userData } = await supabase.auth.getUser();
     await supabase.from("lead_outreach_log").insert({
       lead_id: lead.id,
