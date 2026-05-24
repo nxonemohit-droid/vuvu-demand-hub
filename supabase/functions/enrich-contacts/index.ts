@@ -159,8 +159,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const ids: string[] | undefined = body?.ids;
-    const limit = Math.min(Math.max(Number(body?.limit) || 10, 1), 50);
-    const concurrency = Math.min(Math.max(Number(body?.concurrency) || 6, 1), 12);
+    const limit = Math.min(Math.max(Number(body?.limit) || 8, 1), 25);
+    const concurrency = Math.min(Math.max(Number(body?.concurrency) || 3, 1), 4);
     const emailOnly: boolean = body?.email_only === true;
     const maxAttempts: number = Number.isFinite(body?.max_attempts) ? body.max_attempts : 2;
 
@@ -186,10 +186,6 @@ Deno.serve(async (req) => {
 
     const { data: leads, error } = await q;
     if (error) return json({ error: error.message }, 500);
-
-    let enriched = 0;
-    let emailsFound = 0;
-    const details: Array<Record<string, unknown>> = [];
 
     const processLead = async (lead: any) => {
       const iso = COUNTRY_TO_ISO[lead.country ?? ""] ?? null;
@@ -244,25 +240,32 @@ Deno.serve(async (req) => {
 
       if (Object.keys(update).length > 1) {
         await admin.from("demand_leads").update(update).eq("id", lead.id);
-        if (update.contact_email && update.contact_phone) enriched++;
-        if (update.contact_email && !lead.contact_email) emailsFound++;
       }
-      details.push({ id: lead.id, domain, ...update });
     };
 
-    // Run with bounded concurrency
+    // Run in background to avoid CPU/wall-clock limits on the request handler.
     const queue = [...(leads ?? [])];
-    const workers = Array.from({ length: concurrency }, async () => {
-      while (queue.length) {
-        const lead = queue.shift();
-        if (!lead) break;
-        try { await processLead(lead); }
-        catch (e) { console.error("lead enrich failed", lead.id, e); }
-      }
-    });
-    await Promise.all(workers);
+    const run = async () => {
+      const workers = Array.from({ length: concurrency }, async () => {
+        while (queue.length) {
+          const lead = queue.shift();
+          if (!lead) break;
+          try { await processLead(lead); }
+          catch (e) { console.error("lead enrich failed", lead.id, e); }
+        }
+      });
+      await Promise.all(workers);
+    };
+    // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(run());
+    } else {
+      // Fallback: fire and forget
+      run().catch((e) => console.error("enrich-contacts bg", e));
+    }
 
-    return json({ ok: true, processed: leads?.length ?? 0, enriched, emails_found: emailsFound, details });
+    return json({ ok: true, queued: leads?.length ?? 0, background: true });
   } catch (e) {
     console.error("enrich-contacts error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
