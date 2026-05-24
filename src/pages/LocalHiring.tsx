@@ -287,6 +287,73 @@ export default function LocalHiring() {
     URL.revokeObjectURL(url);
   };
 
+  const stamp = () => new Date().toISOString().slice(0, 10);
+
+  const exportExcel = () => {
+    const rows = toExportRows(leads);
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Auto-size columns based on content
+    const cols = Object.keys(rows[0] ?? {});
+    ws["!cols"] = cols.map((c) => ({
+      wch: Math.min(40, Math.max(c.length, ...rows.map((r) => String((r as Record<string, unknown>)[c] ?? "").length)) + 2),
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Interested Leads");
+    XLSX.writeFile(wb, `voynova-leads-${stamp()}.xlsx`);
+    toast.success(`Exported ${rows.length} leads to Excel`);
+  };
+
+  const exportPdf = () => {
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    doc.setFillColor(0, 82, 204);
+    doc.rect(0, 0, pageW, 60, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Voynova — Interested Leads", 32, 28);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(
+      `${leads.length} leads · generated ${new Date().toLocaleString("en-GB")}`,
+      32, 46,
+    );
+    autoTable(doc, {
+      startY: 76,
+      styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak" },
+      headStyles: { fillColor: [0, 82, 204], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [244, 245, 247] },
+      margin: { left: 24, right: 24 },
+      head: [["Score","Company","Role","Trade","Location","Vac.","Email","Phone","Posted"]],
+      body: leads.map((l) => [
+        String(l.lead_score ?? 0),
+        l.employer_name ?? "—",
+        l.role ?? "—",
+        l.trade_category ?? "—",
+        [l.city, l.country].filter(Boolean).join(", "),
+        String(l.vacancy_count ?? 0),
+        l.contact_email ?? "—",
+        l.phone_e164 ?? l.contact_phone ?? "—",
+        (l.posted_at_local ?? l.created_at)?.slice(0, 10) ?? "—",
+      ]),
+      columnStyles: { 1: { fontStyle: "bold" } },
+    });
+    const pages = doc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text(
+        `Voynova Global Solutions · page ${i}/${pages}`,
+        pageW - 24,
+        doc.internal.pageSize.getHeight() - 14,
+        { align: "right" },
+      );
+    }
+    doc.save(`voynova-leads-${stamp()}.pdf`);
+    toast.success(`Exported ${leads.length} leads to PDF`);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <header className="flex items-start justify-between gap-4 flex-wrap">
@@ -303,6 +370,12 @@ export default function LocalHiring() {
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={exportCsv} disabled={!leads.length}>
             <Download className="h-4 w-4 mr-2" />Export CSV
+          </Button>
+          <Button variant="outline" onClick={exportExcel} disabled={!leads.length}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />Export Excel
+          </Button>
+          <Button variant="outline" onClick={exportPdf} disabled={!leads.length}>
+            <FileText className="h-4 w-4 mr-2" />Export PDF
           </Button>
           <Button variant="outline" onClick={() => enrichAll.mutate()} disabled={enrichAll.isPending}>
             {enrichAll.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
