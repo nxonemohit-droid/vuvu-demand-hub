@@ -268,8 +268,8 @@ Deno.serve(async (req) => {
         first_send_at: rows[0]?.send_at ?? null,
         last_send_at: rows[rows.length - 1]?.send_at ?? null,
         interval_seconds: intervalSec,
-        daily_cap: dailyCap,
-        estimated_days: Math.max(1, Math.ceil(rows.length / dailyCap)),
+        daily_cap: effectiveDailyCap,
+        estimated_days: Math.max(1, Math.ceil(rows.length / effectiveDailyCap)),
         samples,
       });
     }
@@ -294,8 +294,8 @@ Deno.serve(async (req) => {
       first_send_at: rows[0]?.send_at ?? null,
       last_send_at: rows[rows.length - 1]?.send_at ?? null,
       interval_seconds: intervalSec,
-      daily_cap: dailyCap,
-      estimated_days: Math.max(1, Math.ceil(inserted / dailyCap)),
+      daily_cap: effectiveDailyCap,
+      estimated_days: Math.max(1, Math.ceil(inserted / effectiveDailyCap)),
     });
   } catch (e) {
     console.error("queue-demand-lead-outreach", e);
