@@ -18,7 +18,6 @@ import {
   Play, Pause, Plus, Send, RefreshCw, ChevronRight, Mail, AlertTriangle, CheckCircle2,
   MessageCircle, Linkedin, Users, ExternalLink,
 } from "lucide-react";
-import { pickLeadPhone } from "@/lib/phone";
 
 type Channel = "email" | "whatsapp" | "linkedin";
 type LeadSource = "recruiter" | "demand";
