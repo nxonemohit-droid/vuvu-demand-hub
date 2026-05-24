@@ -310,6 +310,12 @@ export type Database = {
           urgency_score: number
           vacancy_count: number
           visa_sponsorship: boolean
+          whatsapp_enrich_attempts: number
+          whatsapp_enriched: boolean
+          whatsapp_last_enriched_at: string | null
+          whatsapp_number: string | null
+          whatsapp_queued: boolean
+          whatsapp_source: string
           worker_origin_focus: string[]
         }
         Insert: {
@@ -367,6 +373,12 @@ export type Database = {
           urgency_score?: number
           vacancy_count?: number
           visa_sponsorship?: boolean
+          whatsapp_enrich_attempts?: number
+          whatsapp_enriched?: boolean
+          whatsapp_last_enriched_at?: string | null
+          whatsapp_number?: string | null
+          whatsapp_queued?: boolean
+          whatsapp_source?: string
           worker_origin_focus?: string[]
         }
         Update: {
@@ -424,6 +436,12 @@ export type Database = {
           urgency_score?: number
           vacancy_count?: number
           visa_sponsorship?: boolean
+          whatsapp_enrich_attempts?: number
+          whatsapp_enriched?: boolean
+          whatsapp_last_enriched_at?: string | null
+          whatsapp_number?: string | null
+          whatsapp_queued?: boolean
+          whatsapp_source?: string
           worker_origin_focus?: string[]
         }
         Relationships: [
@@ -1731,6 +1749,75 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_outreach: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_number: string
+          id: string
+          lead_id: string
+          message: string
+          opened_at: string | null
+          queue_date: string
+          sent_at: string | null
+          status: string
+          template_name: string
+          to_number: string
+          updated_at: string
+          wa_link: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_number: string
+          id?: string
+          lead_id: string
+          message: string
+          opened_at?: string | null
+          queue_date: string
+          sent_at?: string | null
+          status?: string
+          template_name?: string
+          to_number: string
+          updated_at?: string
+          wa_link: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_number?: string
+          id?: string
+          lead_id?: string
+          message?: string
+          opened_at?: string | null
+          queue_date?: string
+          sent_at?: string | null
+          status?: string
+          template_name?: string
+          to_number?: string
+          updated_at?: string
+          wa_link?: string
+        }
+        Relationships: []
+      }
+      whatsapp_send_settings: {
+        Row: {
+          daily_cap: number
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          daily_cap?: number
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          daily_cap?: number
+          id?: number
+          updated_at?: string
         }
         Relationships: []
       }
