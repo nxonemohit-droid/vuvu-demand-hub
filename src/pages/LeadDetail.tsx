@@ -42,6 +42,10 @@ import {
   Activity,
   StickyNote,
   MessageCircle,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Clock,
 } from "lucide-react";
 import { countryFlag } from "@/lib/country-flags";
 import {
@@ -105,6 +109,17 @@ export default function LeadDetail() {
   const [savingLog, setSavingLog] = useState(false);
   const [confirmEmailOpen, setConfirmEmailOpen] = useState(false);
   const [confirmWhatsappOpen, setConfirmWhatsappOpen] = useState(false);
+
+  type EmailLiveStatus = {
+    id: string;
+    to: string;
+    status: "queued" | "sending" | "sent" | "failed" | "cancelled";
+    error?: string | null;
+    updatedAt: string;
+  };
+  type WhatsappLiveStatus = { number: string; at: string };
+  const [emailStatus, setEmailStatus] = useState<EmailLiveStatus | null>(null);
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsappLiveStatus | null>(null);
 
   const loadLog = async () => {
     if (!id) return;
@@ -241,9 +256,15 @@ export default function LeadDetail() {
       return;
     }
     setSendingEmail(true);
+    setEmailStatus({
+      id: "",
+      to: primaryEmail,
+      status: "queued",
+      updatedAt: new Date().toISOString(),
+    });
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const { error: insErr } = await supabase.from("scheduled_emails").insert({
+      const { data: inserted, error: insErr } = await supabase.from("scheduled_emails").insert({
         lead_id: lead.id,
         to_email: primaryEmail,
         subject: outreach.subject,
@@ -252,8 +273,17 @@ export default function LeadDetail() {
         status: "pending",
         template_name: "voynova_demand_outreach",
         created_by: userData.user?.id ?? null,
-      });
+      }).select("id").maybeSingle();
       if (insErr) throw insErr;
+      const scheduledId = inserted?.id as string | undefined;
+      if (scheduledId) {
+        setEmailStatus({
+          id: scheduledId,
+          to: primaryEmail,
+          status: "sending",
+          updatedAt: new Date().toISOString(),
+        });
+      }
       const { error: fnErr } = await supabase.functions.invoke("process-scheduled-emails", { body: {} });
       if (fnErr) throw fnErr;
       await supabase.from("lead_outreach_log").insert({
@@ -264,16 +294,51 @@ export default function LeadDetail() {
       });
       toast.success(`Email sent to ${primaryEmail}`);
       loadLog();
+      if (scheduledId) pollEmailStatus(scheduledId, primaryEmail);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Failed to send email");
+      setEmailStatus((prev) =>
+        prev
+          ? { ...prev, status: "failed", error: e?.message ?? "Send failed", updatedAt: new Date().toISOString() }
+          : prev,
+      );
     } finally {
       setSendingEmail(false);
     }
   };
 
+  const pollEmailStatus = async (scheduledId: string, to: string) => {
+    const deadline = Date.now() + 45_000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const { data, error } = await supabase
+        .from("scheduled_emails")
+        .select("status, error, updated_at, sent_at")
+        .eq("id", scheduledId)
+        .maybeSingle();
+      if (error || !data) continue;
+      const raw = String(data.status ?? "").toLowerCase();
+      let mapped: EmailLiveStatus["status"] = "sending";
+      if (raw === "sent" || data.sent_at) mapped = "sent";
+      else if (raw === "failed" || raw === "error") mapped = "failed";
+      else if (raw === "cancelled") mapped = "cancelled";
+      else if (raw === "pending") mapped = "queued";
+      setEmailStatus({
+        id: scheduledId,
+        to,
+        status: mapped,
+        error: (data as any).error ?? null,
+        updatedAt: (data as any).updated_at ?? new Date().toISOString(),
+      });
+      if (mapped === "sent" || mapped === "failed" || mapped === "cancelled") return;
+    }
+  };
+
   const logWhatsappClick = async () => {
     if (!lead) return;
+    const at = new Date().toISOString();
+    setWhatsappStatus({ number: waNumber, at });
     const { data: userData } = await supabase.auth.getUser();
     await supabase.from("lead_outreach_log").insert({
       lead_id: lead.id,
@@ -410,6 +475,33 @@ export default function LeadDetail() {
               </Button>
             </div>
           </div>
+
+          {(emailStatus || whatsappStatus) && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {emailStatus && (
+                <LiveStatusPill
+                  kind="email"
+                  status={emailStatus.status}
+                  label={`Email → ${emailStatus.to}`}
+                  detail={
+                    emailStatus.status === "failed"
+                      ? emailStatus.error ?? "Send failed"
+                      : new Date(emailStatus.updatedAt).toLocaleTimeString("en-GB")
+                  }
+                  onDismiss={() => setEmailStatus(null)}
+                />
+              )}
+              {whatsappStatus && (
+                <LiveStatusPill
+                  kind="whatsapp"
+                  status="sent"
+                  label={`WhatsApp opened → +${whatsappStatus.number}`}
+                  detail={`at ${new Date(whatsappStatus.at).toLocaleTimeString("en-GB")}`}
+                  onDismiss={() => setWhatsappStatus(null)}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -814,5 +906,77 @@ function ContactButton({
       <span className="text-primary shrink-0">{icon}</span>
       <span className="truncate">{children}</span>
     </a>
+  );
+}
+
+function LiveStatusPill({
+  kind,
+  status,
+  label,
+  detail,
+  onDismiss,
+}: {
+  kind: "email" | "whatsapp";
+  status: "queued" | "sending" | "sent" | "failed" | "cancelled";
+  label: string;
+  detail?: string;
+  onDismiss?: () => void;
+}) {
+  const tone =
+    status === "sent"
+      ? "border-emerald-500/40 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+      : status === "failed"
+        ? "border-destructive/40 bg-destructive/10 text-destructive"
+        : status === "cancelled"
+          ? "border-muted-foreground/30 bg-muted text-muted-foreground"
+          : "border-primary/30 bg-primary/5 text-primary";
+
+  const icon =
+    status === "sent" ? (
+      <CheckCircle2 className="h-3.5 w-3.5" />
+    ) : status === "failed" ? (
+      <XCircle className="h-3.5 w-3.5" />
+    ) : status === "queued" ? (
+      <Clock className="h-3.5 w-3.5" />
+    ) : status === "cancelled" ? (
+      <XCircle className="h-3.5 w-3.5" />
+    ) : (
+      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+    );
+
+  const verb =
+    kind === "whatsapp"
+      ? "Opened"
+      : status === "queued"
+        ? "Queued"
+        : status === "sending"
+          ? "Sending"
+          : status === "sent"
+            ? "Sent"
+            : status === "failed"
+              ? "Failed"
+              : "Cancelled";
+
+  return (
+    <div
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${tone}`}
+      role="status"
+      aria-live="polite"
+    >
+      {icon}
+      <span className="uppercase tracking-wide text-[10px]">{verb}</span>
+      <span className="font-normal truncate max-w-[260px]">{label}</span>
+      {detail && <span className="opacity-70 font-normal">· {detail}</span>}
+      {onDismiss && (status === "sent" || status === "failed" || status === "cancelled") && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="ml-1 opacity-60 hover:opacity-100"
+          aria-label="Dismiss status"
+        >
+          ×
+        </button>
+      )}
+    </div>
   );
 }
