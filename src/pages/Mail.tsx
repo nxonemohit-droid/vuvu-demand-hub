@@ -24,8 +24,10 @@ import { toast } from "sonner";
 import {
   Send, Save, Eye, FileText, Search, RefreshCw, Trash2, Plus, CheckCircle2, XCircle, Beaker,
   Clock, ShieldOff, BarChart3, Settings as SettingsIcon, Mail as MailIcon, Ban, X,
-  Download, Layers,
+  Download, Layers, MessageCircle, Megaphone,
 } from "lucide-react";
+import { QueueDemandOutreachCard } from "@/components/outreach/QueueDemandOutreachCard";
+import { WhatsAppOutreachCard } from "@/components/outreach/WhatsAppOutreachCard";
 
 type Lead = {
   id: string;
@@ -543,6 +545,8 @@ const Mail = () => {
       <Tabs defaultValue="compose" className="space-y-4">
         <TabsList>
           <TabsTrigger value="compose"><MailIcon className="h-3.5 w-3.5 mr-1.5" />Compose</TabsTrigger>
+          <TabsTrigger value="demand"><Megaphone className="h-3.5 w-3.5 mr-1.5" />Demand emails</TabsTrigger>
+          <TabsTrigger value="whatsapp"><MessageCircle className="h-3.5 w-3.5 mr-1.5" />WhatsApp</TabsTrigger>
           <TabsTrigger value="scheduled"><Clock className="h-3.5 w-3.5 mr-1.5" />Scheduled ({scheduled.filter(s => s.status === "pending").length})</TabsTrigger>
           <TabsTrigger value="suppressions"><ShieldOff className="h-3.5 w-3.5 mr-1.5" />Suppressions ({suppressions.length})</TabsTrigger>
           <TabsTrigger value="analytics"><BarChart3 className="h-3.5 w-3.5 mr-1.5" />Analytics</TabsTrigger>
@@ -783,6 +787,14 @@ const Mail = () => {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="demand">
+          <QueueDemandOutreachCard />
+        </TabsContent>
+
+        <TabsContent value="whatsapp">
+          <WhatsAppOutreachCard />
         </TabsContent>
 
         <TabsContent value="scheduled">
