@@ -309,6 +309,8 @@ export default function LocalHiring() {
         </Card>
       )}
 
+      <QueueDemandOutreachCard />
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Boards configured" value={boardsQ.data?.length ?? 0} />
         <Stat label="Leads shown" value={leads.length} />
