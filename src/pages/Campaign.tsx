@@ -229,6 +229,22 @@ const CampaignPage = () => {
     if (selected?.id === c.id) setSelected(null);
   };
 
+  // For non-email channels: flip draft -> active so the operator can work the queue.
+  const activateManual = async (c: Campaign) => {
+    setBusy(c.id);
+    try {
+      const { error } = await supabase
+        .from("email_campaigns")
+        .update({ status: "active", start_date: c.start_date ?? new Date().toISOString().slice(0, 10) })
+        .eq("id", c.id);
+      if (error) throw error;
+      toast.success(`${c.name} activated \u2014 open the queue to send`);
+      setSelected({ ...c, status: "active" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Activate failed");
+    } finally { setBusy(null); }
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <header className="flex flex-wrap items-end justify-between gap-4">
