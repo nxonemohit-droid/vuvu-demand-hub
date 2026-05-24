@@ -12,15 +12,22 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Play, Pause, Plus, Send, RefreshCw, ChevronRight, Mail, AlertTriangle, CheckCircle2,
+  MessageCircle, Linkedin, Users, ExternalLink,
 } from "lucide-react";
+
+type Channel = "email" | "whatsapp" | "linkedin";
+type LeadSource = "recruiter" | "demand";
 
 type Campaign = {
   id: string;
   name: string;
   status: "draft" | "active" | "paused" | "completed";
+  channel: Channel;
+  lead_source: LeadSource;
   total_recipients: number;
   sent_count: number;
   failed_count: number;
@@ -38,8 +45,13 @@ type CampaignEmail = {
   id: string;
   campaign_id: string;
   recruiter_id: string | null;
-  email_to: string;
-  subject: string;
+  demand_lead_id: string | null;
+  channel: Channel;
+  email_to: string | null;
+  to_phone: string | null;
+  to_linkedin: string | null;
+  subject: string | null;
+  body_html: string | null;
   status: "pending" | "sent" | "failed" | "bounced" | "skipped";
   scheduled_for: string | null;
   sent_at: string | null;
@@ -49,17 +61,49 @@ type CampaignEmail = {
   error: string | null;
 };
 
-type Lead = {
+type RecruiterLead = {
   id: string;
   agency_name: string;
   contact_name: string | null;
   contact_email: string | null;
+  contact_phone: string | null;
+  contact_linkedin: string | null;
   hq_country: string | null;
   operating_eu_country: string | null;
   trades: string[] | null;
   quality_score: number | null;
   email_status: string;
   email_source: string | null;
+};
+
+type DemandLead = {
+  id: string;
+  employer_name: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  phone_e164: string | null;
+  whatsapp_number: string | null;
+  country: string | null;
+  city: string | null;
+  role: string | null;
+  trade_category: string | null;
+  quality_score: number | null;
+  outreach_queued: boolean | null;
+};
+
+type AnyRecipient = {
+  lead_id: string;
+  source: LeadSource;
+  display_name: string;
+  email: string | null;
+  phone: string | null;
+  phone_e164: string | null;
+  linkedin: string | null;
+  country: string | null;
+  meta: string;
+  quality: number;
+  already_contacted: boolean;
 };
 
 const DEFAULT_SUBJECT =
@@ -79,11 +123,25 @@ const DEFAULT_BODY =
   `\ud83d\udce7 mohit@voynovaglobal.com<br>` +
   `\ud83c\udf10 www.voynovaglobal.com`;
 
+const DEFAULT_WA_MESSAGE =
+  `Hi {{first_name}}, this is Mohit from Voynova Global Solutions.\n\n` +
+  `We help employers in {{eu_country}} hire pre-vetted blue-collar workers (welders, drivers, construction, factory) from India, Nepal & Bangladesh \u2014 fully compliance-managed, visa + deployment included.\n\n` +
+  `Saw your hiring for {{role}} at {{agency_name}}. Open to a 10-min chat this week?`;
+
+const DEFAULT_LINKEDIN_NOTE =
+  `Hi {{first_name}} \u2014 reaching out from Voynova Global Solutions. We supply pre-vetted blue-collar workers (welders, drivers, construction) to EU employers from India / Nepal / Bangladesh with full visa + compliance support. Saw your role for {{role}} \u2014 worth a 10-min chat?`;
+
 const STATUS_TONE: Record<Campaign["status"], string> = {
   draft: "bg-muted text-foreground",
   active: "bg-emerald-600 text-white hover:bg-emerald-600",
   paused: "bg-amber-500 text-white hover:bg-amber-500",
   completed: "bg-blue-600 text-white hover:bg-blue-600",
+};
+
+const CHANNEL_META: Record<Channel, { label: string; Icon: typeof Mail; tone: string }> = {
+  email:    { label: "Email",    Icon: Mail,          tone: "bg-primary/15 text-primary" },
+  whatsapp: { label: "WhatsApp", Icon: MessageCircle, tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  linkedin: { label: "LinkedIn", Icon: Linkedin,      tone: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
 };
 
 const fmtDate = (iso: string | null) =>
@@ -170,13 +228,29 @@ const CampaignPage = () => {
     if (selected?.id === c.id) setSelected(null);
   };
 
+  // For non-email channels: flip draft -> active so the operator can work the queue.
+  const activateManual = async (c: Campaign) => {
+    setBusy(c.id);
+    try {
+      const { error } = await supabase
+        .from("email_campaigns")
+        .update({ status: "active", start_date: c.start_date ?? new Date().toISOString().slice(0, 10) })
+        .eq("id", c.id);
+      if (error) throw error;
+      toast.success(`${c.name} activated \u2014 open the queue to send`);
+      setSelected({ ...c, status: "active" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Activate failed");
+    } finally { setBusy(null); }
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Email Campaigns</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Outreach Campaigns</h1>
           <p className="text-sm text-muted-foreground">
-            Resend-powered drip campaigns. Default cap: 100 emails / day, 9 AM \u2013 5 PM IST.
+            Multi-channel campaigns (Email, WhatsApp, LinkedIn) targeting recruiter agencies or demand leads. Daily-capped, drip-scheduled.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -191,7 +265,20 @@ const CampaignPage = () => {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">All campaigns ({campaigns.length})</CardTitle>
+          <CardTitle className="text-base flex items-center gap-3 flex-wrap">
+            <span>All campaigns ({campaigns.length})</span>
+            <div className="flex gap-1.5 text-xs font-normal text-muted-foreground">
+              {(["email","whatsapp","linkedin"] as Channel[]).map((ch) => {
+                const n = campaigns.filter((c) => c.channel === ch).length;
+                const M = CHANNEL_META[ch];
+                return (
+                  <Badge key={ch} variant="outline" className="gap-1">
+                    <M.Icon className="h-3 w-3" /> {M.label} \u00b7 {n}
+                  </Badge>
+                );
+              })}
+            </div>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border overflow-x-auto">
@@ -199,6 +286,8 @@ const CampaignPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Channel</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead>Daily limit</TableHead>
@@ -210,9 +299,16 @@ const CampaignPage = () => {
                 {campaigns.map((c) => {
                   const pct = c.total_recipients > 0
                     ? Math.round((c.sent_count / c.total_recipients) * 100) : 0;
+                  const CM = CHANNEL_META[c.channel ?? "email"];
                   return (
                     <TableRow key={c.id} className="cursor-pointer" onClick={() => setSelected(c)}>
                       <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell>
+                        <Badge className={`gap-1 ${CM.tone}`} variant="secondary">
+                          <CM.Icon className="h-3 w-3" /> {CM.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs capitalize text-muted-foreground">{c.lead_source ?? "recruiter"}</TableCell>
                       <TableCell>
                         <Badge className={STATUS_TONE[c.status]}>{c.status}</Badge>
                       </TableCell>
@@ -235,9 +331,14 @@ const CampaignPage = () => {
                       <TableCell className="text-sm">{fmtDate(c.start_date)}</TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1 flex-wrap">
-                          {c.status === "draft" && (
+                          {c.status === "draft" && c.channel === "email" && (
                             <Button size="sm" variant="outline" disabled={busy === c.id} onClick={() => launch(c)}>
                               <Play className="h-3.5 w-3.5 mr-1" /> Launch
+                            </Button>
+                          )}
+                          {c.status === "draft" && c.channel !== "email" && (
+                            <Button size="sm" variant="outline" disabled={busy === c.id} onClick={() => activateManual(c)}>
+                              <Play className="h-3.5 w-3.5 mr-1" /> Activate
                             </Button>
                           )}
                           {(c.status === "active" || c.status === "paused") && (
@@ -247,9 +348,15 @@ const CampaignPage = () => {
                                 : <><Play className="h-3.5 w-3.5 mr-1" /> Resume</>}
                             </Button>
                           )}
-                          <Button size="sm" disabled={busy === c.id || c.status !== "active"} onClick={() => sendTodayBatch(c)}>
-                            <Send className="h-3.5 w-3.5 mr-1" /> Send batch
-                          </Button>
+                          {c.channel === "email" ? (
+                            <Button size="sm" disabled={busy === c.id || c.status !== "active"} onClick={() => sendTodayBatch(c)}>
+                              <Send className="h-3.5 w-3.5 mr-1" /> Send batch
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="secondary" disabled={c.status === "draft"} onClick={() => setSelected(c)}>
+                              <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open queue
+                            </Button>
+                          )}
                           <Button size="sm" variant="ghost" onClick={() => setSelected(c)}>
                             <ChevronRight className="h-4 w-4" />
                           </Button>
@@ -263,7 +370,7 @@ const CampaignPage = () => {
                 })}
                 {campaigns.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
                       {loading ? "Loading\u2026" : "No campaigns yet. Click \u201cCreate Campaign\u201d to get started."}
                     </TableCell>
                   </TableRow>
@@ -300,60 +407,125 @@ const CampaignPage = () => {
   );
 };
 
-/* -------- Create dialog -------- */
+
+/* ============================================================
+   CREATE CAMPAIGN DIALOG  —  channel + source aware
+   ============================================================ */
 function CreateCampaignDialog({
   open, onClose, onCreated,
 }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
+  const [channel, setChannel] = useState<Channel>("email");
+  const [source, setSource] = useState<LeadSource>("recruiter");
   const [name, setName] = useState("");
   const [dailyLimit, setDailyLimit] = useState(100);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [subject, setSubject] = useState(DEFAULT_SUBJECT);
   const [body, setBody] = useState(DEFAULT_BODY);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [waMessage, setWaMessage] = useState(DEFAULT_WA_MESSAGE);
+  const [liMessage, setLiMessage] = useState(DEFAULT_LINKEDIN_NOTE);
+  const [recipients, setRecipients] = useState<AnyRecipient[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filterCountry, setFilterCountry] = useState("");
   const [filterMinQuality, setFilterMinQuality] = useState(0);
   const [filterUncontacted, setFilterUncontacted] = useState(true);
+  const [loadingLeads, setLoadingLeads] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Reset on open
   useEffect(() => {
     if (!open) return;
     setName(""); setSelectedIds(new Set());
-    (async () => {
-      const { data, error } = await supabase
-        .from("recruiter_leads")
-        .select("id, agency_name, contact_name, contact_email, hq_country, operating_eu_country, trades, quality_score, email_status, email_source")
-        .eq("status", "active")
-        .not("contact_email", "is", null)
-        .order("quality_score", { ascending: false })
-        .limit(2000);
-      if (error) toast.error(error.message);
-      setLeads((data ?? []).filter((l) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.contact_email ?? "")) as Lead[]);
-    })();
+    setChannel("email"); setSource("recruiter");
   }, [open]);
 
-  const filtered = useMemo(() => {
-    return leads.filter((l) =>
-      (!filterCountry || (l.hq_country ?? "").toLowerCase().includes(filterCountry.toLowerCase())
-        || (l.operating_eu_country ?? "").toLowerCase().includes(filterCountry.toLowerCase()))
-      && (l.quality_score ?? 0) >= filterMinQuality
-      && (!filterUncontacted || l.email_status !== "sent"),
-    );
-  }, [leads, filterCountry, filterMinQuality, filterUncontacted]);
+  // Auto-name suggestion
+  useEffect(() => {
+    if (!open) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const ch = CHANNEL_META[channel].label;
+    const src = source === "recruiter" ? "Recruiters" : "Demand";
+    setName(`${ch} · ${src} · ${today}`);
+  }, [channel, source, open]);
 
-  const toggle = (id: string) => {
-    setSelectedIds((s) => {
-      const next = new Set(s);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
+  // Load recipients whenever source changes
+  useEffect(() => {
+    if (!open) return;
+    setLoadingLeads(true);
+    setSelectedIds(new Set());
+    (async () => {
+      if (source === "recruiter") {
+        const { data, error } = await supabase
+          .from("recruiter_leads")
+          .select("id, agency_name, contact_name, contact_email, contact_phone, contact_linkedin, hq_country, operating_eu_country, trades, quality_score, email_status, email_source")
+          .eq("status", "active")
+          .order("quality_score", { ascending: false })
+          .limit(2000);
+        if (error) toast.error(error.message);
+        const mapped: AnyRecipient[] = (data ?? []).map((l: RecruiterLead) => ({
+          lead_id: l.id,
+          source: "recruiter",
+          display_name: l.agency_name,
+          email: l.contact_email,
+          phone: l.contact_phone,
+          phone_e164: null,
+          linkedin: l.contact_linkedin,
+          country: l.operating_eu_country ?? l.hq_country,
+          meta: `${l.hq_country ?? "?"} → ${l.operating_eu_country ?? "?"}${l.contact_name ? " · " + l.contact_name : ""}`,
+          quality: l.quality_score ?? 0,
+          already_contacted: l.email_status === "sent",
+        }));
+        setRecipients(mapped);
+      } else {
+        const { data, error } = await supabase
+          .from("demand_leads")
+          .select("id, employer_name, contact_name, contact_email, contact_phone, phone_e164, whatsapp_number, country, city, role, trade_category, quality_score, outreach_queued")
+          .order("quality_score", { ascending: false })
+          .limit(2000);
+        if (error) toast.error(error.message);
+        const mapped: AnyRecipient[] = (data ?? []).map((l: DemandLead) => ({
+          lead_id: l.id,
+          source: "demand",
+          display_name: l.employer_name || l.role || "(unnamed lead)",
+          email: l.contact_email,
+          phone: l.whatsapp_number || l.contact_phone,
+          phone_e164: l.phone_e164,
+          linkedin: null,
+          country: l.country,
+          meta: `${l.role ?? "?"} · ${l.city ?? ""} ${l.country ?? ""}${l.contact_name ? " · " + l.contact_name : ""}`.trim(),
+          quality: l.quality_score ?? 0,
+          already_contacted: l.outreach_queued === true,
+        }));
+        setRecipients(mapped);
+      }
+      setLoadingLeads(false);
+    })();
+  }, [source, open]);
+
+  // Filter by required channel field + UI filters
+  const filtered = useMemo(() => {
+    return recipients.filter((r) => {
+      if (channel === "email" && !(r.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email))) return false;
+      if (channel === "whatsapp" && !(r.phone || r.phone_e164)) return false;
+      if (channel === "linkedin" && !r.linkedin) return false;
+      if (filterCountry && !(r.country ?? "").toLowerCase().includes(filterCountry.toLowerCase())) return false;
+      if (r.quality < filterMinQuality) return false;
+      if (filterUncontacted && r.already_contacted) return false;
+      return true;
     });
-  };
+  }, [recipients, channel, filterCountry, filterMinQuality, filterUncontacted]);
+
+  // Channel availability counts (for the picker hint)
+  const channelCounts = useMemo(() => ({
+    email: recipients.filter((r) => r.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)).length,
+    whatsapp: recipients.filter((r) => r.phone || r.phone_e164).length,
+    linkedin: recipients.filter((r) => r.linkedin).length,
+  }), [recipients]);
+
+  const toggle = (id: string) =>
+    setSelectedIds((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => {
-    if (filtered.every((l) => selectedIds.has(l.id))) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filtered.map((l) => l.id)));
-    }
+    if (filtered.every((l) => selectedIds.has(l.lead_id))) setSelectedIds(new Set());
+    else setSelectedIds(new Set(filtered.map((l) => l.lead_id)));
   };
 
   const create = async () => {
@@ -361,37 +533,44 @@ function CreateCampaignDialog({
     if (selectedIds.size === 0) return toast.error("Pick at least one recipient");
     setCreating(true);
     try {
+      const subjectVal = channel === "email" ? subject : `${CHANNEL_META[channel].label} · ${name.trim()}`;
+      const bodyVal = channel === "email" ? body : channel === "whatsapp" ? waMessage : liMessage;
+
       const { data: camp, error: cErr } = await supabase
         .from("email_campaigns")
         .insert({
           name: name.trim(),
           status: "draft",
+          channel,
+          lead_source: source,
           daily_limit: dailyLimit,
           start_date: startDate,
-          subject_template: subject,
-          body_template: body,
+          subject_template: subjectVal,
+          body_template: bodyVal,
           total_recipients: selectedIds.size,
-        })
+        } as any)
         .select("id")
         .single();
       if (cErr || !camp) throw new Error(cErr?.message ?? "Failed to create campaign");
 
-      const rows = leads
-        .filter((l) => selectedIds.has(l.id))
-        .map((l) => ({
-          campaign_id: camp.id,
-          recruiter_id: l.id,
-          email_to: l.contact_email!,
-          subject,
-          body_html: body,
-          status: "pending",
-        }));
-      // chunk inserts
+      const picked = recipients.filter((r) => selectedIds.has(r.lead_id));
+      const rows = picked.map((r) => ({
+        campaign_id: camp.id,
+        channel,
+        recruiter_id: r.source === "recruiter" ? r.lead_id : null,
+        demand_lead_id: r.source === "demand" ? r.lead_id : null,
+        email_to: channel === "email" ? r.email : null,
+        to_phone: channel === "whatsapp" ? (r.phone_e164 ?? r.phone) : null,
+        to_linkedin: channel === "linkedin" ? r.linkedin : null,
+        subject: channel === "email" ? subject : null,
+        body_html: bodyVal,
+        status: "pending",
+      }));
       for (let i = 0; i < rows.length; i += 500) {
-        const { error: iErr } = await supabase.from("campaign_emails").insert(rows.slice(i, i + 500));
+        const { error: iErr } = await supabase.from("campaign_emails").insert(rows.slice(i, i + 500) as any);
         if (iErr) throw new Error(iErr.message);
       }
-      toast.success(`Created "${name}" with ${rows.length} recipients`);
+      toast.success(`Created "${name}" · ${rows.length} recipients · ${CHANNEL_META[channel].label}`);
       onCreated(camp.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Create failed");
@@ -400,15 +579,50 @@ function CreateCampaignDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create campaign</DialogTitle>
           <DialogDescription>
-            Pick recipients, schedule, and launch. Emails go out via Resend at your set daily cap.
+            Pick a channel + audience, set your daily cap, and launch. Same UI for Email, WhatsApp and LinkedIn.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid md:grid-cols-2 gap-4">
+        {/* Channel + Source pickers */}
+        <div className="grid md:grid-cols-2 gap-4 border-b pb-4">
+          <div>
+            <Label className="text-xs">Channel</Label>
+            <Tabs value={channel} onValueChange={(v) => setChannel(v as Channel)}>
+              <TabsList className="grid grid-cols-3 w-full mt-1">
+                {(["email", "whatsapp", "linkedin"] as Channel[]).map((ch) => {
+                  const M = CHANNEL_META[ch];
+                  return (
+                    <TabsTrigger key={ch} value={ch} className="gap-1.5">
+                      <M.Icon className="h-3.5 w-3.5" />
+                      <span>{M.label}</span>
+                      <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">{channelCounts[ch]}</Badge>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
+          </div>
+          <div>
+            <Label className="text-xs">Audience</Label>
+            <Tabs value={source} onValueChange={(v) => setSource(v as LeadSource)}>
+              <TabsList className="grid grid-cols-2 w-full mt-1">
+                <TabsTrigger value="recruiter" className="gap-1.5">
+                  <Users className="h-3.5 w-3.5" /> Recruiter agencies
+                </TabsTrigger>
+                <TabsTrigger value="demand" className="gap-1.5">
+                  <Users className="h-3.5 w-3.5" /> Demand leads (employers)
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 pt-2">
+          {/* Left column: campaign settings + template */}
           <div className="space-y-3">
             <div>
               <Label>Name</Label>
@@ -425,21 +639,50 @@ function CreateCampaignDialog({
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
             </div>
-            <div>
-              <Label>Subject template</Label>
-              <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
-            </div>
-            <div>
-              <Label>Body template (HTML)</Label>
-              <Textarea rows={8} className="font-mono text-xs" value={body} onChange={(e) => setBody(e.target.value)} />
-              <div className="text-[10px] text-muted-foreground mt-1">
-                Merge tags: <code>{`{{agency_name}}`}</code> <code>{`{{first_name}}`}</code> <code>{`{{eu_country}}`}</code> <code>{`{{hq_country}}`}</code> <code>{`{{trade}}`}</code>
+
+            {channel === "email" && (
+              <>
+                <div>
+                  <Label>Subject template</Label>
+                  <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Body template (HTML)</Label>
+                  <Textarea rows={9} className="font-mono text-xs" value={body} onChange={(e) => setBody(e.target.value)} />
+                </div>
+              </>
+            )}
+            {channel === "whatsapp" && (
+              <div>
+                <Label>WhatsApp message</Label>
+                <Textarea rows={9} className="text-xs" value={waMessage} onChange={(e) => setWaMessage(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Click-through queue. You'll open each chat from the campaign detail view (no auto-sending).
+                </p>
               </div>
+            )}
+            {channel === "linkedin" && (
+              <div>
+                <Label>LinkedIn connection note</Label>
+                <Textarea rows={9} className="text-xs" value={liMessage} onChange={(e) => setLiMessage(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Click-through queue. Each row opens the lead's LinkedIn profile so you can send the note manually.
+                  {source === "demand" && " Demand leads usually don't have LinkedIn — switch to recruiter audience for fuller coverage."}
+                </p>
+              </div>
+            )}
+
+            <div className="text-[10px] text-muted-foreground">
+              Merge tags: <code>{`{{agency_name}}`}</code> <code>{`{{first_name}}`}</code> <code>{`{{eu_country}}`}</code> <code>{`{{hq_country}}`}</code> <code>{`{{role}}`}</code> <code>{`{{trade}}`}</code>
             </div>
           </div>
 
+          {/* Right column: recipient picker */}
           <div className="space-y-2">
-            <Label>Recipients ({selectedIds.size} selected / {filtered.length} match)</Label>
+            <Label>
+              Recipients ({selectedIds.size} selected / {filtered.length} match
+              {loadingLeads ? " · loading…" : ""})
+            </Label>
             <div className="flex gap-2">
               <Input placeholder="Country filter" value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="text-xs" />
               <Input type="number" min={0} max={100} placeholder="Min quality" value={filterMinQuality}
@@ -447,30 +690,40 @@ function CreateCampaignDialog({
             </div>
             <label className="flex items-center gap-2 text-xs">
               <input type="checkbox" checked={filterUncontacted} onChange={(e) => setFilterUncontacted(e.target.checked)} />
-              Uncontacted only
+              Skip already-contacted
             </label>
-            <div className="border rounded-md max-h-[320px] overflow-y-auto">
+            <div className="border rounded-md max-h-[380px] overflow-y-auto">
               <div className="sticky top-0 bg-card border-b p-2 flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"
-                  checked={filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id))}
+                  checked={filtered.length > 0 && filtered.every((l) => selectedIds.has(l.lead_id))}
                   onChange={toggleAll}
                 />
                 <span>Select all visible</span>
               </div>
-              {filtered.slice(0, 500).map((l) => (
-                <label key={l.id} className="flex items-center gap-2 p-2 border-b text-xs hover:bg-muted/40 cursor-pointer">
-                  <input type="checkbox" checked={selectedIds.has(l.id)} onChange={() => toggle(l.id)} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{l.agency_name}</div>
-                    <div className="text-muted-foreground truncate">{l.contact_email} \u00b7 {l.hq_country ?? "?"} \u2192 {l.operating_eu_country ?? "?"}</div>
-                  </div>
-                  <Badge variant="outline" className="text-[10px]">{l.quality_score ?? 0}</Badge>
-                  {l.email_source === "guessed" && (
-                    <Badge className="text-[9px] px-1 py-0 bg-amber-500 hover:bg-amber-500 text-white">guessed</Badge>
-                  )}
-                </label>
-              ))}
+              {filtered.slice(0, 500).map((r) => {
+                const reach = channel === "email" ? r.email
+                  : channel === "whatsapp" ? (r.phone_e164 ?? r.phone)
+                  : r.linkedin;
+                return (
+                  <label key={r.lead_id} className="flex items-center gap-2 p-2 border-b text-xs hover:bg-muted/40 cursor-pointer">
+                    <input type="checkbox" checked={selectedIds.has(r.lead_id)} onChange={() => toggle(r.lead_id)} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{r.display_name}</div>
+                      <div className="text-muted-foreground truncate">{reach} · {r.meta}</div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px]">{r.quality}</Badge>
+                    {r.already_contacted && (
+                      <Badge className="text-[9px] px-1 py-0 bg-muted text-foreground">contacted</Badge>
+                    )}
+                  </label>
+                );
+              })}
+              {filtered.length === 0 && !loadingLeads && (
+                <div className="p-6 text-[11px] text-muted-foreground text-center">
+                  No reachable leads on this channel. Try switching audience or relaxing filters.
+                </div>
+              )}
               {filtered.length > 500 && (
                 <div className="p-2 text-[10px] text-muted-foreground text-center">
                   Showing first 500. Tighten filters to see the rest.
@@ -482,8 +735,8 @@ function CreateCampaignDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={creating}>Cancel</Button>
-          <Button onClick={create} disabled={creating}>
-            {creating ? "Creating\u2026" : `Create campaign (${selectedIds.size})`}
+          <Button onClick={create} disabled={creating || selectedIds.size === 0}>
+            {creating ? "Creating…" : `Create campaign (${selectedIds.size})`}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -491,28 +744,27 @@ function CreateCampaignDialog({
   );
 }
 
-/* -------- Detail dialog -------- */
+/* ============================================================
+   DETAIL DIALOG — channel-aware queue + click-through
+   ============================================================ */
 function CampaignDetailDialog({ campaign, onClose }: { campaign: Campaign; onClose: () => void }) {
   const [emails, setEmails] = useState<CampaignEmail[]>([]);
   const [loading, setLoading] = useState(true);
+  const channel: Channel = campaign.channel ?? "email";
+  const CM = CHANNEL_META[channel];
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const { data, error } = await supabase
-        .from("campaign_emails")
-        .select("*")
-        .eq("campaign_id", campaign.id)
-        .order("scheduled_for", { ascending: true })
-        .limit(500);
-      if (error) toast.error(error.message);
-      if (mounted) {
-        setEmails((data ?? []) as CampaignEmail[]);
-        setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
-  }, [campaign.id]);
+  const load = async () => {
+    const { data, error } = await supabase
+      .from("campaign_emails")
+      .select("*")
+      .eq("campaign_id", campaign.id)
+      .order("scheduled_for", { ascending: true, nullsFirst: true })
+      .limit(1000);
+    if (error) toast.error(error.message);
+    setEmails((data ?? []) as CampaignEmail[]);
+    setLoading(false);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [campaign.id]);
 
   const startOfToday = useMemo(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString();
@@ -520,19 +772,41 @@ function CampaignDetailDialog({ campaign, onClose }: { campaign: Campaign; onClo
   const sentToday = emails.filter((e) => e.status === "sent" && (e.sent_at ?? "") >= startOfToday).length;
   const pending = emails.filter((e) => e.status === "pending").length;
   const sentTotal = emails.filter((e) => e.status === "sent").length;
+  const failedTotal = emails.filter((e) => e.status === "failed").length;
   const openedTotal = emails.reduce((acc, e) => acc + (e.open_count > 0 ? 1 : 0), 0);
   const openRate = sentTotal > 0 ? Math.round((openedTotal / sentTotal) * 100) : 0;
 
+  const markSent = async (e: CampaignEmail) => {
+    const { error } = await supabase.from("campaign_emails")
+      .update({ status: "sent", sent_at: new Date().toISOString() })
+      .eq("id", e.id);
+    if (error) return toast.error(error.message);
+    setEmails((prev) => prev.map((x) => x.id === e.id ? { ...x, status: "sent", sent_at: new Date().toISOString() } : x));
+  };
+
+  const openChat = (e: CampaignEmail) => {
+    if (channel === "whatsapp" && e.to_phone) {
+      const digits = e.to_phone.replace(/\D/g, "");
+      const text = encodeURIComponent(campaign.body_template ?? "");
+      window.open(`https://wa.me/${digits}?text=${text}`, "_blank", "noopener");
+    } else if (channel === "linkedin" && e.to_linkedin) {
+      window.open(e.to_linkedin, "_blank", "noopener");
+    }
+  };
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            <CM.Icon className="h-4 w-4" />
             {campaign.name}
             <Badge className={STATUS_TONE[campaign.status]}>{campaign.status}</Badge>
+            <Badge className={`gap-1 ${CM.tone}`} variant="secondary">{CM.label}</Badge>
+            <Badge variant="outline" className="capitalize">{campaign.lead_source ?? "recruiter"}</Badge>
           </DialogTitle>
           <DialogDescription>
-            {campaign.daily_limit}/day \u00b7 {campaign.send_window_start_hour}:00\u2013{campaign.send_window_end_hour}:00 {campaign.timezone}
+            {campaign.daily_limit}/day · {campaign.send_window_start_hour}:00–{campaign.send_window_end_hour}:00 {campaign.timezone}
           </DialogDescription>
         </DialogHeader>
 
@@ -540,11 +814,20 @@ function CampaignDetailDialog({ campaign, onClose }: { campaign: Campaign; onClo
           <Stat label="Sent today" value={sentToday} Icon={Send} />
           <Stat label="Sent total" value={sentTotal} Icon={CheckCircle2} />
           <Stat label="Queue remaining" value={pending} Icon={Mail} />
-          <Stat label="Failed" value={campaign.failed_count} Icon={AlertTriangle} tone="text-destructive" />
-          <Stat label="Open rate" value={`${openRate}%`} Icon={Mail} />
+          <Stat label="Failed" value={failedTotal} Icon={AlertTriangle} tone="text-destructive" />
+          {channel === "email"
+            ? <Stat label="Open rate" value={`${openRate}%`} Icon={Mail} />
+            : <Stat label="Recipients" value={emails.length} Icon={Users} />}
         </div>
 
-        <div className="rounded-md border overflow-x-auto mt-4">
+        {channel !== "email" && pending > 0 && (
+          <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+            This is a manual click-through queue. Click <strong>Open</strong> on any pending row to launch{" "}
+            {channel === "whatsapp" ? "WhatsApp" : "LinkedIn"} in a new tab, then click <strong>Mark sent</strong> to log it.
+          </div>
+        )}
+
+        <div className="rounded-md border overflow-x-auto mt-2">
           <Table>
             <TableHeader>
               <TableRow>
@@ -552,35 +835,52 @@ function CampaignDetailDialog({ campaign, onClose }: { campaign: Campaign; onClo
                 <TableHead>Scheduled</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Sent</TableHead>
-                <TableHead>Error</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {emails.slice(0, 200).map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell className="text-xs">{e.email_to}</TableCell>
-                  <TableCell className="text-xs">{fmtDateTime(e.scheduled_for)}</TableCell>
-                  <TableCell>
-                    <Badge variant={e.status === "sent" ? "default" : "outline"} className="text-[10px]">
-                      {e.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs">{fmtDateTime(e.sent_at)}</TableCell>
-                  <TableCell className="text-xs text-destructive max-w-[240px] truncate">{e.error ?? ""}</TableCell>
-                </TableRow>
-              ))}
+              {emails.slice(0, 300).map((e) => {
+                const reach = channel === "email" ? e.email_to
+                  : channel === "whatsapp" ? e.to_phone
+                  : e.to_linkedin;
+                return (
+                  <TableRow key={e.id}>
+                    <TableCell className="text-xs max-w-[260px] truncate">{reach ?? "—"}</TableCell>
+                    <TableCell className="text-xs">{fmtDateTime(e.scheduled_for)}</TableCell>
+                    <TableCell>
+                      <Badge variant={e.status === "sent" ? "default" : "outline"} className="text-[10px]">
+                        {e.status}
+                      </Badge>
+                      {e.error && <div className="text-[10px] text-destructive mt-1 truncate max-w-[200px]" title={e.error}>{e.error}</div>}
+                    </TableCell>
+                    <TableCell className="text-xs">{fmtDateTime(e.sent_at)}</TableCell>
+                    <TableCell className="text-right">
+                      {channel !== "email" && e.status === "pending" && (
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="outline" onClick={() => openChat(e)}>
+                            <ExternalLink className="h-3 w-3 mr-1" /> Open
+                          </Button>
+                          <Button size="sm" onClick={() => markSent(e)}>
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Mark sent
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {emails.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
-                    {loading ? "Loading\u2026" : "No emails queued."}
+                    {loading ? "Loading…" : "No recipients queued."}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-          {emails.length > 200 && (
+          {emails.length > 300 && (
             <div className="p-2 text-xs text-muted-foreground text-center">
-              Showing first 200 of {emails.length}.
+              Showing first 300 of {emails.length}.
             </div>
           )}
         </div>

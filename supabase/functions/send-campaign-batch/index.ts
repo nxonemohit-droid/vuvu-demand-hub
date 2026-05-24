@@ -84,9 +84,10 @@ Deno.serve(async (req) => {
       const remaining = Math.max((camp.daily_limit ?? 100), 1);
       const { data: emails } = await admin
         .from("campaign_emails")
-        .select("id, campaign_id, recruiter_id, email_to, subject, body_html, body_text")
+        .select("id, campaign_id, recruiter_id, demand_lead_id, email_to, subject, body_html, body_text, channel")
         .eq("campaign_id", camp.id)
         .eq("status", "pending")
+        .eq("channel", "email")
         .lte("scheduled_for", nowIso)
         .order("scheduled_for", { ascending: true })
         .limit(Math.min(remaining, maxBatch));
@@ -115,6 +116,34 @@ Deno.serve(async (req) => {
             subject = renderTemplate(subject, vars);
             html = renderTemplate(html, vars);
           }
+        } else if (e.demand_lead_id) {
+          const { data: lead } = await admin
+            .from("demand_leads")
+            .select("employer_name, contact_name, country, city, role, trade_category, sector_tags")
+            .eq("id", e.demand_lead_id)
+            .maybeSingle();
+          if (lead) {
+            const vars: Record<string, string> = {
+              agency_name: lead.employer_name ?? "",
+              employer_name: lead.employer_name ?? "",
+              first_name: (lead.contact_name ?? "").split(" ")[0] || "there",
+              contact_name: lead.contact_name ?? "",
+              hq_country: lead.country ?? "",
+              eu_country: lead.country ?? "Europe",
+              city: lead.city ?? "",
+              role: lead.role ?? "",
+              trade: lead.trade_category ?? lead.role ?? "skilled workers",
+              trades: (lead.sector_tags ?? []).join(", "),
+            };
+            subject = renderTemplate(subject, vars);
+            html = renderTemplate(html, vars);
+          }
+        }
+        if (!e.email_to) {
+          await admin.from("campaign_emails")
+            .update({ status: "skipped", error: "no email address" }).eq("id", e.id);
+          skipped++;
+          continue;
         }
         const text = e.body_text ? renderTemplate(e.body_text, {}) : htmlToText(html);
 

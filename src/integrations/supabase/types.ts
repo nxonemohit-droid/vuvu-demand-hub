@@ -46,9 +46,11 @@ export type Database = {
           body_html: string | null
           body_text: string | null
           campaign_id: string
+          channel: string
           click_count: number
           created_at: string
-          email_to: string
+          demand_lead_id: string | null
+          email_to: string | null
           error: string | null
           id: string
           open_count: number
@@ -57,16 +59,20 @@ export type Database = {
           scheduled_for: string | null
           sent_at: string | null
           status: string
-          subject: string
+          subject: string | null
+          to_linkedin: string | null
+          to_phone: string | null
           updated_at: string
         }
         Insert: {
           body_html?: string | null
           body_text?: string | null
           campaign_id: string
+          channel?: string
           click_count?: number
           created_at?: string
-          email_to: string
+          demand_lead_id?: string | null
+          email_to?: string | null
           error?: string | null
           id?: string
           open_count?: number
@@ -75,16 +81,20 @@ export type Database = {
           scheduled_for?: string | null
           sent_at?: string | null
           status?: string
-          subject: string
+          subject?: string | null
+          to_linkedin?: string | null
+          to_phone?: string | null
           updated_at?: string
         }
         Update: {
           body_html?: string | null
           body_text?: string | null
           campaign_id?: string
+          channel?: string
           click_count?: number
           created_at?: string
-          email_to?: string
+          demand_lead_id?: string | null
+          email_to?: string | null
           error?: string | null
           id?: string
           open_count?: number
@@ -93,7 +103,9 @@ export type Database = {
           scheduled_for?: string | null
           sent_at?: string | null
           status?: string
-          subject?: string
+          subject?: string | null
+          to_linkedin?: string | null
+          to_phone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -701,11 +713,13 @@ export type Database = {
       email_campaigns: {
         Row: {
           body_template: string | null
+          channel: string
           created_at: string
           created_by: string | null
           daily_limit: number
           failed_count: number
           id: string
+          lead_source: string
           name: string
           resend_batch_id: string | null
           send_window_end_hour: number
@@ -720,11 +734,13 @@ export type Database = {
         }
         Insert: {
           body_template?: string | null
+          channel?: string
           created_at?: string
           created_by?: string | null
           daily_limit?: number
           failed_count?: number
           id?: string
+          lead_source?: string
           name: string
           resend_batch_id?: string | null
           send_window_end_hour?: number
@@ -739,11 +755,13 @@ export type Database = {
         }
         Update: {
           body_template?: string | null
+          channel?: string
           created_at?: string
           created_by?: string | null
           daily_limit?: number
           failed_count?: number
           id?: string
+          lead_source?: string
           name?: string
           resend_batch_id?: string | null
           send_window_end_hour?: number
