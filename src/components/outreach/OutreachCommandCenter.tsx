@@ -67,7 +67,7 @@ export function OutreachCommandCenter({ onJump }: { onJump: (tab: string) => voi
         .gte("updated_at", todayStart)
         .select("id");
       if (e1) throw e1;
-      const { data: wa, error: e2 } = await supabase
+      const { data: wa, error: e2 } = await (supabase as any)
         .from("whatsapp_outreach")
         .update({ status: "pending", error: null })
         .eq("status", "failed")
@@ -96,7 +96,7 @@ export function OutreachCommandCenter({ onJump }: { onJump: (tab: string) => voi
         .gte("created_at", todayStart)
         .select("id");
       if (e1) throw e1;
-      const { data: wa, error: e2 } = await supabase
+      const { data: wa, error: e2 } = await (supabase as any)
         .from("whatsapp_outreach")
         .update({ status: "cancelled" })
         .eq("status", "pending")
