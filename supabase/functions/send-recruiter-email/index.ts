@@ -83,7 +83,28 @@ Deno.serve(async (req) => {
     if (html) payload.html = html;
     if (text) payload.text = text;
 
-    const res = await fetch(`${GATEWAY_URL}/emails`, {
+    // Throttle to stay under Resend's 2 req/sec limit and retry once on 429.
+    async function sendWithRetry(attempt = 0): Promise<Response> {
+      const r = await fetch(`${GATEWAY_URL}/emails`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "X-Connection-Api-Key": RESEND_API_KEY,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (r.status === 429 && attempt < 3) {
+        const retryAfter = Number(r.headers.get("retry-after")) || 1;
+        await new Promise((res) => setTimeout(res, Math.max(retryAfter * 1000, 600 * (attempt + 1))));
+        return sendWithRetry(attempt + 1);
+      }
+      return r;
+    }
+    await new Promise((res) => setTimeout(res, 600));
+    const res = await sendWithRetry();
+    // unused placeholder to preserve diff context
+    const _noop = () => ({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
