@@ -103,16 +103,6 @@ Deno.serve(async (req) => {
     }
     await new Promise((res) => setTimeout(res, 600));
     const res = await sendWithRetry();
-    // unused placeholder to preserve diff context
-    const _noop = () => ({
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": RESEND_API_KEY,
-      },
-      body: JSON.stringify(payload),
-    });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       console.error("Resend gateway error", res.status, data);
