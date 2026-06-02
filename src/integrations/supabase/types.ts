@@ -271,6 +271,7 @@ export type Database = {
           ai_rationale: string | null
           city: string | null
           company_id: string | null
+          confidence: number | null
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
@@ -288,10 +289,12 @@ export type Database = {
           id: string
           is_direct_employer: boolean
           last_enriched_at: string | null
+          last_signal_at: string | null
           lead_score: number
           local_lang: string | null
           matched_keywords: string[] | null
           normalized_demand_id: string | null
+          normalized_domain: string | null
           notes: string | null
           outreach_queued: boolean
           outreach_queued_at: string | null
@@ -304,6 +307,7 @@ export type Database = {
           repost_count: number
           review_status: string
           role: string
+          role_classification: string | null
           salary_currency: string | null
           salary_max: number | null
           salary_min: number | null
@@ -334,6 +338,7 @@ export type Database = {
           ai_rationale?: string | null
           city?: string | null
           company_id?: string | null
+          confidence?: number | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -351,10 +356,12 @@ export type Database = {
           id?: string
           is_direct_employer?: boolean
           last_enriched_at?: string | null
+          last_signal_at?: string | null
           lead_score?: number
           local_lang?: string | null
           matched_keywords?: string[] | null
           normalized_demand_id?: string | null
+          normalized_domain?: string | null
           notes?: string | null
           outreach_queued?: boolean
           outreach_queued_at?: string | null
@@ -367,6 +374,7 @@ export type Database = {
           repost_count?: number
           review_status?: string
           role: string
+          role_classification?: string | null
           salary_currency?: string | null
           salary_max?: number | null
           salary_min?: number | null
@@ -397,6 +405,7 @@ export type Database = {
           ai_rationale?: string | null
           city?: string | null
           company_id?: string | null
+          confidence?: number | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -414,10 +423,12 @@ export type Database = {
           id?: string
           is_direct_employer?: boolean
           last_enriched_at?: string | null
+          last_signal_at?: string | null
           lead_score?: number
           local_lang?: string | null
           matched_keywords?: string[] | null
           normalized_demand_id?: string | null
+          normalized_domain?: string | null
           notes?: string | null
           outreach_queued?: boolean
           outreach_queued_at?: string | null
@@ -430,6 +441,7 @@ export type Database = {
           repost_count?: number
           review_status?: string
           role?: string
+          role_classification?: string | null
           salary_currency?: string | null
           salary_max?: number | null
           salary_min?: number | null
@@ -1309,6 +1321,8 @@ export type Database = {
         Row: {
           active_orders: Json
           agency_name: string
+          company_id: string | null
+          confidence: number | null
           contact_email: string | null
           contact_linkedin: string | null
           contact_name: string | null
@@ -1329,9 +1343,13 @@ export type Database = {
           hq_city: string | null
           hq_country: string | null
           id: string
+          last_enrichment_at: string | null
+          last_enrichment_error: string | null
           last_seen_at: string
+          last_signal_at: string | null
           license_number: string | null
           license_verified: boolean
+          normalized_domain: string | null
           notes: string | null
           operating_eu_country: string | null
           quality_score: number
@@ -1339,6 +1357,7 @@ export type Database = {
           recruitment_model: Database["public"]["Enums"]["recruitment_model_tag"][]
           replied_at: string | null
           resend_message_id: string | null
+          role_classification: string | null
           source_posted_at: string | null
           source_url: string | null
           status: string
@@ -1353,6 +1372,8 @@ export type Database = {
         Insert: {
           active_orders?: Json
           agency_name: string
+          company_id?: string | null
+          confidence?: number | null
           contact_email?: string | null
           contact_linkedin?: string | null
           contact_name?: string | null
@@ -1373,9 +1394,13 @@ export type Database = {
           hq_city?: string | null
           hq_country?: string | null
           id?: string
+          last_enrichment_at?: string | null
+          last_enrichment_error?: string | null
           last_seen_at?: string
+          last_signal_at?: string | null
           license_number?: string | null
           license_verified?: boolean
+          normalized_domain?: string | null
           notes?: string | null
           operating_eu_country?: string | null
           quality_score?: number
@@ -1383,6 +1408,7 @@ export type Database = {
           recruitment_model?: Database["public"]["Enums"]["recruitment_model_tag"][]
           replied_at?: string | null
           resend_message_id?: string | null
+          role_classification?: string | null
           source_posted_at?: string | null
           source_url?: string | null
           status?: string
@@ -1397,6 +1423,8 @@ export type Database = {
         Update: {
           active_orders?: Json
           agency_name?: string
+          company_id?: string | null
+          confidence?: number | null
           contact_email?: string | null
           contact_linkedin?: string | null
           contact_name?: string | null
@@ -1417,9 +1445,13 @@ export type Database = {
           hq_city?: string | null
           hq_country?: string | null
           id?: string
+          last_enrichment_at?: string | null
+          last_enrichment_error?: string | null
           last_seen_at?: string
+          last_signal_at?: string | null
           license_number?: string | null
           license_verified?: boolean
+          normalized_domain?: string | null
           notes?: string | null
           operating_eu_country?: string | null
           quality_score?: number
@@ -1427,6 +1459,7 @@ export type Database = {
           recruitment_model?: Database["public"]["Enums"]["recruitment_model_tag"][]
           replied_at?: string | null
           resend_message_id?: string | null
+          role_classification?: string | null
           source_posted_at?: string | null
           source_url?: string | null
           status?: string
@@ -1438,11 +1471,28 @@ export type Database = {
           worker_collar?: string | null
           worker_origin_focus?: string[]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "recruiter_leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recruiter_leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_demand_stats"
+            referencedColumns: ["company_id"]
+          },
+        ]
       }
       scheduled_emails: {
         Row: {
           attempts: number
+          blocked_at: string | null
+          blocking_reason: string | null
           body: string
           created_at: string
           created_by: string | null
@@ -1460,6 +1510,8 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          blocked_at?: string | null
+          blocking_reason?: string | null
           body: string
           created_at?: string
           created_by?: string | null
@@ -1477,6 +1529,8 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          blocked_at?: string | null
+          blocking_reason?: string | null
           body?: string
           created_at?: string
           created_by?: string | null

@@ -22,6 +22,7 @@ import Campaign from "./pages/Campaign.tsx";
 import Mail from "./pages/Mail.tsx";
 import LocalHiring from "./pages/LocalHiring.tsx";
 import DiscoverySettings from "./pages/DiscoverySettings.tsx";
+import Diagnostics from "./pages/Diagnostics.tsx";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => (
             <Route path="/local-hiring" element={<LocalHiring />} />
             <Route path="/settings/discovery" element={<DiscoverySettings />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/admin/diagnostics" element={<Diagnostics />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

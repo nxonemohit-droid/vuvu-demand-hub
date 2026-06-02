@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Users, Plus, Search, MapPin, Calendar, Sparkles } from "lucide-react";
+import { ArrowLeft, Users, Plus, Search, MapPin, Calendar, Sparkles, Wand2, Loader2, AlertTriangle } from "lucide-react";
 import { countryFlag } from "@/lib/country-flags";
 
 type Candidate = {
@@ -47,6 +47,25 @@ export default function Candidates() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<Candidate[]>([]);
   const [query, setQuery] = useState("");
+  const [matching, setMatching] = useState(false);
+
+  const runReverseMatching = async () => {
+    setMatching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("match-candidates", { body: {} });
+      if (error) throw error;
+      const d = data as { matched?: number; candidate_count?: number; note?: string };
+      if (d.candidate_count === 0) {
+        toast.warning("No candidates in database to match against.");
+      } else {
+        toast.success(`Matched ${d.matched ?? 0} lead↔candidate pairs from ${d.candidate_count} candidates.`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Matcher failed");
+    } finally {
+      setMatching(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -109,13 +128,36 @@ export default function Candidates() {
               Workers ready to be matched with employer demand.
             </p>
           </div>
-          <Button onClick={() => toast.info("Candidate intake form coming soon")}>
-            <Plus className="h-4 w-4 mr-2" /> Add candidate
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={runReverseMatching}
+              disabled={matching || rows.length === 0}
+              title={rows.length === 0 ? "Seed candidates first" : "Match all candidates against recent demand leads"}
+            >
+              {matching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+              Run reverse matching
+            </Button>
+            <Button onClick={() => toast.info("Candidate intake form coming soon")}>
+              <Plus className="h-4 w-4 mr-2" /> Add candidate
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-4">
+        {!loading && rows.length === 0 && (
+          <Card className="p-4 rounded-xl border-amber-500/40 bg-amber-500/5 flex items-start gap-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium">Reverse matching will return zero results.</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                The candidates table is empty. The matcher runs against your 3,780 demand leads but has no workers to compare them to. Add candidates to start producing matches.
+              </p>
+            </div>
+          </Card>
+        )}
+
         <Card className="p-4 rounded-xl">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

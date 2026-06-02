@@ -30,6 +30,11 @@ import { QueueDemandOutreachCard } from "@/components/outreach/QueueDemandOutrea
 import { WhatsAppOutreachCard } from "@/components/outreach/WhatsAppOutreachCard";
 import { OutreachCommandCenter } from "@/components/outreach/OutreachCommandCenter";
 import { MailWalkthrough } from "@/components/outreach/MailWalkthrough";
+import { PendingMailsPanel } from "@/components/outreach/PendingMailsPanel";
+import {
+  resolveLeadStatus, isEligible, STATUS_BADGE,
+  type OutreachStatus, type LeadForStatus,
+} from "@/lib/outreach-status";
 
 type Lead = {
   id: string;
@@ -44,6 +49,9 @@ type Lead = {
   contact_phone: string | null;
   contact_linkedin: string | null;
   source_url: string | null;
+  replied_at: string | null;
+  email_last_event: string | null;
+  last_enrichment_error: string | null;
 };
 
 type Template = {
@@ -151,7 +159,7 @@ const Mail = () => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "not_sent" | "sent">("not_sent");
+  const [filter, setFilter] = useState<"eligible" | "queued" | "sent" | "replied" | "bounced" | "all">("eligible");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -240,6 +248,9 @@ const Mail = () => {
     contact_phone: "+30 21 0000 0000",
     contact_linkedin: "https://www.linkedin.com/in/alex-sample",
     source_url: "https://www.sample-agency.com",
+    replied_at: null,
+    email_last_event: null,
+    last_enrichment_error: null,
   };
 
   const sendTest = async () => {
@@ -276,9 +287,8 @@ const Mail = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("recruiter_leads")
-      .select("id,agency_name,contact_name,contact_email,contact_phone,contact_linkedin,source_url,hq_country,operating_eu_country,trades,email_status,email_sent_at")
+      .select("id,agency_name,contact_name,contact_email,contact_phone,contact_linkedin,source_url,hq_country,operating_eu_country,trades,email_status,email_sent_at,replied_at,email_last_event,last_enrichment_error")
       .eq("status", "active")
-      .not("contact_email", "is", null)
       .order("quality_score", { ascending: false })
       .limit(1000);
     if (error) toast.error(error.message);
@@ -297,9 +307,21 @@ const Mail = () => {
   useEffect(() => { loadLeads(); loadTemplates(); }, []);
 
   const filtered = useMemo(() => {
+    const suppressedSet = new Set(
+      (suppressions ?? []).map((s: { email: string }) => s.email.toLowerCase()),
+    );
+    const pendingLeadIds = new Set(
+      (scheduled ?? []).filter((s: { status: string; lead_id: string | null }) => s.status === "pending" && s.lead_id).map((s) => s.lead_id as string),
+    );
     let rows = leads;
-    if (filter === "not_sent") rows = rows.filter((l) => l.email_status !== "sent");
-    if (filter === "sent") rows = rows.filter((l) => l.email_status === "sent");
+    if (filter === "eligible") {
+      rows = rows.filter((l) => isEligible(l as LeadForStatus, { suppressedEmails: suppressedSet }));
+    } else if (filter !== "all") {
+      rows = rows.filter((l) => {
+        const status = resolveLeadStatus(l as LeadForStatus, { suppressedEmails: suppressedSet, pendingLeadIds });
+        return status === filter;
+      });
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       rows = rows.filter((l) =>
@@ -308,7 +330,17 @@ const Mail = () => {
       );
     }
     return rows;
-  }, [leads, filter, search]);
+  }, [leads, filter, search, suppressions, scheduled]);
+
+  // Memoised contexts for per-row status pill rendering
+  const suppressedSet = useMemo(
+    () => new Set((suppressions ?? []).map((s: { email: string }) => s.email.toLowerCase())),
+    [suppressions],
+  );
+  const pendingLeadIds = useMemo(
+    () => new Set((scheduled ?? []).filter((s: { status: string; lead_id: string | null }) => s.status === "pending" && s.lead_id).map((s) => s.lead_id as string)),
+    [scheduled],
+  );
 
   const allSelected = filtered.length > 0 && filtered.every((l) => selected.has(l.id));
   const toggleAll = () => {
@@ -555,7 +587,7 @@ const Mail = () => {
           <TabsTrigger value="compose"><MailIcon className="h-3.5 w-3.5 mr-1.5" />Compose</TabsTrigger>
           <TabsTrigger value="demand"><Megaphone className="h-3.5 w-3.5 mr-1.5" />Demand emails</TabsTrigger>
           <TabsTrigger value="whatsapp"><MessageCircle className="h-3.5 w-3.5 mr-1.5" />WhatsApp</TabsTrigger>
-          <TabsTrigger value="scheduled"><Clock className="h-3.5 w-3.5 mr-1.5" />Scheduled ({scheduled.filter(s => s.status === "pending").length})</TabsTrigger>
+          <TabsTrigger value="pending"><Clock className="h-3.5 w-3.5 mr-1.5" />Pending Mails ({scheduled.filter(s => s.status === "pending" || s.status === "failed").length})</TabsTrigger>
           <TabsTrigger value="suppressions"><ShieldOff className="h-3.5 w-3.5 mr-1.5" />Suppressions ({suppressions.length})</TabsTrigger>
           <TabsTrigger value="analytics"><BarChart3 className="h-3.5 w-3.5 mr-1.5" />Analytics</TabsTrigger>
           <TabsTrigger value="settings"><SettingsIcon className="h-3.5 w-3.5 mr-1.5" />Settings</TabsTrigger>
@@ -577,8 +609,11 @@ const Mail = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="not_sent">Not contacted</SelectItem>
-                    <SelectItem value="sent">Already sent</SelectItem>
+                    <SelectItem value="eligible">Eligible</SelectItem>
+                    <SelectItem value="queued">Queued</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="replied">Replied</SelectItem>
+                    <SelectItem value="bounced">Bounced</SelectItem>
                     <SelectItem value="all">All</SelectItem>
                   </SelectContent>
                 </Select>
@@ -632,9 +667,18 @@ const Mail = () => {
                         {l.hq_country ?? "—"} → {l.operating_eu_country ?? "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={l.email_status === "sent" ? "default" : "outline"}>
-                          {l.email_status}
-                        </Badge>
+                        {(() => {
+                          const status: OutreachStatus = resolveLeadStatus(l as LeadForStatus, { suppressedEmails: suppressedSet, pendingLeadIds });
+                          const meta = STATUS_BADGE[status];
+                          const tip = l.last_enrichment_error
+                            ? `Last enrichment error: ${l.last_enrichment_error}`
+                            : undefined;
+                          return (
+                            <Badge variant="outline" className={`text-[11px] ${meta.tone}`} title={tip}>
+                              {meta.label}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" variant="ghost" onClick={() => setPreviewLead(l)}>
@@ -805,45 +849,8 @@ const Mail = () => {
           <WhatsAppOutreachCard />
         </TabsContent>
 
-        <TabsContent value="scheduled">
-          <Card><CardContent className="pt-6">
-            <div className="rounded-md border max-h-[600px] overflow-auto">
-              <Table>
-                <TableHeader className="sticky top-0 bg-background z-10"><TableRow>
-                  <TableHead>Send at</TableHead><TableHead>Recipient</TableHead>
-                  <TableHead>Subject</TableHead><TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  {scheduled.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="text-xs">{new Date(s.send_at).toLocaleString()}</TableCell>
-                      <TableCell className="text-xs">{s.to_email}</TableCell>
-                      <TableCell className="text-xs max-w-[420px] truncate">{s.subject}</TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          s.status === "sent" ? "default" :
-                          s.status === "failed" ? "destructive" :
-                          s.status === "cancelled" || s.status === "suppressed" ? "secondary" : "outline"
-                        }>{s.status}</Badge>
-                        {s.error && <div className="text-[10px] text-destructive mt-0.5 truncate max-w-[260px]">{s.error}</div>}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {s.status === "pending" && (
-                          <Button size="sm" variant="ghost" onClick={() => cancelScheduled(s.id)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {scheduled.length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">No scheduled emails</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent></Card>
+        <TabsContent value="pending">
+          <PendingMailsPanel />
         </TabsContent>
 
         <TabsContent value="suppressions">
