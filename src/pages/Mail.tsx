@@ -51,7 +51,6 @@ type Lead = {
   source_url: string | null;
   replied_at: string | null;
   email_last_event: string | null;
-  snoozed_until: string | null;
   last_enrichment_error: string | null;
 };
 
@@ -249,6 +248,9 @@ const Mail = () => {
     contact_phone: "+30 21 0000 0000",
     contact_linkedin: "https://www.linkedin.com/in/alex-sample",
     source_url: "https://www.sample-agency.com",
+    replied_at: null,
+    email_last_event: null,
+    last_enrichment_error: null,
   };
 
   const sendTest = async () => {
@@ -285,7 +287,7 @@ const Mail = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("recruiter_leads")
-      .select("id,agency_name,contact_name,contact_email,contact_phone,contact_linkedin,source_url,hq_country,operating_eu_country,trades,email_status,email_sent_at,replied_at,email_last_event,snoozed_until,last_enrichment_error")
+      .select("id,agency_name,contact_name,contact_email,contact_phone,contact_linkedin,source_url,hq_country,operating_eu_country,trades,email_status,email_sent_at,replied_at,email_last_event,last_enrichment_error")
       .eq("status", "active")
       .order("quality_score", { ascending: false })
       .limit(1000);
