@@ -820,34 +820,58 @@ export type Database = {
       }
       email_send_settings: {
         Row: {
+          auto_unblock_enabled: boolean
+          country_window_overrides: Json
           daily_cap: number
+          hourly_cap: number
           id: number
           per_domain_daily_cap: number
+          reply_stop_enabled: boolean
           respect_send_window: boolean
           send_window_end_hour: number
           send_window_start_hour: number
           send_window_timezone: string
+          skip_weekends: boolean
           updated_at: string
+          warmup_daily_increment: number
+          warmup_initial_cap: number
+          warmup_started_at: string | null
         }
         Insert: {
+          auto_unblock_enabled?: boolean
+          country_window_overrides?: Json
           daily_cap?: number
+          hourly_cap?: number
           id?: number
           per_domain_daily_cap?: number
+          reply_stop_enabled?: boolean
           respect_send_window?: boolean
           send_window_end_hour?: number
           send_window_start_hour?: number
           send_window_timezone?: string
+          skip_weekends?: boolean
           updated_at?: string
+          warmup_daily_increment?: number
+          warmup_initial_cap?: number
+          warmup_started_at?: string | null
         }
         Update: {
+          auto_unblock_enabled?: boolean
+          country_window_overrides?: Json
           daily_cap?: number
+          hourly_cap?: number
           id?: number
           per_domain_daily_cap?: number
+          reply_stop_enabled?: boolean
           respect_send_window?: boolean
           send_window_end_hour?: number
           send_window_start_hour?: number
           send_window_timezone?: string
+          skip_weekends?: boolean
           updated_at?: string
+          warmup_daily_increment?: number
+          warmup_initial_cap?: number
+          warmup_started_at?: string | null
         }
         Relationships: []
       }
@@ -1494,18 +1518,21 @@ export type Database = {
           blocked_at: string | null
           blocking_reason: string | null
           body: string
+          cancelled_reason: string | null
           created_at: string
           created_by: string | null
           error: string | null
           id: string
           lead_id: string | null
           message_id: string | null
+          recipient_country: string | null
           send_at: string
           sent_at: string | null
           status: string
           subject: string
           template_name: string | null
           to_email: string
+          unblocked_at: string | null
           updated_at: string
         }
         Insert: {
@@ -1513,18 +1540,21 @@ export type Database = {
           blocked_at?: string | null
           blocking_reason?: string | null
           body: string
+          cancelled_reason?: string | null
           created_at?: string
           created_by?: string | null
           error?: string | null
           id?: string
           lead_id?: string | null
           message_id?: string | null
+          recipient_country?: string | null
           send_at: string
           sent_at?: string | null
           status?: string
           subject: string
           template_name?: string | null
           to_email: string
+          unblocked_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -1532,18 +1562,21 @@ export type Database = {
           blocked_at?: string | null
           blocking_reason?: string | null
           body?: string
+          cancelled_reason?: string | null
           created_at?: string
           created_by?: string | null
           error?: string | null
           id?: string
           lead_id?: string | null
           message_id?: string | null
+          recipient_country?: string | null
           send_at?: string
           sent_at?: string | null
           status?: string
           subject?: string
           template_name?: string | null
           to_email?: string
+          unblocked_at?: string | null
           updated_at?: string
         }
         Relationships: []
