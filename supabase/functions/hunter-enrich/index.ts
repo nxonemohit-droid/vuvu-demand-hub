@@ -109,6 +109,24 @@ Deno.serve(async (req) => {
     if (!APIFY_TOKEN) throw new Error("APIFY_API_TOKEN not configured");
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+    // Soft monthly cost cap (USD). Counts hunter:* scrape_jobs from the
+    // current calendar month and blocks new runs once the cap is exceeded.
+    const cap = Number(Deno.env.get("HUNTER_MONTHLY_CAP") ?? "0");
+    if (cap > 0) {
+      const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+      const { data: spentRows } = await supabase
+        .from("scrape_jobs")
+        .select("cost_usd")
+        .like("keyword", "hunter:%")
+        .gte("started_at", monthStart.toISOString());
+      const spent = (spentRows ?? []).reduce((acc, r) => acc + Number(r.cost_usd ?? 0), 0);
+      if (spent >= cap) {
+        return new Response(JSON.stringify({
+          ok: false, error: "monthly_cap_reached", spent_usd: spent, cap_usd: cap,
+        }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     // Background work has a ~140s budget; one actor call now budgets 90s, so
     // process leads strictly serially. Limit to 2 per invocation.

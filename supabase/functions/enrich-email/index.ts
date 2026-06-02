@@ -98,22 +98,32 @@ Deno.serve(async (req) => {
 
     // bulk: scan recruiter_leads with missing/placeholder email
     const limit = Math.min(Math.max(Number(body?.limit) || 500, 1), 2000);
-    const { data: rows, error } = await admin
+    const leadIds: string[] | undefined = Array.isArray(body?.lead_ids) ? body.lead_ids : undefined;
+    let query = admin
       .from("recruiter_leads")
       .select("id, agency_name, contact_name, contact_email, website, source_url")
-      .eq("status", "active")
-      .eq("email_enriched", false)
       .limit(limit);
+    if (leadIds?.length) {
+      query = query.in("id", leadIds.slice(0, 2000));
+    } else {
+      query = query.eq("status", "active").eq("email_enriched", false);
+    }
+    const { data: rows, error } = await query;
     if (error) return json({ error: error.message }, 500);
 
-    let enriched = 0, skipped = 0;
+    // Per-invocation cache so multiple leads at the same domain share one derivation.
+    const domainCache = new Map<string, string[]>();
+    let enriched = 0, skipped = 0, failed = 0;
     for (const r of rows ?? []) {
       const current = (r.contact_email ?? "").trim().toLowerCase();
       const isPlaceholder = !current || PLACEHOLDER_EMAILS.has(current) ||
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(current);
       if (!isPlaceholder) {
         await admin.from("recruiter_leads")
-          .update({ email_enriched: true, email_source: "verified" })
+          .update({
+            email_enriched: true, email_source: "verified",
+            last_enrichment_at: new Date().toISOString(), last_enrichment_error: null,
+          })
           .eq("id", r.id);
         skipped++;
         continue;
@@ -121,22 +131,43 @@ Deno.serve(async (req) => {
       const domain = extractDomain(r.website ?? r.source_url, r.agency_name);
       if (!domain) {
         await admin.from("recruiter_leads")
-          .update({ email_source: "missing" })
+          .update({
+            email_source: "missing",
+            last_enrichment_at: new Date().toISOString(),
+            last_enrichment_error: "Could not derive a domain from website / source / agency name",
+          })
           .eq("id", r.id);
+        failed++;
         continue;
       }
-      const candidates = buildCandidates(domain, r.contact_name);
-      await admin.from("recruiter_leads")
+      let candidates = domainCache.get(domain);
+      if (!candidates) {
+        candidates = buildCandidates(domain, r.contact_name);
+        domainCache.set(domain, candidates);
+      }
+      const { error: upErr } = await admin.from("recruiter_leads")
         .update({
           contact_email: candidates[0],
           email_enriched: true,
           email_source: "guessed",
+          last_enrichment_at: new Date().toISOString(),
+          last_enrichment_error: null,
         })
         .eq("id", r.id);
-      enriched++;
+      if (upErr) {
+        failed++;
+        await admin.from("recruiter_leads")
+          .update({
+            last_enrichment_at: new Date().toISOString(),
+            last_enrichment_error: upErr.message.slice(0, 500),
+          })
+          .eq("id", r.id);
+      } else {
+        enriched++;
+      }
     }
 
-    return json({ ok: true, scanned: rows?.length ?? 0, enriched, already_ok: skipped });
+    return json({ ok: true, scanned: rows?.length ?? 0, enriched, already_ok: skipped, failed, cached_domains: domainCache.size });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("enrich-email error", msg);
