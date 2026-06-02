@@ -1,4 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import {
+  DEFAULT_SETTINGS,
+  effectiveDailyCap,
+  EngineSettings,
+  isSendableNow,
+} from "../_shared/sequence-engine.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,26 +12,6 @@ const corsHeaders = {
 };
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/resend";
-
-type Settings = {
-  daily_cap: number;
-  per_domain_daily_cap: number;
-  send_window_start_hour: number;
-  send_window_end_hour: number;
-  send_window_timezone: string;
-  respect_send_window: boolean;
-};
-
-function inSendWindow(s: Settings): boolean {
-  if (!s.respect_send_window) return true;
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: s.send_window_timezone,
-    hour: "numeric",
-    hour12: false,
-  });
-  const h = parseInt(fmt.format(new Date()), 10);
-  return h >= s.send_window_start_hour && h < s.send_window_end_hour;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -47,29 +33,31 @@ Deno.serve(async (req) => {
 
   // Load settings + counters
   const { data: s } = await admin.from("email_send_settings").select("*").eq("id", 1).maybeSingle();
-  const settings = (s ?? {
-    daily_cap: 200, per_domain_daily_cap: 25,
-    send_window_start_hour: 8, send_window_end_hour: 19,
-    send_window_timezone: "Europe/Belgrade", respect_send_window: true,
-  }) as Settings;
+  const settings: EngineSettings = { ...DEFAULT_SETTINGS, ...(s ?? {}) } as EngineSettings;
 
-  if (!inSendWindow(settings)) {
-    return new Response(JSON.stringify({ ok: true, skipped: "outside_send_window" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  const { data: counter } = await admin.from("email_sent_today").select("sent_today").maybeSingle();
+  const { data: counter } = await admin
+    .from("email_sent_today")
+    .select("sent_today, sent_last_hour")
+    .maybeSingle();
   let sentToday: number = (counter as any)?.sent_today ?? 0;
-  const remaining = Math.max(0, settings.daily_cap - sentToday);
+  const sentLastHour: number = (counter as any)?.sent_last_hour ?? 0;
+
+  const dailyCap = effectiveDailyCap(settings);
+  const remaining = Math.max(0, dailyCap - sentToday);
   if (remaining === 0) {
     return new Response(JSON.stringify({ ok: true, skipped: "daily_cap_hit", sentToday }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+  let hourlyRemaining = Math.max(0, settings.hourly_cap - sentLastHour);
+  if (hourlyRemaining === 0) {
+    return new Response(JSON.stringify({ ok: true, skipped: "hourly_cap_hit", sentLastHour }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   // Pull due rows
-  const batchSize = Math.min(remaining, 20);
+  const batchSize = Math.min(remaining, hourlyRemaining, 20);
   const { data: due } = await admin
     .from("scheduled_emails")
     .select("*")
@@ -85,10 +73,42 @@ Deno.serve(async (req) => {
   const perDomainBatch = new Map<string, number>();
 
   for (const row of rows) {
+    // Reply-stop: if the lead already replied, cancel pending rows for them.
+    if (settings.reply_stop_enabled && row.lead_id) {
+      const { data: lead } = await admin
+        .from("recruiter_leads")
+        .select("replied_at,email_status")
+        .eq("id", row.lead_id)
+        .maybeSingle();
+      if (lead && (lead.replied_at || lead.email_status === "replied")) {
+        await admin.from("scheduled_emails").update({
+          status: "cancelled",
+          cancelled_reason: "reply_stop",
+          blocking_reason: "replied",
+          blocked_at: new Date().toISOString(),
+        }).eq("id", row.id);
+        results.push({ id: row.id, ok: false, error: "reply_stop" });
+        continue;
+      }
+    }
+
+    // Country-aware window + weekend skip (defer, don't fail).
+    const windowCheck = isSendableNow(settings, row.recipient_country ?? null);
+    if (!windowCheck.ok) {
+      await admin.from("scheduled_emails").update({
+        blocking_reason: windowCheck.reason ?? "outside_window",
+        blocked_at: new Date().toISOString(),
+      }).eq("id", row.id);
+      results.push({ id: row.id, ok: false, error: windowCheck.reason });
+      continue;
+    }
+
     const domain = String(row.to_email).split("@")[1]?.toLowerCase() ?? "";
     if (!domain) {
       await admin.from("scheduled_emails").update({
-        status: "failed", error: "Invalid recipient", attempts: (row.attempts ?? 0) + 1,
+        status: "failed", error: "Invalid recipient",
+        blocking_reason: "missing_email", blocked_at: new Date().toISOString(),
+        attempts: (row.attempts ?? 0) + 1,
       }).eq("id", row.id);
       results.push({ id: row.id, ok: false, error: "invalid_email" });
       continue;
@@ -99,7 +119,9 @@ Deno.serve(async (req) => {
       .from("email_suppressions").select("email").eq("email", row.to_email.toLowerCase()).maybeSingle();
     if (sup) {
       await admin.from("scheduled_emails").update({
-        status: "suppressed", error: "Recipient on suppression list", attempts: (row.attempts ?? 0) + 1,
+        status: "suppressed", error: "Recipient on suppression list",
+        blocking_reason: "suppressed", blocked_at: new Date().toISOString(),
+        attempts: (row.attempts ?? 0) + 1,
       }).eq("id", row.id);
       results.push({ id: row.id, ok: false, error: "suppressed" });
       continue;
@@ -114,7 +136,9 @@ Deno.serve(async (req) => {
       .ilike("note", `%@${domain}%`);
     const inBatch = perDomainBatch.get(domain) ?? 0;
     if ((domainCount ?? 0) + inBatch >= settings.per_domain_daily_cap) {
-      // leave pending — try again tomorrow / next cycle
+      await admin.from("scheduled_emails").update({
+        blocking_reason: "per_domain_cap", blocked_at: new Date().toISOString(),
+      }).eq("id", row.id);
       results.push({ id: row.id, ok: false, error: "per_domain_cap" });
       continue;
     }
@@ -176,6 +200,7 @@ Deno.serve(async (req) => {
 
       perDomainBatch.set(domain, inBatch + 1);
       sentToday++;
+      hourlyRemaining--;
       results.push({ id: row.id, ok: true, messageId: (data as any)?.id });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "send failed";
@@ -183,14 +208,18 @@ Deno.serve(async (req) => {
       await admin.from("scheduled_emails").update({
         status: failedAttempts >= 3 ? "failed" : "pending",
         error: msg,
+        blocking_reason: failedAttempts >= 3 ? `provider_error: ${msg.slice(0, 200)}` : null,
+        blocked_at: failedAttempts >= 3 ? new Date().toISOString() : null,
       }).eq("id", row.id);
       results.push({ id: row.id, ok: false, error: msg });
     }
 
-    if (sentToday >= settings.daily_cap) break;
+    if (sentToday >= dailyCap || hourlyRemaining <= 0) break;
   }
 
-  return new Response(JSON.stringify({ ok: true, processed: rows.length, results, sentToday }), {
+  return new Response(JSON.stringify({
+    ok: true, processed: rows.length, results, sentToday, dailyCap, hourlyRemaining,
+  }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
