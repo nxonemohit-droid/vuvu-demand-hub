@@ -16,11 +16,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Play, Pause, Plus, Send, RefreshCw, ChevronRight, Mail, AlertTriangle, CheckCircle2,
-  MessageCircle, Linkedin, Users, ExternalLink,
+  MessageCircle, Linkedin, Users, ExternalLink, GraduationCap,
 } from "lucide-react";
 
 type Channel = "email" | "whatsapp" | "linkedin";
-type LeadSource = "recruiter" | "demand";
+type LeadSource = "recruiter" | "demand" | "othm";
 
 type Campaign = {
   id: string;
@@ -88,6 +88,25 @@ type DemandLead = {
   city: string | null;
   role: string | null;
   trade_category: string | null;
+  quality_score: number | null;
+  outreach_queued: boolean | null;
+};
+
+type OthmLead = {
+  id: string;
+  entity_type: string;
+  full_name: string | null;
+  institution_name: string | null;
+  email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  linkedin_url: string | null;
+  country: string | null;
+  city: string | null;
+  course_level: string | null;
+  intake_month: string | null;
+  preferred_country: string | null;
+  stage: string;
   quality_score: number | null;
   outreach_queued: boolean | null;
 };
@@ -443,7 +462,7 @@ function CreateCampaignDialog({
     if (!open) return;
     const today = new Date().toISOString().slice(0, 10);
     const ch = CHANNEL_META[channel].label;
-    const src = source === "recruiter" ? "Recruiters" : "Demand";
+    const src = source === "recruiter" ? "Recruiters" : source === "demand" ? "Demand" : "OTHM";
     setName(`${ch} · ${src} · ${today}`);
   }, [channel, source, open]);
 
@@ -475,7 +494,7 @@ function CreateCampaignDialog({
           already_contacted: l.email_status === "sent",
         }));
         setRecipients(mapped);
-      } else {
+      } else if (source === "demand") {
         const { data, error } = await supabase
           .from("demand_leads")
           .select("id, employer_name, contact_name, contact_email, contact_phone, phone_e164, whatsapp_number, country, city, role, trade_category, quality_score, outreach_queued")
@@ -494,6 +513,27 @@ function CreateCampaignDialog({
           meta: `${l.role ?? "?"} · ${l.city ?? ""} ${l.country ?? ""}${l.contact_name ? " · " + l.contact_name : ""}`.trim(),
           quality: l.quality_score ?? 0,
           already_contacted: l.outreach_queued === true,
+        }));
+        setRecipients(mapped);
+      } else {
+        const { data, error } = await supabase
+          .from("othm_leads")
+          .select("id, entity_type, full_name, institution_name, email, phone, whatsapp, linkedin_url, country, city, course_level, intake_month, preferred_country, stage, quality_score, outreach_queued")
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        if (error) toast.error(error.message);
+        const mapped: AnyRecipient[] = (data ?? []).map((l: OthmLead) => ({
+          lead_id: l.id,
+          source: "othm",
+          display_name: l.institution_name || l.full_name || "(unnamed)",
+          email: l.email,
+          phone: l.whatsapp || l.phone,
+          phone_e164: null,
+          linkedin: l.linkedin_url,
+          country: l.country,
+          meta: `${l.entity_type}${l.course_level ? " · " + l.course_level : ""}${l.intake_month ? " · " + l.intake_month : ""}${l.city ? " · " + l.city : ""}${l.country ? " " + l.country : ""}${l.full_name && l.institution_name ? " · " + l.full_name : ""}`.trim(),
+          quality: l.quality_score ?? 0,
+          already_contacted: l.outreach_queued === true || l.stage === "contacted" || l.stage === "enrolled",
         }));
         setRecipients(mapped);
       }
@@ -559,6 +599,7 @@ function CreateCampaignDialog({
         channel,
         recruiter_id: r.source === "recruiter" ? r.lead_id : null,
         demand_lead_id: r.source === "demand" ? r.lead_id : null,
+        othm_lead_id: r.source === "othm" ? r.lead_id : null,
         email_to: channel === "email" ? r.email : null,
         to_phone: channel === "whatsapp" ? (r.phone_e164 ?? r.phone) : null,
         to_linkedin: channel === "linkedin" ? r.linkedin : null,
@@ -609,12 +650,15 @@ function CreateCampaignDialog({
           <div>
             <Label className="text-xs">Audience</Label>
             <Tabs value={source} onValueChange={(v) => setSource(v as LeadSource)}>
-              <TabsList className="grid grid-cols-2 w-full mt-1">
+              <TabsList className="grid grid-cols-3 w-full mt-1">
                 <TabsTrigger value="recruiter" className="gap-1.5">
                   <Users className="h-3.5 w-3.5" /> Recruiter agencies
                 </TabsTrigger>
                 <TabsTrigger value="demand" className="gap-1.5">
                   <Users className="h-3.5 w-3.5" /> Demand leads (employers)
+                </TabsTrigger>
+                <TabsTrigger value="othm" className="gap-1.5">
+                  <GraduationCap className="h-3.5 w-3.5" /> OTHM (students/colleges)
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -673,7 +717,12 @@ function CreateCampaignDialog({
             )}
 
             <div className="text-[10px] text-muted-foreground">
-              Merge tags: <code>{`{{agency_name}}`}</code> <code>{`{{first_name}}`}</code> <code>{`{{eu_country}}`}</code> <code>{`{{hq_country}}`}</code> <code>{`{{role}}`}</code> <code>{`{{trade}}`}</code>
+              Merge tags:
+              {source === "othm" ? (
+                <> <code>{`{{full_name}}`}</code> <code>{`{{first_name}}`}</code> <code>{`{{institution_name}}`}</code> <code>{`{{entity_type}}`}</code> <code>{`{{course_level}}`}</code> <code>{`{{intake_month}}`}</code> <code>{`{{preferred_country}}`}</code> <code>{`{{country}}`}</code></>
+              ) : (
+                <> <code>{`{{agency_name}}`}</code> <code>{`{{first_name}}`}</code> <code>{`{{eu_country}}`}</code> <code>{`{{hq_country}}`}</code> <code>{`{{role}}`}</code> <code>{`{{trade}}`}</code></>
+              )}
             </div>
           </div>
 

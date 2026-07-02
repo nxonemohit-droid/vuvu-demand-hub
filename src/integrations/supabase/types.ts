@@ -54,6 +54,7 @@ export type Database = {
           error: string | null
           id: string
           open_count: number
+          othm_lead_id: string | null
           recruiter_id: string | null
           resend_message_id: string | null
           scheduled_for: string | null
@@ -76,6 +77,7 @@ export type Database = {
           error?: string | null
           id?: string
           open_count?: number
+          othm_lead_id?: string | null
           recruiter_id?: string | null
           resend_message_id?: string | null
           scheduled_for?: string | null
@@ -98,6 +100,7 @@ export type Database = {
           error?: string | null
           id?: string
           open_count?: number
+          othm_lead_id?: string | null
           recruiter_id?: string | null
           resend_message_id?: string | null
           scheduled_for?: string | null
@@ -114,6 +117,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_emails_othm_lead_id_fkey"
+            columns: ["othm_lead_id"]
+            isOneToOne: false
+            referencedRelation: "othm_leads"
             referencedColumns: ["id"]
           },
           {
@@ -1215,6 +1225,84 @@ export type Database = {
             referencedColumns: ["company_id"]
           },
         ]
+      }
+      othm_leads: {
+        Row: {
+          city: string | null
+          country: string | null
+          course_level: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          entity_type: string
+          full_name: string | null
+          id: string
+          institution_name: string | null
+          intake_month: string | null
+          linkedin_url: string | null
+          notes: string | null
+          outreach_queued: boolean
+          phone: string | null
+          preferred_country: string | null
+          quality_score: number | null
+          source: string | null
+          stage: string
+          tags: string[]
+          updated_at: string
+          website: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          course_level?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          entity_type?: string
+          full_name?: string | null
+          id?: string
+          institution_name?: string | null
+          intake_month?: string | null
+          linkedin_url?: string | null
+          notes?: string | null
+          outreach_queued?: boolean
+          phone?: string | null
+          preferred_country?: string | null
+          quality_score?: number | null
+          source?: string | null
+          stage?: string
+          tags?: string[]
+          updated_at?: string
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          course_level?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          entity_type?: string
+          full_name?: string | null
+          id?: string
+          institution_name?: string | null
+          intake_month?: string | null
+          linkedin_url?: string | null
+          notes?: string | null
+          outreach_queued?: boolean
+          phone?: string | null
+          preferred_country?: string | null
+          quality_score?: number | null
+          source?: string | null
+          stage?: string
+          tags?: string[]
+          updated_at?: string
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {

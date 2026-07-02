@@ -54,9 +54,9 @@ Deno.serve(async (req) => {
       );
       const { data: u } = await supa.auth.getUser();
       if (!u?.user) return json({ error: "Unauthorized" }, 401);
-      const { data: roleRow } = await admin.from("user_roles").select("role")
-        .eq("user_id", u.user.id).eq("role", "admin").maybeSingle();
-      if (!roleRow) return json({ error: "Admin only" }, 403);
+      const { data: roleRows } = await admin.from("user_roles").select("role")
+        .eq("user_id", u.user.id).in("role", ["admin", "bd"]);
+      if (!roleRows?.length) return json({ error: "Team members only" }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       const remaining = Math.max((camp.daily_limit ?? 100), 1);
       const { data: emails } = await admin
         .from("campaign_emails")
-        .select("id, campaign_id, recruiter_id, demand_lead_id, email_to, subject, body_html, body_text, channel")
+        .select("id, campaign_id, recruiter_id, demand_lead_id, othm_lead_id, email_to, subject, body_html, body_text, channel")
         .eq("campaign_id", camp.id)
         .eq("status", "pending")
         .eq("channel", "email")
@@ -134,6 +134,29 @@ Deno.serve(async (req) => {
               role: lead.role ?? "",
               trade: lead.trade_category ?? lead.role ?? "skilled workers",
               trades: (lead.sector_tags ?? []).join(", "),
+            };
+            subject = renderTemplate(subject, vars);
+            html = renderTemplate(html, vars);
+          }
+        } else if (e.othm_lead_id) {
+          const { data: lead } = await admin
+            .from("othm_leads")
+            .select("full_name, institution_name, entity_type, country, city, course_level, intake_month, preferred_country")
+            .eq("id", e.othm_lead_id)
+            .maybeSingle();
+          if (lead) {
+            const vars: Record<string, string> = {
+              full_name: lead.full_name ?? "",
+              first_name: (lead.full_name ?? "").split(" ")[0] || "there",
+              contact_name: lead.full_name ?? "",
+              institution_name: lead.institution_name ?? "",
+              agency_name: lead.institution_name ?? lead.full_name ?? "",
+              entity_type: lead.entity_type ?? "student",
+              country: lead.country ?? "",
+              city: lead.city ?? "",
+              course_level: lead.course_level ?? "",
+              intake_month: lead.intake_month ?? "",
+              preferred_country: lead.preferred_country ?? "UK",
             };
             subject = renderTemplate(subject, vars);
             html = renderTemplate(html, vars);

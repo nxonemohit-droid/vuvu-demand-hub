@@ -15,6 +15,7 @@ import {
   BarChart3,
   Globe2,
   Activity,
+  GraduationCap,
 } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ const navItems = [
   { to: "/recruiters", label: "Recruiters", icon: Building2 },
   { to: "/mail", label: "Mail / Outreach", icon: Mail },
   { to: "/campaign", label: "Campaign", icon: BarChart3 },
+  { to: "/othm", label: "OTHM Students", icon: GraduationCap },
   { to: "/candidates", label: "Candidates", icon: Users },
   { to: "/runs", label: "Discovery Runs", icon: PlayCircle },
   { to: "/admin/diagnostics", label: "Diagnostics", icon: Activity, adminOnly: true },
