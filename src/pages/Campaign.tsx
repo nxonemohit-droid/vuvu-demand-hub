@@ -650,12 +650,15 @@ function CreateCampaignDialog({
           <div>
             <Label className="text-xs">Audience</Label>
             <Tabs value={source} onValueChange={(v) => setSource(v as LeadSource)}>
-              <TabsList className="grid grid-cols-2 w-full mt-1">
+              <TabsList className="grid grid-cols-3 w-full mt-1">
                 <TabsTrigger value="recruiter" className="gap-1.5">
                   <Users className="h-3.5 w-3.5" /> Recruiter agencies
                 </TabsTrigger>
                 <TabsTrigger value="demand" className="gap-1.5">
                   <Users className="h-3.5 w-3.5" /> Demand leads (employers)
+                </TabsTrigger>
+                <TabsTrigger value="othm" className="gap-1.5">
+                  <GraduationCap className="h-3.5 w-3.5" /> OTHM (students/colleges)
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -714,7 +717,12 @@ function CreateCampaignDialog({
             )}
 
             <div className="text-[10px] text-muted-foreground">
-              Merge tags: <code>{`{{agency_name}}`}</code> <code>{`{{first_name}}`}</code> <code>{`{{eu_country}}`}</code> <code>{`{{hq_country}}`}</code> <code>{`{{role}}`}</code> <code>{`{{trade}}`}</code>
+              Merge tags:
+              {source === "othm" ? (
+                <> <code>{`{{full_name}}`}</code> <code>{`{{first_name}}`}</code> <code>{`{{institution_name}}`}</code> <code>{`{{entity_type}}`}</code> <code>{`{{course_level}}`}</code> <code>{`{{intake_month}}`}</code> <code>{`{{preferred_country}}`}</code> <code>{`{{country}}`}</code></>
+              ) : (
+                <> <code>{`{{agency_name}}`}</code> <code>{`{{first_name}}`}</code> <code>{`{{eu_country}}`}</code> <code>{`{{hq_country}}`}</code> <code>{`{{role}}`}</code> <code>{`{{trade}}`}</code></>
+              )}
             </div>
           </div>
 
