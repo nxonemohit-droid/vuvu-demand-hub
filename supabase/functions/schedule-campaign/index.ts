@@ -24,9 +24,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-    const { data: roleRow } = await admin.from("user_roles").select("role")
-      .eq("user_id", u.user.id).eq("role", "admin").maybeSingle();
-    if (!roleRow) return json({ error: "Admin only" }, 403);
+    const { data: roleRows } = await admin.from("user_roles").select("role")
+      .eq("user_id", u.user.id).in("role", ["admin", "bd"]);
+    if (!roleRows?.length) return json({ error: "Team members only" }, 403);
 
     const body = await req.json().catch(() => ({}));
     const campaignId = String(body?.campaign_id ?? "");
