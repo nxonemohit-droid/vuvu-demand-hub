@@ -462,7 +462,7 @@ function CreateCampaignDialog({
     if (!open) return;
     const today = new Date().toISOString().slice(0, 10);
     const ch = CHANNEL_META[channel].label;
-    const src = source === "recruiter" ? "Recruiters" : "Demand";
+    const src = source === "recruiter" ? "Recruiters" : source === "demand" ? "Demand" : "OTHM";
     setName(`${ch} · ${src} · ${today}`);
   }, [channel, source, open]);
 
@@ -494,7 +494,7 @@ function CreateCampaignDialog({
           already_contacted: l.email_status === "sent",
         }));
         setRecipients(mapped);
-      } else {
+      } else if (source === "demand") {
         const { data, error } = await supabase
           .from("demand_leads")
           .select("id, employer_name, contact_name, contact_email, contact_phone, phone_e164, whatsapp_number, country, city, role, trade_category, quality_score, outreach_queued")
@@ -513,6 +513,27 @@ function CreateCampaignDialog({
           meta: `${l.role ?? "?"} · ${l.city ?? ""} ${l.country ?? ""}${l.contact_name ? " · " + l.contact_name : ""}`.trim(),
           quality: l.quality_score ?? 0,
           already_contacted: l.outreach_queued === true,
+        }));
+        setRecipients(mapped);
+      } else {
+        const { data, error } = await supabase
+          .from("othm_leads")
+          .select("id, entity_type, full_name, institution_name, email, phone, whatsapp, linkedin_url, country, city, course_level, intake_month, preferred_country, stage, quality_score, outreach_queued")
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        if (error) toast.error(error.message);
+        const mapped: AnyRecipient[] = (data ?? []).map((l: OthmLead) => ({
+          lead_id: l.id,
+          source: "othm",
+          display_name: l.institution_name || l.full_name || "(unnamed)",
+          email: l.email,
+          phone: l.whatsapp || l.phone,
+          phone_e164: null,
+          linkedin: l.linkedin_url,
+          country: l.country,
+          meta: `${l.entity_type}${l.course_level ? " · " + l.course_level : ""}${l.intake_month ? " · " + l.intake_month : ""}${l.city ? " · " + l.city : ""}${l.country ? " " + l.country : ""}${l.full_name && l.institution_name ? " · " + l.full_name : ""}`.trim(),
+          quality: l.quality_score ?? 0,
+          already_contacted: l.outreach_queued === true || l.stage === "contacted" || l.stage === "enrolled",
         }));
         setRecipients(mapped);
       }
