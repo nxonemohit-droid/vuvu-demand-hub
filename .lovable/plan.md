@@ -1,129 +1,118 @@
-## Scope (this pass)
+## Voynova Pivot → HM Mauritius Admissions Engine (500 admissions)
 
-Two of the four slices you approved, plus the candidates matcher debug. Single shared sender mailbox stays as-is (per-mailbox caps map to the existing global daily cap + per-domain cap in `email_send_settings`).
+Ek hi consolidated system: **scrape leads → AI-personalize → bulk mail** — sab ek page, one-click.
 
-Out of scope this pass: full per-mailbox sequence engine, warmup, timezone-aware send windows, recruiters/HR-managers/companies tab rebuild, sequence-engine "weekend skip + reply-stop".
+---
 
-## Important finding (will surface in UI)
+### 1) Kya hataana hai (cleanup)
+- **Sidebar/routes remove:** Demand Intelligence, Recruiters, Employers, Local Hiring, Discovery Runs, Actor Health, Archived Leads, Keyword Audit (archive UI, not DB).
+- **DB tables retain hoti hain** (data safe) but hidden from nav. Migration sirf naye tables banayegi, purani ko touch nahi karegi.
+- Nayi default landing: **`/hm-mauritius`** (single command center).
 
-- `candidates` table has **0 rows**. `match-candidates` is not broken in logic — it has nothing to compare against. I will (a) tighten the matcher (current exact-role match is too strict; switch to case-insensitive substring + skill/trade overlap) and (b) show a clear empty-state on Candidates and in the matcher response. The ">0 matches against 3780 leads" criterion cannot be met until you seed candidate rows.
-- "Pending Mails" lives in `scheduled_emails` today (20 pending, 4 failed with "Invalid recipient"). I will NOT create a parallel `pending_mail` table.
+### 2) Lead Discovery — naya focused mode
 
-## What ships
+**Target audience (2 buckets):**
 
-### 1. Mail · Compose tab — eligibility & status pills
+| Bucket | Kya scrape ho | Filters/Keywords |
+|---|---|---|
+| **A. Hotel Management Institutes** (NE India + Uttarakhand + Nepal) | Institute name, website, principal/director/owner/HR manager/placement head, email, phone, LinkedIn, current + passed-out students list (jahaan available) | `hotel management institute`, `IHM`, `culinary institute`, `hospitality college`, `diploma hotel management` **+ region:** Manipur, Meghalaya, Assam, Nagaland, Mizoram, Tripura, Arunachal Pradesh, Sikkim, Uttarakhand, Nepal (Kathmandu, Pokhara, Chitwan) |
+| **B. Career Consultancies** (hotel management + overseas study focus) | Agency name, founder/CEO/counsellor, email, phone, LinkedIn, city | `hotel management consultancy`, `overseas hospitality admissions`, `study abroad hotel management`, `Mauritius admissions consultant` |
 
-- Recipient query filters to **outreach-eligible**: `status='active'`, has valid email OR LinkedIn, email not in `email_suppressions`, `email_status NOT IN ('bounced','complained','unsubscribed')`, not already `sent` within the active sequence window.
-- Status column shows a single pill from: **New · Queued · Sent · Replied · Bounced · Snoozed** derived from `recruiter_leads.email_status`, `replied_at`, suppressions, and the presence of a pending `scheduled_emails` row.
-- Filter dropdown options: Eligible (default) · Queued · Sent · Replied · Bounced · All.
-
-### 2. Mail · Pending Mails tab (replaces today's "Scheduled" tab)
-
-New three-section table built on `scheduled_emails`:
-
-- **Drafts** — `status='pending'` AND (`send_at` is null OR `send_at <= now()`).
-- **Scheduled** — `status='pending'` AND `send_at > now()`.
-- **Awaiting enrichment** — pending rows whose `to_email` is missing/invalid OR whose joined lead has `email_source='missing'`.
-- **Blocked / Failed** — `status='failed'` plus the computed `blocking_reason`.
-
-Computed `blocking_reason` per row (client-side derivation, also persisted via the migration column added in slice 2):
-
-- `missing_email` · `missing_first_name` · `unresolved_template_var` (scans subject/body for unrendered `{{…}}`) · `over_daily_cap` (count of today's `sent` ≥ `email_send_settings.daily_cap`) · `suppressed` · `bounced` · `provider_error: <text>`.
-
-Bulk actions on selected rows:
-
-- **Enrich now** → invokes `enrich-email` (bulk mode) for the linked recruiter leads, then re-queries.
-- **Reassign sender** → disabled with a tooltip ("single mailbox — change in Settings → Email"). Kept in UI for future.
-- **Reschedule** → datetime picker → bulk `UPDATE send_at, status='pending', error=null`.
-- **Discard** → bulk `UPDATE status='cancelled', error='discarded by user'`.
-
-### 3. Pending Mails health banner
-
-Above the table:
-
-```text
-Awaiting enrichment: 7   Sender cap: 0   Unresolved vars: 3   Provider error: 1
-[ Resolve all auto-fixable ]
+**Region enum (hardcoded, editable via UI chips):**
+```
+NE India: Manipur, Meghalaya, Assam, Nagaland, Mizoram,
+          Tripura, Arunachal Pradesh, Sikkim
+Uttarakhand: Dehradun, Haldwani, Nainital, Rishikesh, Haridwar
+Nepal: Kathmandu, Pokhara, Chitwan, Biratnagar, Butwal
 ```
 
-"Resolve all auto-fixable":
-- For `missing_email` rows → invoke `enrich-email` bulk for those leads.
-- For `unresolved_template_var` rows that resolve once the lead is re-fetched → re-render and update.
-- For permanently broken rows (no lead, no email, lead deleted) → discard.
+### 3) Best scraping stack (recommendation)
 
-### 4. Enrichment write-back polish
-
-- `enrich-email` already writes `contact_email`, `email_enriched`, `email_source`. Add: write `last_enrichment_error` and `last_enrichment_at` on failure rather than silently moving on, and a small in-memory domain→best-candidate cache per invocation. Resend's monthly cost cap is a no-op here (Hunter is the paid hop) — I'll add a soft `HUNTER_MONTHLY_CAP` env-var guard inside `hunter-enrich`.
-- Per-lead enrichment status & last error surfaced on the Leads tab status pill tooltip and on `LeadDetail`.
-
-### 5. Migrations (slice 2)
-
-Single migration, idempotent:
-
-- `scheduled_emails`: add `blocking_reason text`, `blocked_at timestamptz`, index on `(status, send_at)`.
-- `recruiter_leads`: add `normalized_domain text`, `role_classification text`, `confidence numeric`, `last_signal_at timestamptz`, `company_id uuid`, `last_enrichment_error text`, `last_enrichment_at timestamptz`.
-- `demand_leads`: add `normalized_domain text`, `role_classification text`, `confidence numeric`, `last_signal_at timestamptz` (company_id already exists).
-- Backfill `normalized_domain` from `source_url`/`website`/`contact_email` via a one-time `UPDATE`.
-- Add FK `recruiter_leads.company_id → companies.id ON DELETE SET NULL`, `demand_leads.company_id → companies.id ON DELETE SET NULL`. (No `pending_mail` table; `scheduled_emails.lead_id` is heterogeneous — recruiter OR demand — so no FK there to avoid breaking inserts.)
-- RLS: new columns inherit the existing team-member policies on each table. No new policies needed. Verified all touched tables already have `is_team_member` SELECT/INSERT/UPDATE coverage.
-
-### 6. /admin/diagnostics page
-
-New route `/admin/diagnostics`, admin-gated. Single-page dashboard:
-
-- **Pipeline counts**: raw_signals (total / structured / unstructured), demand_leads by `review_status`, recruiter_leads by `status`, candidates total.
-- **Last run per source**: max(`finished_at`) per `source_boards.id` and per `scrape_jobs.source`.
-- **Error rates (last 24h)**: scrape_jobs failed/total, scheduled_emails failed/sent, hunter-enrich attempts (from `recruiter_leads.last_enrichment_error` non-null in 24h).
-- **Queue depths**: pending scheduled_emails, awaiting-enrichment count, WhatsApp pending today.
-
-### 7. Candidates matcher fix
-
-- `match-candidates/index.ts`: case-insensitive substring matching on role, OR overlap between candidate `skills` and lead trades. Threshold lowered to 30. Returns `{ ok, matched, candidate_count }` and surfaces a `note: "no candidates in database"` when zero.
-- Candidates page: empty-state banner with a one-click "Run reverse-matching" button (disabled when candidates=0, with explanation).
-
-### 8. CHANGELOG + Security memory
-
-- New `CHANGELOG.md` entry dated 2026-05-31 listing the above.
-- Append to security-memory: confirmation that new columns inherit existing RLS (no new findings expected) and that `scheduled_emails.lead_id` deliberately has no FK because it points to either `recruiter_leads` or `demand_leads`.
-
-## File map
+**Layered — use best tool per job:**
 
 ```text
-NEW
-  src/pages/Diagnostics.tsx
-  src/components/outreach/PendingMailsPanel.tsx
-  src/components/outreach/PendingMailsHealthBanner.tsx
-  src/lib/outreach-status.ts          // status pill + blocking_reason derivation
-  CHANGELOG.md
-  supabase/migrations/<ts>_outreach_pending_and_pipeline.sql
-
-EDIT
-  src/App.tsx                          // add /admin/diagnostics route
-  src/components/AppLayout.tsx         // add nav link (admin-only)
-  src/pages/Mail.tsx                   // eligibility query, status pills, new tab
-  src/pages/Candidates.tsx             // empty-state + matcher trigger
-  src/pages/LeadDetail.tsx             // surface last_enrichment_error
-  supabase/functions/enrich-email/index.ts        // write-back error + at
-  supabase/functions/hunter-enrich/index.ts       // soft monthly cap guard
-  supabase/functions/match-candidates/index.ts    // looser matching + candidate_count
+Discovery layer  → Google CSE  (cheap, precise site: + region queries)
+Enrichment layer → Firecrawl   (already integrated; scrape institute site
+                                for director/HR/email/phone/students)
+Bulk pages       → Apify       (already integrated; run when >200 URLs
+                                queued — LinkedIn people search actor,
+                                Google Maps actor for institute contacts)
+Email finder     → Hunter      (already integrated; domain → verified emails)
 ```
 
-## Acceptance against your original list
+Reason: Google CSE deta hai precise SERP without burn; Firecrawl har hit ka clean markdown/JSON extraction karta hai; Apify sirf tab jab volume ho (LinkedIn/GMaps); Hunter final email verification. Sab 4 already project me connected hain — no new secret needed.
 
-| Criterion | Status this pass |
-|---|---|
-| Leads tab shows only outreach-eligible | ✅ |
-| Status pills New/Queued/Sent/Replied/Bounced/Snoozed | ✅ |
-| Pending Mails split with blocking reason + bulk actions | ✅ (Reassign sender disabled — single mailbox) |
-| Enrich emails flow: retries + cost cap + cache + write-back + per-lead status | ✅ (retries already in send path; soft Hunter cap added; per-invocation cache; write-back error+at) |
-| Sequence engine: timezone, per-mailbox caps, weekend, reply-stop | ❌ deferred (separate pass) |
-| Fix Queued-with-no-scheduled_at | ✅ surfaced as "Drafts" and rescheduleable |
-| Pending Mails health banner + Resolve all auto-fixable | ✅ |
-| New columns/indexes + backfill | ✅ |
-| FKs recruiter/lead → company | ✅ (scheduled_emails.lead_id deliberately not FK'd — heterogeneous) |
-| RLS mirroring demand_leads | ✅ inherited |
-| /admin/diagnostics | ✅ |
-| Recruiters / HR Managers / Companies tabs populated | ❌ deferred |
-| Candidates reverse-matching > 0 results | ⚠️ matcher tightened, but blocked by 0 candidates in DB |
-| CHANGELOG + security-memory updated | ✅ |
-| All in one commit | ✅ |
+### 4) Naya DB schema (1 migration)
+
+**`hm_leads`** — main table
+- `id, type ('institute'|'consultancy'), name, website, region, country, city, state`
+- `contact_name, contact_role (Director/Owner/HR/Placement/CEO/Counsellor), email, phone, linkedin`
+- `students_meta jsonb` (current batch size, pass-out years, courses offered)
+- `source ('gcse'|'firecrawl'|'apify'|'hunter'|'manual'), source_url, dedup_hash`
+- `status ('new'|'enriched'|'queued'|'sent'|'replied'|'admitted'|'rejected')`
+- `admission_stage ('lead'|'interested'|'docs_sent'|'application'|'offer'|'visa'|'admitted')`
+- `score int, notes, tags text[], imported_by, timestamps`
+
+**`hm_campaigns`** — id, name, template_1/2/3 (subject+body), daily_cap=50, gap_seconds=90, window (9-18 IST, Mon-Fri), status, counts.
+
+**`hm_campaign_sends`** — id, campaign_id, lead_id, template_variant (1|2|3), scheduled_for, sent_at, status, resend_message_id, personalized_subject/body snapshot, error.
+
+**`hm_scrape_jobs`** — id, mode ('discover'|'enrich'), region, keywords[], provider, status, leads_found, cost_estimate, timestamps.
+
+RLS: admin + bd read/write, viewer read.
+
+### 5) Edge functions (5 new, reuse 1)
+
+1. **`hm-discover`** — takes region + bucket (institute/consultancy) → runs Google CSE queries → dedupes URLs → queues Firecrawl scrape jobs.
+2. **`hm-enrich`** — Firecrawl scrape per URL → AI (`gemini-3-flash-preview`) extracts structured fields (name, contact_name, role, email, phone, students_meta) → if email missing, Hunter domain search → insert into `hm_leads`.
+3. **`hm-apify-bulk`** — trigger only when queue > 200 URLs, calls Apify actor (LinkedIn people search / GMaps) for extra contacts.
+4. **`hm-generate-templates`** — Lovable AI generates 3 draft variants using **voynova-outreach skill** rules, tailored for **HM Mauritius admissions pitch** (partnership for institutes, referral for consultancies, admissions for students-post-passout). Signature: Mohit Gururani, Voynova Global Solutions Pvt. Ltd., + `https://voynovaglobal.com` + `https://voy-nova-profiles.live/company-profile`.
+5. **`hm-schedule-campaign`** — locks templates + leads → distributes 50/day, 90s gap, Mon-Fri 9:00–18:00 IST, weekend skip, random variant per lead, personalizes merge tags (`{{first_name}} {{institute}} {{region}} {{role}}`).
+6. **Reuse `send-campaign-batch`** — add `hm` channel branch reading `hm_campaign_sends`, respects 90s gap + Resend 429 backoff + reply-stop via inbound webhook.
+
+### 6) Frontend — single page `/hm-mauritius`
+
+Tabs (top of page):
+
+```text
+[ 1. Discover ] [ 2. Leads ] [ 3. Templates ] [ 4. Campaign ] [ 5. Pipeline ]
+```
+
+- **Discover:** region chips (multi-select), bucket toggle (Institute/Consultancy/Both), keyword preset dropdown, "Start scrape" button. Live progress: URLs found → enriched → leads created. Cost/quota meter (Firecrawl/Hunter/Apify).
+- **Leads:** filterable table (region, type, has_email, stage), bulk select, "Add to campaign" button, CSV import fallback, export.
+- **Templates:** "Generate 3 AI drafts" (HM Mauritius pitch) → 3 editable cards → "Regenerate this one" per card → Lock.
+- **Campaign:** select leads + locked templates → shows schedule preview ("312 leads → 7 days, first send Mon 9:00 IST") → Launch. Live counter: queued/sent today/total sent/failed/replied.
+- **Pipeline:** admissions funnel (Lead → Interested → Docs → Application → Offer → Visa → **Admitted**). Target progress bar: **X / 500 admissions**. Per-stage lead table, drag-drop stage change.
+
+### 7) One-click "Auto Run" (top-right on `/hm-mauritius`)
+Single button that chains: **Discover (default regions) → Enrich → Generate templates (if none) → Preview → Wait for user Launch confirm**. User sirf approve karta hai, baaki background me chalta hai (edge function `EdgeRuntime.waitUntil`).
+
+### 8) Sending rules (locked, same as before)
+- Cap: **50/day** per campaign
+- Gap: **90 seconds** between sends
+- Window: **09:00–18:00 Asia/Kolkata, Mon–Fri**
+- Weekend skip + auto rollover
+- Resend 429 → `Retry-After` backoff, 1 retry
+- Reply-stop via existing `resend-inbound` webhook
+- Suppression check via `email_suppressions`
+
+### 9) AI template rules (HM Mauritius specific)
+3 variants baked into prompt:
+- **V1 Formal (institute partnership)** — ~220 words, pitch: Voynova × [Institute] partnership to place hotel management students in Mauritius (hospitality), zero worker-fee, compliance-first, visa + travel support.
+- **V2 Warm (consultancy referral)** — ~160 words, revenue-share angle for career consultancies, quick sample-batch pitch.
+- **V3 Short (direct student/passout)** — ~90 words, "Mauritius hospitality opportunities — apply now" CTA to voynovaglobal.com.
+
+### 10) Build order
+1. Migration (4 tables + grants + RLS).
+2. `hm-discover` + `hm-enrich` edge functions + Google CSE integration (needs `GOOGLE_CSE_ID` + `GOOGLE_CSE_KEY` — will ask user before build).
+3. `hm-generate-templates` + `hm-schedule-campaign`.
+4. Wire `send-campaign-batch` to drain `hm_campaign_sends`.
+5. `/hm-mauritius` page with 5 tabs + Auto Run button.
+6. Sidebar cleanup: remove old routes, add "HM Mauritius" as primary nav.
+7. Smoke test: scrape 20 Uttarakhand IHMs → enrich → 3 templates → launch 5 test sends.
+
+---
+
+**Ek confirmation chahiye build shuru karne se pehle:** Google CSE ke liye `GOOGLE_CSE_ID` aur `GOOGLE_CSE_API_KEY` chahiye honge (free 100 queries/day, phir $5/1000). Approve kare toh main add_secret request bhejunga; agar tu Google CSE skip karna chahe, main sirf Firecrawl search + Apify pe chala sakta hu (thoda mehnga par already-connected).
+
+Approve karega toh build start.
