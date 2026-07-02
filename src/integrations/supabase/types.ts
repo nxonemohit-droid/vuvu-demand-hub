@@ -1034,6 +1034,300 @@ export type Database = {
           },
         ]
       }
+      hm_campaign_sends: {
+        Row: {
+          attempts: number
+          campaign_id: string
+          created_at: string
+          error: string | null
+          id: string
+          lead_id: string
+          personalized_body: string | null
+          personalized_subject: string | null
+          resend_message_id: string | null
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          template_variant: number
+          to_email: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          campaign_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          lead_id: string
+          personalized_body?: string | null
+          personalized_subject?: string | null
+          resend_message_id?: string | null
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          template_variant: number
+          to_email: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          campaign_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          lead_id?: string
+          personalized_body?: string | null
+          personalized_subject?: string | null
+          resend_message_id?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          template_variant?: number
+          to_email?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hm_campaign_sends_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "hm_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hm_campaign_sends_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "hm_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hm_campaigns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          daily_cap: number
+          description: string | null
+          gap_seconds: number
+          id: string
+          name: string
+          send_window_end_hour: number
+          send_window_start_hour: number
+          skip_weekends: boolean
+          status: string
+          template_1_body: string | null
+          template_1_subject: string | null
+          template_2_body: string | null
+          template_2_subject: string | null
+          template_3_body: string | null
+          template_3_subject: string | null
+          timezone: string
+          total_failed: number | null
+          total_queued: number | null
+          total_replied: number | null
+          total_sent: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          daily_cap?: number
+          description?: string | null
+          gap_seconds?: number
+          id?: string
+          name: string
+          send_window_end_hour?: number
+          send_window_start_hour?: number
+          skip_weekends?: boolean
+          status?: string
+          template_1_body?: string | null
+          template_1_subject?: string | null
+          template_2_body?: string | null
+          template_2_subject?: string | null
+          template_3_body?: string | null
+          template_3_subject?: string | null
+          timezone?: string
+          total_failed?: number | null
+          total_queued?: number | null
+          total_replied?: number | null
+          total_sent?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          daily_cap?: number
+          description?: string | null
+          gap_seconds?: number
+          id?: string
+          name?: string
+          send_window_end_hour?: number
+          send_window_start_hour?: number
+          skip_weekends?: boolean
+          status?: string
+          template_1_body?: string | null
+          template_1_subject?: string | null
+          template_2_body?: string | null
+          template_2_subject?: string | null
+          template_3_body?: string | null
+          template_3_subject?: string | null
+          timezone?: string
+          total_failed?: number | null
+          total_queued?: number | null
+          total_replied?: number | null
+          total_sent?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hm_leads: {
+        Row: {
+          admission_stage: Database["public"]["Enums"]["hm_admission_stage"]
+          city: string | null
+          contact_name: string | null
+          contact_role: string | null
+          country: string
+          created_at: string
+          dedup_hash: string | null
+          email: string | null
+          id: string
+          imported_by: string | null
+          linkedin: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          region: string | null
+          score: number | null
+          source: Database["public"]["Enums"]["hm_source"]
+          source_url: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["hm_lead_status"]
+          students_meta: Json | null
+          tags: string[] | null
+          type: Database["public"]["Enums"]["hm_lead_type"]
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          admission_stage?: Database["public"]["Enums"]["hm_admission_stage"]
+          city?: string | null
+          contact_name?: string | null
+          contact_role?: string | null
+          country?: string
+          created_at?: string
+          dedup_hash?: string | null
+          email?: string | null
+          id?: string
+          imported_by?: string | null
+          linkedin?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          region?: string | null
+          score?: number | null
+          source?: Database["public"]["Enums"]["hm_source"]
+          source_url?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["hm_lead_status"]
+          students_meta?: Json | null
+          tags?: string[] | null
+          type: Database["public"]["Enums"]["hm_lead_type"]
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          admission_stage?: Database["public"]["Enums"]["hm_admission_stage"]
+          city?: string | null
+          contact_name?: string | null
+          contact_role?: string | null
+          country?: string
+          created_at?: string
+          dedup_hash?: string | null
+          email?: string | null
+          id?: string
+          imported_by?: string | null
+          linkedin?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          region?: string | null
+          score?: number | null
+          source?: Database["public"]["Enums"]["hm_source"]
+          source_url?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["hm_lead_status"]
+          students_meta?: Json | null
+          tags?: string[] | null
+          type?: Database["public"]["Enums"]["hm_lead_type"]
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      hm_scrape_jobs: {
+        Row: {
+          bucket: Database["public"]["Enums"]["hm_lead_type"] | null
+          cost_estimate_usd: number | null
+          created_at: string
+          created_by: string | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          input_url: string | null
+          keywords: string[] | null
+          leads_created: number | null
+          meta: Json | null
+          mode: string
+          provider: string
+          regions: string[] | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          urls_found: number | null
+        }
+        Insert: {
+          bucket?: Database["public"]["Enums"]["hm_lead_type"] | null
+          cost_estimate_usd?: number | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          input_url?: string | null
+          keywords?: string[] | null
+          leads_created?: number | null
+          meta?: Json | null
+          mode: string
+          provider: string
+          regions?: string[] | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          urls_found?: number | null
+        }
+        Update: {
+          bucket?: Database["public"]["Enums"]["hm_lead_type"] | null
+          cost_estimate_usd?: number | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          input_url?: string | null
+          keywords?: string[] | null
+          leads_created?: number | null
+          meta?: Json | null
+          mode?: string
+          provider?: string
+          regions?: string[] | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          urls_found?: number | null
+        }
+        Relationships: []
+      }
       lead_blacklist: {
         Row: {
           created_at: string
@@ -2311,6 +2605,24 @@ export type Database = {
         | "google_jobs"
         | "company_site"
         | "directory"
+      hm_admission_stage:
+        | "lead"
+        | "interested"
+        | "docs_sent"
+        | "application"
+        | "offer"
+        | "visa"
+        | "admitted"
+      hm_lead_status:
+        | "new"
+        | "enriched"
+        | "queued"
+        | "sent"
+        | "replied"
+        | "admitted"
+        | "rejected"
+      hm_lead_type: "institute" | "consultancy"
+      hm_source: "gcse" | "firecrawl" | "apify" | "hunter" | "manual" | "csv"
       job_status:
         | "queued"
         | "running"
@@ -2471,6 +2783,26 @@ export const Constants = {
         "company_site",
         "directory",
       ],
+      hm_admission_stage: [
+        "lead",
+        "interested",
+        "docs_sent",
+        "application",
+        "offer",
+        "visa",
+        "admitted",
+      ],
+      hm_lead_status: [
+        "new",
+        "enriched",
+        "queued",
+        "sent",
+        "replied",
+        "admitted",
+        "rejected",
+      ],
+      hm_lead_type: ["institute", "consultancy"],
+      hm_source: ["gcse", "firecrawl", "apify", "hunter", "manual", "csv"],
       job_status: [
         "queued",
         "running",
