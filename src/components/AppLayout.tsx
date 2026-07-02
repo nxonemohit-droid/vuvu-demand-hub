@@ -17,6 +17,7 @@ import {
   Activity,
   GraduationCap,
   BookOpen,
+  Hotel,
 } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -66,15 +67,12 @@ const VArrowLogo = ({ className }: { className?: string }) => {
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/guide", label: "User Guide", icon: BookOpen },
-  { to: "/demand", label: "Demand Intelligence", icon: Radar },
-  { to: "/local-hiring", label: "Local Hiring", icon: Globe2 },
-  { to: "/leads", label: "Leads", icon: Briefcase },
-  { to: "/recruiters", label: "Recruiters", icon: Building2 },
+  { to: "/hm-mauritius", label: "HM Mauritius", icon: Hotel },
+  { to: "/leads", label: "Leads (legacy)", icon: Briefcase, adminOnly: true },
   { to: "/mail", label: "Mail / Outreach", icon: Mail },
   { to: "/campaign", label: "Campaign", icon: BarChart3 },
   { to: "/othm", label: "OTHM Students", icon: GraduationCap },
   { to: "/candidates", label: "Candidates", icon: Users },
-  { to: "/runs", label: "Discovery Runs", icon: PlayCircle },
   { to: "/admin/diagnostics", label: "Diagnostics", icon: Activity, adminOnly: true },
   { to: "/settings/discovery", label: "Discovery Settings", icon: Settings, adminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings, adminOnly: true },
