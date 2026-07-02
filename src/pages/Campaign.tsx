@@ -732,15 +732,27 @@ function CreateCampaignDialog({
               Recipients ({selectedIds.size} selected / {filtered.length} match
               {loadingLeads ? " · loading…" : ""})
             </Label>
-            <div className="flex gap-2">
-              <Input placeholder="Country filter" value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="text-xs" />
-              <Input type="number" min={0} max={100} placeholder="Min quality" value={filterMinQuality}
-                onChange={(e) => setFilterMinQuality(Math.max(0, Math.min(100, Number(e.target.value) || 0)))} className="text-xs w-28" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                placeholder="Country filter"
+                value={filterCountry}
+                onChange={(e) => setFilterCountry(e.target.value)}
+                className="text-xs h-9 flex-1 min-w-[140px]"
+              />
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                placeholder="Min quality"
+                value={filterMinQuality}
+                onChange={(e) => setFilterMinQuality(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                className="text-xs h-9 w-28 shrink-0"
+              />
+              <label className="flex items-center gap-2 text-xs whitespace-nowrap shrink-0">
+                <input type="checkbox" checked={filterUncontacted} onChange={(e) => setFilterUncontacted(e.target.checked)} />
+                Skip contacted
+              </label>
             </div>
-            <label className="flex items-center gap-2 text-xs">
-              <input type="checkbox" checked={filterUncontacted} onChange={(e) => setFilterUncontacted(e.target.checked)} />
-              Skip already-contacted
-            </label>
             <div className="border rounded-md max-h-[380px] overflow-y-auto">
               <div className="sticky top-0 bg-card border-b p-2 flex items-center gap-2 text-xs">
                 <input
