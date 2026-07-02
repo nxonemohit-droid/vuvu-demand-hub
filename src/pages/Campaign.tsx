@@ -599,6 +599,7 @@ function CreateCampaignDialog({
         channel,
         recruiter_id: r.source === "recruiter" ? r.lead_id : null,
         demand_lead_id: r.source === "demand" ? r.lead_id : null,
+        othm_lead_id: r.source === "othm" ? r.lead_id : null,
         email_to: channel === "email" ? r.email : null,
         to_phone: channel === "whatsapp" ? (r.phone_e164 ?? r.phone) : null,
         to_linkedin: channel === "linkedin" ? r.linkedin : null,
