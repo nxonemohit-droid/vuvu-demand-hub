@@ -16,6 +16,7 @@ import {
   Globe2,
   Activity,
   GraduationCap,
+  BookOpen,
 } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ const VArrowLogo = ({ className }: { className?: string }) => {
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/guide", label: "User Guide", icon: BookOpen },
   { to: "/demand", label: "Demand Intelligence", icon: Radar },
   { to: "/local-hiring", label: "Local Hiring", icon: Globe2 },
   { to: "/leads", label: "Leads", icon: Briefcase },
