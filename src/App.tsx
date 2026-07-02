@@ -24,6 +24,7 @@ import LocalHiring from "./pages/LocalHiring.tsx";
 import DiscoverySettings from "./pages/DiscoverySettings.tsx";
 import Diagnostics from "./pages/Diagnostics.tsx";
 import Othm from "./pages/Othm.tsx";
+import Guide from "./pages/Guide.tsx";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/campaign" element={<Campaign />} />
             <Route path="/othm" element={<Othm />} />
             <Route path="/mail" element={<Mail />} />
+            <Route path="/guide" element={<Guide />} />
             <Route path="/candidates" element={<Candidates />} />
             <Route path="/runs" element={<DiscoveryRuns />} />
             <Route path="/demand" element={<DemandIntelligence />} />
