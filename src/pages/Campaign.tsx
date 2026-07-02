@@ -650,15 +650,18 @@ function CreateCampaignDialog({
           <div>
             <Label className="text-xs">Audience</Label>
             <Tabs value={source} onValueChange={(v) => setSource(v as LeadSource)}>
-              <TabsList className="grid grid-cols-3 w-full mt-1">
-                <TabsTrigger value="recruiter" className="gap-1.5">
-                  <Users className="h-3.5 w-3.5" /> Recruiter agencies
+              <TabsList className="grid grid-cols-3 w-full mt-1 h-auto">
+                <TabsTrigger value="recruiter" className="flex-col gap-0.5 py-1.5 px-1 text-[11px] leading-tight whitespace-normal">
+                  <Users className="h-3.5 w-3.5" />
+                  <span className="text-center">Recruiters</span>
                 </TabsTrigger>
-                <TabsTrigger value="demand" className="gap-1.5">
-                  <Users className="h-3.5 w-3.5" /> Demand leads (employers)
+                <TabsTrigger value="demand" className="flex-col gap-0.5 py-1.5 px-1 text-[11px] leading-tight whitespace-normal">
+                  <Users className="h-3.5 w-3.5" />
+                  <span className="text-center">Employers</span>
                 </TabsTrigger>
-                <TabsTrigger value="othm" className="gap-1.5">
-                  <GraduationCap className="h-3.5 w-3.5" /> OTHM (students/colleges)
+                <TabsTrigger value="othm" className="flex-col gap-0.5 py-1.5 px-1 text-[11px] leading-tight whitespace-normal">
+                  <GraduationCap className="h-3.5 w-3.5" />
+                  <span className="text-center">OTHM</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
