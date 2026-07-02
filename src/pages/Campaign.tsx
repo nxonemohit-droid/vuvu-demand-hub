@@ -16,11 +16,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Play, Pause, Plus, Send, RefreshCw, ChevronRight, Mail, AlertTriangle, CheckCircle2,
-  MessageCircle, Linkedin, Users, ExternalLink,
+  MessageCircle, Linkedin, Users, ExternalLink, GraduationCap,
 } from "lucide-react";
 
 type Channel = "email" | "whatsapp" | "linkedin";
-type LeadSource = "recruiter" | "demand";
+type LeadSource = "recruiter" | "demand" | "othm";
 
 type Campaign = {
   id: string;
@@ -88,6 +88,25 @@ type DemandLead = {
   city: string | null;
   role: string | null;
   trade_category: string | null;
+  quality_score: number | null;
+  outreach_queued: boolean | null;
+};
+
+type OthmLead = {
+  id: string;
+  entity_type: string;
+  full_name: string | null;
+  institution_name: string | null;
+  email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  linkedin_url: string | null;
+  country: string | null;
+  city: string | null;
+  course_level: string | null;
+  intake_month: string | null;
+  preferred_country: string | null;
+  stage: string;
   quality_score: number | null;
   outreach_queued: boolean | null;
 };
