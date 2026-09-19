@@ -1,24 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useId } from "react";
-import {
-  LayoutDashboard,
-  Radar,
-  Briefcase,
-  Users,
-  PlayCircle,
-  Settings,
-  LogOut,
-  HelpCircle,
-  Building2,
-  Send,
-  Mail,
-  BarChart3,
-  Globe2,
-  Activity,
-  GraduationCap,
-  BookOpen,
-  Hotel,
-} from "lucide-react";
+import { Radar, LogOut, HelpCircle, Send, BarChart3 } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,17 +47,9 @@ const VArrowLogo = ({ className }: { className?: string }) => {
 };
 
 const navItems = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/guide", label: "User Guide", icon: BookOpen },
-  { to: "/hm-mauritius", label: "HM Mauritius", icon: Hotel },
-  { to: "/leads", label: "Leads (legacy)", icon: Briefcase, adminOnly: true },
-  { to: "/mail", label: "Mail / Outreach", icon: Mail },
-  { to: "/campaign", label: "Campaign", icon: BarChart3 },
-  { to: "/othm", label: "OTHM Students", icon: GraduationCap },
-  { to: "/candidates", label: "Candidates", icon: Users },
-  { to: "/admin/diagnostics", label: "Diagnostics", icon: Activity, adminOnly: true },
-  { to: "/settings/discovery", label: "Discovery Settings", icon: Settings, adminOnly: true },
-  { to: "/settings", label: "Settings", icon: Settings, adminOnly: true },
+  { to: "/find", label: "Find Leads", icon: Radar },
+  { to: "/outreach", label: "Outreach", icon: Send },
+  { to: "/pipeline", label: "Pipeline", icon: BarChart3 },
 ];
 
 export const AppLayout = () => {
@@ -114,12 +88,10 @@ export const AppLayout = () => {
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems
-            .filter((i) => !i.adminOnly || isAdmin)
             .map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.end}
                 className={({ isActive }) =>
                   cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",

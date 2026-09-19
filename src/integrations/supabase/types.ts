@@ -942,6 +942,57 @@ export type Database = {
         }
         Relationships: []
       }
+      find_jobs: {
+        Row: {
+          countries: string[]
+          created_at: string
+          created_by: string | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          keywords: string[]
+          kind: Database["public"]["Enums"]["lead_kind"]
+          leads_created: number
+          sectors: string[]
+          started_at: string
+          status: string
+          updated_at: string
+          urls_found: number
+        }
+        Insert: {
+          countries?: string[]
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          keywords?: string[]
+          kind?: Database["public"]["Enums"]["lead_kind"]
+          leads_created?: number
+          sectors?: string[]
+          started_at?: string
+          status?: string
+          updated_at?: string
+          urls_found?: number
+        }
+        Update: {
+          countries?: string[]
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          keywords?: string[]
+          kind?: Database["public"]["Enums"]["lead_kind"]
+          leads_created?: number
+          sectors?: string[]
+          started_at?: string
+          status?: string
+          updated_at?: string
+          urls_found?: number
+        }
+        Relationships: []
+      }
       firecrawl_jobs: {
         Row: {
           company_id: string | null
@@ -1436,6 +1487,102 @@ export type Database = {
         }
         Relationships: []
       }
+      leads: {
+        Row: {
+          city: string | null
+          company: string
+          contact_name: string | null
+          contact_role: string | null
+          country: string
+          created_at: string
+          created_by: string | null
+          dedup_hash: string | null
+          email: string | null
+          enrich_attempts: number
+          enriched: boolean
+          hiring_signal: string | null
+          id: string
+          kind: Database["public"]["Enums"]["lead_kind"]
+          last_error: string | null
+          linkedin: string | null
+          notes: string | null
+          phone: string | null
+          program_type: string | null
+          role: string | null
+          sector: string | null
+          source: string
+          source_url: string | null
+          stage: Database["public"]["Enums"]["lead_stage"]
+          updated_at: string
+          visa_fit_score: number
+          visa_speed: string | null
+          website: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          city?: string | null
+          company: string
+          contact_name?: string | null
+          contact_role?: string | null
+          country: string
+          created_at?: string
+          created_by?: string | null
+          dedup_hash?: string | null
+          email?: string | null
+          enrich_attempts?: number
+          enriched?: boolean
+          hiring_signal?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["lead_kind"]
+          last_error?: string | null
+          linkedin?: string | null
+          notes?: string | null
+          phone?: string | null
+          program_type?: string | null
+          role?: string | null
+          sector?: string | null
+          source?: string
+          source_url?: string | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          updated_at?: string
+          visa_fit_score?: number
+          visa_speed?: string | null
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          city?: string | null
+          company?: string
+          contact_name?: string | null
+          contact_role?: string | null
+          country?: string
+          created_at?: string
+          created_by?: string | null
+          dedup_hash?: string | null
+          email?: string | null
+          enrich_attempts?: number
+          enriched?: boolean
+          hiring_signal?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["lead_kind"]
+          last_error?: string | null
+          linkedin?: string | null
+          notes?: string | null
+          phone?: string | null
+          program_type?: string | null
+          role?: string | null
+          sector?: string | null
+          source?: string
+          source_url?: string | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          updated_at?: string
+          visa_fit_score?: number
+          visa_speed?: string | null
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
       normalized_demand: {
         Row: {
           city: string | null
@@ -1597,6 +1744,65 @@ export type Database = {
           whatsapp?: string | null
         }
         Relationships: []
+      }
+      outreach_sends: {
+        Row: {
+          attempts: number
+          body: string
+          channel: Database["public"]["Enums"]["outreach_channel"]
+          created_at: string
+          error: string | null
+          id: string
+          lead_id: string
+          provider_message_id: string | null
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          subject: string | null
+          to_address: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          channel: Database["public"]["Enums"]["outreach_channel"]
+          created_at?: string
+          error?: string | null
+          id?: string
+          lead_id: string
+          provider_message_id?: string | null
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          to_address: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          channel?: Database["public"]["Enums"]["outreach_channel"]
+          created_at?: string
+          error?: string | null
+          id?: string
+          lead_id?: string
+          provider_message_id?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          to_address?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_sends_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -2637,6 +2843,15 @@ export type Database = {
         | "in_progress"
         | "converted"
         | "rejected"
+      lead_kind: "employer" | "education"
+      lead_stage:
+        | "new"
+        | "contacted"
+        | "replied"
+        | "interested"
+        | "deal"
+        | "rejected"
+      outreach_channel: "email" | "whatsapp"
       priority_tag: "high" | "medium" | "low"
       recruitment_model_tag:
         | "no_advance_after_visa"
@@ -2819,6 +3034,16 @@ export const Constants = {
         "converted",
         "rejected",
       ],
+      lead_kind: ["employer", "education"],
+      lead_stage: [
+        "new",
+        "contacted",
+        "replied",
+        "interested",
+        "deal",
+        "rejected",
+      ],
+      outreach_channel: ["email", "whatsapp"],
       priority_tag: ["high", "medium", "low"],
       recruitment_model_tag: [
         "no_advance_after_visa",
