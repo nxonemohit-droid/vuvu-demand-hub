@@ -13,6 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MARKETS, SECTORS } from "@/lib/markets";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/PageHeader";
+
 
 const FAST = MARKETS.filter((m) => m.speed === "fast").map((m) => m.country);
 
@@ -111,12 +113,12 @@ const FindLeads = () => {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-2xl font-bold">Find Leads</h1>
-        <p className="text-muted-foreground text-sm">
-          Europe ke un markets me employers dhundo jahan work visa 2 mahine ke andar lag jata hai.
-        </p>
-      </div>
+      <PageHeader
+        step={1}
+        title="Find Leads"
+        description="Europe ke un markets me employers dhundo jahan work visa 2 mahine ke andar lag jata hai."
+      />
+
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Total leads" value={counts?.total} />

@@ -24,6 +24,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { MARKETS, STAGES, STAGE_LABELS, marketFor, type Stage } from "@/lib/markets";
+import { PageHeader } from "@/components/PageHeader";
+
 
 const Pipeline = () => {
   const qc = useQueryClient();
@@ -93,15 +95,17 @@ const Pipeline = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Pipeline</h1>
-          <p className="text-muted-foreground text-sm">Har lead ka stage yahi se badlo.</p>
-        </div>
-        <Button variant="outline" onClick={exportCsv}>
-          <Download className="mr-2 h-4 w-4" /> Export CSV
-        </Button>
-      </div>
+      <PageHeader
+        step={3}
+        title="Pipeline"
+        description="Har lead ka stage yahi se badlo."
+        action={
+          <Button variant="outline" onClick={exportCsv}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+        }
+      />
+
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
         {STAGES.map((s) => (

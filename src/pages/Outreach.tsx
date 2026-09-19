@@ -16,6 +16,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageHeader } from "@/components/PageHeader";
+
 
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -108,12 +110,12 @@ const Outreach = () => {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-2xl font-bold">Outreach</h1>
-        <p className="text-muted-foreground text-sm">
-          Email aur WhatsApp — 50 per din, har message ke beech gap, Mon–Fri 9:00–18:00 IST.
-        </p>
-      </div>
+      <PageHeader
+        step={2}
+        title="Outreach"
+        description="Email aur WhatsApp — 50 per din, har message ke beech gap, Mon–Fri 9:00–18:00 IST."
+      />
+
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Waiting" value={stats?.pending} />
