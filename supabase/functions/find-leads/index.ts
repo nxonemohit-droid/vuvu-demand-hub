@@ -306,7 +306,12 @@ Deno.serve(async (req) => {
       .single();
     if (jobErr) throw jobErr;
 
-    const queries = buildQueries(kind, countries, sectors, keywords).slice(0, maxQueries);
+    const mapsQueries = buildMapsQueries(kind, countries, sectors);
+    const webQueries = buildQueries(kind, countries, sectors, keywords).slice(0, maxQueries);
+    const queries = [
+      ...mapsQueries.map((q) => ({ q, maps: true })),
+      ...webQueries.map((q) => ({ q, maps: false })),
+    ];
 
     const work = async () => {
       providerErrors.clear();
@@ -314,13 +319,17 @@ Deno.serve(async (req) => {
       let created = 0;
       let found = 0;
 
-      for (const q of queries) {
-        let hits = [...(await googleSearch(q)), ...(await firecrawlSearch(q))];
-        if (!hits.length) hits = await apifySearch(q);
-        if (!hits.length) hits = await ddgSearch(q);
-        if (!hits.length) hits = await mojeekSearch(q);
-        if (!hits.length) providerErrors.add("Free web search bhi is server se block ho raha hai.");
-        await new Promise((r) => setTimeout(r, 1200));
+      for (const { q, maps } of queries) {
+        let hits: Hit[] = [];
+        if (maps) {
+          hits = await mapsSearch(q);
+        } else {
+          hits = [...(await googleSearch(q)), ...(await firecrawlSearch(q))];
+          if (!hits.length) hits = await apifySearch(q);
+          if (!hits.length) hits = await ddgSearch(q);
+          if (!hits.length) hits = await mojeekSearch(q);
+        }
+        await new Promise((r) => setTimeout(r, maps ? 400 : 1200));
         for (const hit of hits) {
           if (!hit?.url || seen.has(hit.url) || !isUsefulUrl(hit.url)) continue;
           seen.add(hit.url);
@@ -333,13 +342,16 @@ Deno.serve(async (req) => {
 
           const lead = {
             kind,
-            company: companyFromHit(hit),
+            company: hit.company ?? companyFromHit(hit),
             website: domain ? `https://${domain}` : null,
             country,
+            city: hit.city ?? null,
+            phone: hit.phone ?? null,
+            whatsapp: hit.phone ?? null,
             sector,
             hiring_signal: hit.snippet?.slice(0, 400) ?? null,
             visa_speed: marketFor(country)?.speed ?? null,
-            source: "gcse",
+            source: maps ? "google_maps" : "gcse",
             source_url: hit.url,
             dedup_hash: hash,
           };
