@@ -83,6 +83,32 @@ export function buildQueries(
   return out;
 }
 
+/** Plain-language queries for Google Maps Places text search. */
+export function buildMapsQueries(
+  kind: "employer" | "education",
+  countries: string[],
+  sectors: string[],
+): string[] {
+  const out: string[] = [];
+  for (const country of countries) {
+    if (kind === "education") {
+      out.push(
+        `vocational college in ${country}`,
+        `private college in ${country}`,
+        `hospitality training school in ${country}`,
+      );
+      continue;
+    }
+    const secs = sectors.length ? sectors : marketFor(country)?.sectors ?? ["construction", "hospitality"];
+    for (const sector of secs) {
+      out.push(`${sector} company in ${country}`);
+      out.push(`${sector} employer in ${country}`);
+    }
+    out.push(`recruitment agency in ${country}`);
+  }
+  return out;
+}
+
 // Junk domains that never yield a direct employer/college contact.
 const BLOCKED = [
   "wikipedia.org", "facebook.com", "twitter.com", "x.com", "youtube.com",
