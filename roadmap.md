@@ -10,3 +10,5 @@
 - [ ] Drop legacy tables (needs user to run DROP in SQL editor — migration tool blocks drops)
 - [ ] Light, friendly UI theme across all screens
 - [ ] Apify Google-search fallback in find-leads (Google CSE + Firecrawl blocked)
+- [ ] Google Maps Places (New) as primary lead source — blocked: key needs "Places API (New)" enabled in Google Cloud
+- [ ] User's paid Gemini API key for enrichment (secret pending)

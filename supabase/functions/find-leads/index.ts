@@ -1,13 +1,65 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient, sha256Hex, extractDomain } from "../_shared/supabase.ts";
-import { buildQueries, isUsefulUrl, marketFor, scoreLead } from "../_shared/markets.ts";
+import { buildQueries, buildMapsQueries, isUsefulUrl, marketFor, scoreLead } from "../_shared/markets.ts";
 
 const CSE_KEY = Deno.env.get("GOOGLE_CSE_API_KEY");
 const CSE_ID = Deno.env.get("GOOGLE_CSE_ID");
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 const APIFY_TOKEN = Deno.env.get("APIFY_API_TOKEN");
+const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
+const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");
+const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
 
-type Hit = { url: string; title: string; snippet: string };
+type Hit = {
+  url: string;
+  title: string;
+  snippet: string;
+  company?: string;
+  phone?: string | null;
+  city?: string | null;
+};
+
+/** Google Maps Places (New) text search — reliable employer discovery with phone numbers. */
+async function mapsSearch(q: string): Promise<Hit[]> {
+  if (!LOVABLE_KEY || !MAPS_KEY) return [];
+  try {
+    const res = await fetch(`${GATEWAY_URL}/places/v1/places:searchText`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_KEY}`,
+        "X-Connection-Api-Key": MAPS_KEY,
+        "Content-Type": "application/json",
+        "X-Goog-FieldMask":
+          "places.displayName,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.formattedAddress,places.shortFormattedAddress",
+      },
+      body: JSON.stringify({ textQuery: q, pageSize: 20 }),
+    });
+    if (!res.ok) {
+      const body = (await res.text()).slice(0, 300);
+      console.error(`Maps search ${res.status}: ${body}`);
+      noteError("Google Maps", res.status, body);
+      return [];
+    }
+    const data = await res.json();
+    const hits: Hit[] = [];
+    for (const p of data.places ?? []) {
+      const website = p.websiteUri as string | undefined;
+      if (!website) continue;
+      hits.push({
+        url: website,
+        title: p.displayName?.text ?? "",
+        snippet: p.formattedAddress ?? "",
+        company: p.displayName?.text ?? undefined,
+        phone: p.internationalPhoneNumber ?? p.nationalPhoneNumber ?? null,
+        city: (p.shortFormattedAddress ?? "").split(",")[0]?.trim() || null,
+      });
+    }
+    return hits;
+  } catch (e) {
+    console.error("Maps search error", e);
+    return [];
+  }
+}
 
 const providerErrors = new Set<string>();
 
@@ -254,7 +306,12 @@ Deno.serve(async (req) => {
       .single();
     if (jobErr) throw jobErr;
 
-    const queries = buildQueries(kind, countries, sectors, keywords).slice(0, maxQueries);
+    const mapsQueries = buildMapsQueries(kind, countries, sectors);
+    const webQueries = buildQueries(kind, countries, sectors, keywords).slice(0, maxQueries);
+    const queries = [
+      ...mapsQueries.map((q) => ({ q, maps: true })),
+      ...webQueries.map((q) => ({ q, maps: false })),
+    ];
 
     const work = async () => {
       providerErrors.clear();
@@ -262,13 +319,17 @@ Deno.serve(async (req) => {
       let created = 0;
       let found = 0;
 
-      for (const q of queries) {
-        let hits = [...(await googleSearch(q)), ...(await firecrawlSearch(q))];
-        if (!hits.length) hits = await apifySearch(q);
-        if (!hits.length) hits = await ddgSearch(q);
-        if (!hits.length) hits = await mojeekSearch(q);
-        if (!hits.length) providerErrors.add("Free web search bhi is server se block ho raha hai.");
-        await new Promise((r) => setTimeout(r, 1200));
+      for (const { q, maps } of queries) {
+        let hits: Hit[] = [];
+        if (maps) {
+          hits = await mapsSearch(q);
+        } else {
+          hits = [...(await googleSearch(q)), ...(await firecrawlSearch(q))];
+          if (!hits.length) hits = await apifySearch(q);
+          if (!hits.length) hits = await ddgSearch(q);
+          if (!hits.length) hits = await mojeekSearch(q);
+        }
+        await new Promise((r) => setTimeout(r, maps ? 400 : 1200));
         for (const hit of hits) {
           if (!hit?.url || seen.has(hit.url) || !isUsefulUrl(hit.url)) continue;
           seen.add(hit.url);
@@ -281,13 +342,16 @@ Deno.serve(async (req) => {
 
           const lead = {
             kind,
-            company: companyFromHit(hit),
+            company: hit.company ?? companyFromHit(hit),
             website: domain ? `https://${domain}` : null,
             country,
+            city: hit.city ?? null,
+            phone: hit.phone ?? null,
+            whatsapp: hit.phone ?? null,
             sector,
             hiring_signal: hit.snippet?.slice(0, 400) ?? null,
             visa_speed: marketFor(country)?.speed ?? null,
-            source: "gcse",
+            source: maps ? "google_maps" : "gcse",
             source_url: hit.url,
             dedup_hash: hash,
           };
