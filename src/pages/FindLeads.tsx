@@ -143,11 +143,19 @@ const FindLeads = () => {
           </Tabs>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <Label>Countries</Label>
-              <Button variant="ghost" size="sm" onClick={() => setCountries(FAST)}>
-                Select fastest visa
-              </Button>
+              <div className="flex flex-wrap gap-1">
+                <Button variant="secondary" size="sm" onClick={() => setCountries(FOCUS)}>
+                  Main focus (Latvia, Serbia, Cyprus, Estonia)
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setCountries(FAST)}>
+                  Fastest visa
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setCountries(ALL_COUNTRIES)}>
+                  All Europe
+                </Button>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {MARKETS.map((m) => {
