@@ -287,6 +287,12 @@ const Pipeline = () => {
           )}
         </CardContent>
       </Card>
+
+      <LeadMailDialog
+        lead={mailLead}
+        onClose={() => setMailLead(null)}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["pipeline-leads"] })}
+      />
     </div>
   );
 };
