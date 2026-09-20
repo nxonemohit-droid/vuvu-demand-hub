@@ -59,6 +59,11 @@ async function mapsSearch(q: string): Promise<Hit[]> {
         company: p.displayName?.text ?? undefined,
         phone: p.internationalPhoneNumber ?? p.nationalPhoneNumber ?? null,
         city: (p.shortFormattedAddress ?? "").split(",")[0]?.trim() || null,
+        address: p.formattedAddress ?? null,
+        openingHours: (p.regularOpeningHours?.weekdayDescriptions ?? []).join("\n") || null,
+        rating: typeof p.rating === "number" ? p.rating : null,
+        ratingCount: typeof p.userRatingCount === "number" ? p.userRatingCount : null,
+        placeId: p.id ?? null,
       });
     }
     return hits;
