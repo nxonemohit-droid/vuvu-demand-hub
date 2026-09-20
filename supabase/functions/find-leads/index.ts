@@ -113,11 +113,15 @@ async function googleSearch(q: string): Promise<Hit[]> {
 }
 
 async function firecrawlSearch(q: string): Promise<Hit[]> {
-  if (!FIRECRAWL_KEY) return [];
+  if (!FIRECRAWL_KEY || !LOVABLE_KEY) return [];
   try {
-    const res = await fetch("https://api.firecrawl.dev/v2/search", {
+    const res = await fetch("https://connector-gateway.lovable.dev/firecrawl/v2/search", {
       method: "POST",
-      headers: { Authorization: `Bearer ${FIRECRAWL_KEY}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${LOVABLE_KEY}`,
+        "X-Connection-Api-Key": FIRECRAWL_KEY,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ query: q, limit: 8 }),
     });
     if (!res.ok) {
