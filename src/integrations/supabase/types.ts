@@ -1489,6 +1489,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          address: string | null
           city: string | null
           company: string
           contact_name: string | null
@@ -1498,6 +1499,7 @@ export type Database = {
           created_by: string | null
           dedup_hash: string | null
           email: string | null
+          email_source: string | null
           enrich_attempts: number
           enriched: boolean
           hiring_signal: string | null
@@ -1506,8 +1508,12 @@ export type Database = {
           last_error: string | null
           linkedin: string | null
           notes: string | null
+          opening_hours: string | null
           phone: string | null
+          place_id: string | null
           program_type: string | null
+          rating: number | null
+          rating_count: number | null
           role: string | null
           sector: string | null
           source: string
@@ -1520,6 +1526,7 @@ export type Database = {
           whatsapp: string | null
         }
         Insert: {
+          address?: string | null
           city?: string | null
           company: string
           contact_name?: string | null
@@ -1529,6 +1536,7 @@ export type Database = {
           created_by?: string | null
           dedup_hash?: string | null
           email?: string | null
+          email_source?: string | null
           enrich_attempts?: number
           enriched?: boolean
           hiring_signal?: string | null
@@ -1537,8 +1545,12 @@ export type Database = {
           last_error?: string | null
           linkedin?: string | null
           notes?: string | null
+          opening_hours?: string | null
           phone?: string | null
+          place_id?: string | null
           program_type?: string | null
+          rating?: number | null
+          rating_count?: number | null
           role?: string | null
           sector?: string | null
           source?: string
@@ -1551,6 +1563,7 @@ export type Database = {
           whatsapp?: string | null
         }
         Update: {
+          address?: string | null
           city?: string | null
           company?: string
           contact_name?: string | null
@@ -1560,6 +1573,7 @@ export type Database = {
           created_by?: string | null
           dedup_hash?: string | null
           email?: string | null
+          email_source?: string | null
           enrich_attempts?: number
           enriched?: boolean
           hiring_signal?: string | null
@@ -1568,8 +1582,12 @@ export type Database = {
           last_error?: string | null
           linkedin?: string | null
           notes?: string | null
+          opening_hours?: string | null
           phone?: string | null
+          place_id?: string | null
           program_type?: string | null
+          rating?: number | null
+          rating_count?: number | null
           role?: string | null
           sector?: string | null
           source?: string

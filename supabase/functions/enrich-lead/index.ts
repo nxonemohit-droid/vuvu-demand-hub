@@ -6,8 +6,54 @@ const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 const HUNTER_KEY = Deno.env.get("HUNTER_API_KEY");
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 
+const UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+
+const SKIP_EMAIL = /(example\.|sentry|wixpress|\.png|\.jpg|\.webp|@2x|domain\.com|email\.com)/i;
+
+/** Free fallback: read the site directly and pull visible text + emails. */
+async function plainFetch(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, "Accept-Language": "en,lv,et,sr;q=0.8" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 400000);
+    const mails = html.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? [];
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const found = [...new Set(mails.filter((m) => !SKIP_EMAIL.test(m)))].slice(0, 10);
+    return `${found.length ? `Emails on page: ${found.join(", ")}\n\n` : ""}${text}`.slice(0, 8000);
+  } catch {
+    return null;
+  }
+}
+
+/** Try the site's usual contact pages for an email address. */
+async function findEmailOnSite(website: string): Promise<string | null> {
+  const base = website.replace(/\/+$/, "");
+  const paths = ["", "/contact", "/contacts", "/kontakt", "/kontakti", "/contact-us", "/about", "/admissions"];
+  for (const p of paths) {
+    const page = await plainFetch(base + p);
+    const m = page?.match(/Emails on page: ([^\n]+)/);
+    if (m) {
+      const list = m[1].split(",").map((s) => s.trim());
+      const priority = /(hr|info|office|admission|kontakt|contact|recruit|jobs|karjera)/i;
+      return list.find((e) => priority.test(e)) ?? list[0];
+    }
+  }
+  return null;
+}
+
 async function scrape(url: string): Promise<string | null> {
-  if (!FIRECRAWL_KEY) return null;
+  if (!FIRECRAWL_KEY) return await plainFetch(url);
   try {
     const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
       method: "POST",
@@ -15,29 +61,46 @@ async function scrape(url: string): Promise<string | null> {
       body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
       signal: AbortSignal.timeout(20000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return await plainFetch(url);
     const data = await res.json();
     const md = data.markdown ?? data.data?.markdown ?? null;
-    return md ? String(md).slice(0, 8000) : null;
+    return md ? String(md).slice(0, 8000) : await plainFetch(url);
   } catch {
-    return null;
+    return await plainFetch(url);
   }
 }
 
-async function hunterEmail(domain: string): Promise<{ email: string; name: string | null } | null> {
+type HunterHit = { email: string; name: string | null; role: string | null };
+
+/** Prefer a real decision maker (HR / admissions / owner), else any generic inbox. */
+async function hunterEmail(domain: string): Promise<HunterHit | null> {
   if (!HUNTER_KEY || !domain) return null;
   try {
     const res = await fetch(
-      `https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=5&api_key=${HUNTER_KEY}`,
-      { signal: AbortSignal.timeout(12000) },
+      `https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=10&api_key=${HUNTER_KEY}`,
+      { signal: AbortSignal.timeout(15000) },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`Hunter ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      return null;
+    }
     const data = await res.json();
-    const best = (data.data?.emails ?? [])[0];
-    if (!best?.value) return null;
-    const name = [best.first_name, best.last_name].filter(Boolean).join(" ") || null;
-    return { email: best.value, name };
-  } catch {
+    const emails: Array<Record<string, string>> = data.data?.emails ?? [];
+    if (!emails.length) return null;
+
+    const priority = /(hr|human resource|recruit|admission|talent|owner|director|manager|ceo|founder)/i;
+    const pick =
+      emails.find((e) => priority.test(`${e.position ?? ""} ${e.department ?? ""}`)) ??
+      emails.find((e) => e.type === "personal") ??
+      emails[0];
+    if (!pick?.value) return null;
+    return {
+      email: pick.value,
+      name: [pick.first_name, pick.last_name].filter(Boolean).join(" ") || null,
+      role: pick.position ?? null,
+    };
+  } catch (e) {
+    console.error("Hunter error", e);
     return null;
   }
 }
@@ -155,11 +218,23 @@ Deno.serve(async (req) => {
 
         let email = ai.email ?? lead.email ?? null;
         let contactName = ai.contact_name ?? lead.contact_name ?? null;
+        let contactRole = ai.contact_role ?? lead.contact_role ?? null;
+        let emailSource = lead.email_source ?? (email ? "page" : null);
         if (!email && domain) {
           const h = await hunterEmail(domain);
           if (h) {
             email = h.email;
             contactName = contactName ?? h.name;
+            contactRole = contactRole ?? h.role;
+            emailSource = "hunter";
+          }
+        }
+        // Last resort: read the institute's own contact pages.
+        if (!email && lead.website) {
+          const site = await findEmailOnSite(lead.website);
+          if (site) {
+            email = site;
+            emailSource = "website";
           }
         }
 
@@ -170,7 +245,8 @@ Deno.serve(async (req) => {
           sector: ai.sector ?? lead.sector,
           role: ai.role ?? lead.role,
           contact_name: contactName,
-          contact_role: ai.contact_role ?? lead.contact_role,
+          contact_role: contactRole,
+          email_source: emailSource,
           email,
           phone,
           whatsapp: ai.whatsapp ?? phone,

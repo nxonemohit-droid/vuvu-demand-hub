@@ -18,6 +18,12 @@ type Hit = {
   company?: string;
   phone?: string | null;
   city?: string | null;
+  address?: string | null;
+  openingHours?: string | null;
+  rating?: number | null;
+  ratingCount?: number | null;
+  placeId?: string | null;
+  contactName?: string | null;
 };
 
 /** Google Maps Places (New) text search — reliable employer discovery with phone numbers. */
@@ -31,7 +37,7 @@ async function mapsSearch(q: string): Promise<Hit[]> {
         "X-Connection-Api-Key": MAPS_KEY,
         "Content-Type": "application/json",
         "X-Goog-FieldMask":
-          "places.displayName,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.formattedAddress,places.shortFormattedAddress",
+          "places.id,places.displayName,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.formattedAddress,places.shortFormattedAddress,places.regularOpeningHours.weekdayDescriptions,places.rating,places.userRatingCount,places.primaryTypeDisplayName",
       },
       body: JSON.stringify({ textQuery: q, pageSize: 20 }),
     });
@@ -53,6 +59,11 @@ async function mapsSearch(q: string): Promise<Hit[]> {
         company: p.displayName?.text ?? undefined,
         phone: p.internationalPhoneNumber ?? p.nationalPhoneNumber ?? null,
         city: (p.shortFormattedAddress ?? "").split(",")[0]?.trim() || null,
+        address: p.formattedAddress ?? null,
+        openingHours: (p.regularOpeningHours?.weekdayDescriptions ?? []).join("\n") || null,
+        rating: typeof p.rating === "number" ? p.rating : null,
+        ratingCount: typeof p.userRatingCount === "number" ? p.userRatingCount : null,
+        placeId: p.id ?? null,
       });
     }
     return hits;
@@ -350,6 +361,11 @@ Deno.serve(async (req) => {
             phone: hit.phone ?? null,
             whatsapp: hit.phone ?? null,
             sector,
+            address: hit.address ?? null,
+            opening_hours: hit.openingHours ?? null,
+            rating: hit.rating ?? null,
+            rating_count: hit.ratingCount ?? null,
+            place_id: hit.placeId ?? null,
             hiring_signal: hit.snippet?.slice(0, 400) ?? null,
             visa_speed: marketFor(country)?.speed ?? null,
             source: maps ? "google_maps" : "gcse",

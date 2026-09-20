@@ -78,7 +78,8 @@ const Pipeline = () => {
   const exportCsv = () => {
     const cols = [
       "company", "country", "city", "sector", "role", "contact_name", "contact_role",
-      "email", "phone", "whatsapp", "website", "visa_speed", "visa_fit_score", "stage",
+      "email", "email_source", "phone", "whatsapp", "website", "address", "opening_hours",
+      "visa_speed", "visa_fit_score", "stage",
     ];
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const csv = [
@@ -162,7 +163,8 @@ const Pipeline = () => {
                   <TableRow>
                     <TableHead>Company</TableHead>
                     <TableHead>Country</TableHead>
-                    <TableHead>Contact</TableHead>
+                    <TableHead>Contact person</TableHead>
+                    <TableHead>Address &amp; hours</TableHead>
                     <TableHead>Visa</TableHead>
                     <TableHead>Score</TableHead>
                     <TableHead>Stage</TableHead>
@@ -192,8 +194,20 @@ const Pipeline = () => {
                         <TableCell className="text-sm">{l.country}</TableCell>
                         <TableCell className="text-xs">
                           <div>{l.contact_name ?? "—"}</div>
+                          {l.contact_role && (
+                            <div className="text-muted-foreground">{l.contact_role}</div>
+                          )}
                           <div className="text-muted-foreground">{l.email ?? "no email"}</div>
                           <div className="text-muted-foreground">{l.whatsapp ?? l.phone ?? ""}</div>
+                        </TableCell>
+                        <TableCell className="text-xs max-w-64">
+                          <div className="text-muted-foreground">{l.address ?? "—"}</div>
+                          {l.opening_hours && (
+                            <details>
+                              <summary className="cursor-pointer text-muted-foreground">Hours</summary>
+                              <pre className="whitespace-pre-wrap text-[11px]">{l.opening_hours}</pre>
+                            </details>
+                          )}
                         </TableCell>
                         <TableCell>
                           {m && (

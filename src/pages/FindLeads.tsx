@@ -17,11 +17,14 @@ import { PageHeader } from "@/components/PageHeader";
 
 
 const FAST = MARKETS.filter((m) => m.speed === "fast").map((m) => m.country);
+// Main focus corridor: less explored Europe markets with quick work visas.
+const FOCUS = ["Latvia", "Serbia", "Cyprus", "Estonia"];
+const ALL_COUNTRIES = MARKETS.map((m) => m.country);
 
 const FindLeads = () => {
   const qc = useQueryClient();
   const [kind, setKind] = useState<"employer" | "education">("employer");
-  const [countries, setCountries] = useState<string[]>(["Latvia", "Serbia"]);
+  const [countries, setCountries] = useState<string[]>(FOCUS);
   const [sectors, setSectors] = useState<string[]>(["construction", "hospitality"]);
   const [keywords, setKeywords] = useState("");
   const [starting, setStarting] = useState(false);
@@ -64,6 +67,20 @@ const FindLeads = () => {
     refetchInterval: 5000,
   });
 
+  const { data: recent } = useQuery({
+    queryKey: ["recent-leads"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("id, company, website, phone, address, opening_hours, city, country")
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) throw error;
+      return data;
+    },
+    refetchInterval: 5000,
+  });
+
   const toggle = (list: string[], set: (v: string[]) => void, value: string) =>
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
@@ -93,8 +110,8 @@ const FindLeads = () => {
   const enrichBatch = async () => {
     setEnriching(true);
     try {
-      for (let i = 0; i < 6; i++) {
-        const { data, error } = await supabase.functions.invoke("enrich-lead", { body: { limit: 5 } });
+      for (let i = 0; i < 12; i++) {
+        const { data, error } = await supabase.functions.invoke("enrich-lead", { body: { limit: 4 } });
         if (error) throw error;
         qc.invalidateQueries({ queryKey: ["lead-counts"] });
         if (!data?.processed || !data?.remaining) break;
@@ -140,11 +157,19 @@ const FindLeads = () => {
           </Tabs>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <Label>Countries</Label>
-              <Button variant="ghost" size="sm" onClick={() => setCountries(FAST)}>
-                Select fastest visa
-              </Button>
+              <div className="flex flex-wrap gap-1">
+                <Button variant="secondary" size="sm" onClick={() => setCountries(FOCUS)}>
+                  Main focus (Latvia, Serbia, Cyprus, Estonia)
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setCountries(FAST)}>
+                  Fastest visa
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setCountries(ALL_COUNTRIES)}>
+                  All Europe
+                </Button>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {MARKETS.map((m) => {
@@ -244,6 +269,51 @@ const FindLeads = () => {
                 {job.urls_found} pages checked · {job.leads_created} new leads saved
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Just discovered</CardTitle>
+          <CardDescription>Naam, website, phone, address aur opening hours.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!recent ? (
+            <Skeleton className="h-40 w-full" />
+          ) : !recent.length ? (
+            <p className="text-sm text-muted-foreground">Abhi koi lead nahi mili.</p>
+          ) : (
+            recent.map((l) => (
+              <div key={l.id} className="rounded-lg border p-3 text-sm">
+                <div className="font-medium">{l.company}</div>
+                <div className="text-xs text-muted-foreground">
+                  {[l.city, l.country].filter(Boolean).join(", ")}
+                </div>
+                {l.website && (
+                  <a
+                    href={l.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {l.website.replace(/^https?:\/\//, "")}
+                  </a>
+                )}
+                <div className="mt-1 text-xs">{l.phone ?? "phone nahi mila"}</div>
+                {l.address && <div className="text-xs text-muted-foreground">{l.address}</div>}
+                {l.opening_hours && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-muted-foreground">
+                      Opening hours
+                    </summary>
+                    <pre className="whitespace-pre-wrap text-[11px] text-muted-foreground">
+                      {l.opening_hours}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            ))
           )}
         </CardContent>
       </Card>
