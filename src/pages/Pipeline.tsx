@@ -119,11 +119,21 @@ const Pipeline = () => {
       <PageHeader
         step={3}
         title="Pipeline"
-        description="Har lead ka stage yahi se badlo."
+        description="Har lead ka stage badlo aur uske liye personalised mail banao."
         action={
-          <Button variant="outline" onClick={exportCsv}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={draftBatch} disabled={drafting}>
+              {drafting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Personalised mails banao
+            </Button>
+            <Button variant="outline" onClick={exportCsv}>
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+          </div>
         }
       />
 
