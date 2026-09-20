@@ -193,8 +193,20 @@ const Pipeline = () => {
                         <TableCell className="text-sm">{l.country}</TableCell>
                         <TableCell className="text-xs">
                           <div>{l.contact_name ?? "—"}</div>
+                          {l.contact_role && (
+                            <div className="text-muted-foreground">{l.contact_role}</div>
+                          )}
                           <div className="text-muted-foreground">{l.email ?? "no email"}</div>
                           <div className="text-muted-foreground">{l.whatsapp ?? l.phone ?? ""}</div>
+                        </TableCell>
+                        <TableCell className="text-xs max-w-64">
+                          <div className="text-muted-foreground">{l.address ?? "—"}</div>
+                          {l.opening_hours && (
+                            <details>
+                              <summary className="cursor-pointer text-muted-foreground">Hours</summary>
+                              <pre className="whitespace-pre-wrap text-[11px]">{l.opening_hours}</pre>
+                            </details>
+                          )}
                         </TableCell>
                         <TableCell>
                           {m && (
