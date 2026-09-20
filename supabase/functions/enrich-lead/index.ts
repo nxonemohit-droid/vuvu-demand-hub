@@ -229,6 +229,14 @@ Deno.serve(async (req) => {
             emailSource = "hunter";
           }
         }
+        // Last resort: read the institute's own contact pages.
+        if (!email && lead.website) {
+          const site = await findEmailOnSite(lead.website);
+          if (site) {
+            email = site;
+            emailSource = "website";
+          }
+        }
 
         const phone = ai.phone ?? lead.phone ?? null;
         const merged = {
