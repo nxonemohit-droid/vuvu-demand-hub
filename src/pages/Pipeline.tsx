@@ -78,7 +78,8 @@ const Pipeline = () => {
   const exportCsv = () => {
     const cols = [
       "company", "country", "city", "sector", "role", "contact_name", "contact_role",
-      "email", "phone", "whatsapp", "website", "visa_speed", "visa_fit_score", "stage",
+      "email", "email_source", "phone", "whatsapp", "website", "address", "opening_hours",
+      "visa_speed", "visa_fit_score", "stage",
     ];
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const csv = [

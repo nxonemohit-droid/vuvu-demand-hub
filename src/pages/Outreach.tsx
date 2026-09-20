@@ -102,6 +102,25 @@ const Outreach = () => {
     );
   };
 
+  /** One click: queue every lead with an email and start sending the due ones. */
+  const autoCampaign = async () => {
+    setBusy("auto");
+    const { data: sched, error } = await supabase.functions.invoke("schedule-outreach", {
+      body: { channels: ["email"] },
+    });
+    if (error) {
+      setBusy(null);
+      toast.error("Campaign shuru nahi hui, dobara try karo.");
+      return;
+    }
+    const { data: sent } = await supabase.functions.invoke("process-outreach", { body: {} });
+    setBusy(null);
+    qc.invalidateQueries();
+    toast.success(
+      `${sched?.email ?? 0} emails queue me, ${sent?.sent ?? 0} abhi bhej diye. Baaki apne aap jayenge.`,
+    );
+  };
+
   const flush = async () => {
     const data = await run("process-outreach", {}, "flush");
     if (!data) return;
