@@ -172,11 +172,15 @@ Deno.serve(async (req) => {
 
         let email = ai.email ?? lead.email ?? null;
         let contactName = ai.contact_name ?? lead.contact_name ?? null;
+        let contactRole = ai.contact_role ?? lead.contact_role ?? null;
+        let emailSource = lead.email_source ?? (email ? "page" : null);
         if (!email && domain) {
           const h = await hunterEmail(domain);
           if (h) {
             email = h.email;
             contactName = contactName ?? h.name;
+            contactRole = contactRole ?? h.role;
+            emailSource = "hunter";
           }
         }
 
@@ -187,7 +191,8 @@ Deno.serve(async (req) => {
           sector: ai.sector ?? lead.sector,
           role: ai.role ?? lead.role,
           contact_name: contactName,
-          contact_role: ai.contact_role ?? lead.contact_role,
+          contact_role: contactRole,
+          email_source: emailSource,
           email,
           phone,
           whatsapp: ai.whatsapp ?? phone,
