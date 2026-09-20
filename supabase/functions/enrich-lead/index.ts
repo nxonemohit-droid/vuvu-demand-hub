@@ -24,20 +24,37 @@ async function scrape(url: string): Promise<string | null> {
   }
 }
 
-async function hunterEmail(domain: string): Promise<{ email: string; name: string | null } | null> {
+type HunterHit = { email: string; name: string | null; role: string | null };
+
+/** Prefer a real decision maker (HR / admissions / owner), else any generic inbox. */
+async function hunterEmail(domain: string): Promise<HunterHit | null> {
   if (!HUNTER_KEY || !domain) return null;
   try {
     const res = await fetch(
-      `https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=5&api_key=${HUNTER_KEY}`,
-      { signal: AbortSignal.timeout(12000) },
+      `https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=10&api_key=${HUNTER_KEY}`,
+      { signal: AbortSignal.timeout(15000) },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`Hunter ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      return null;
+    }
     const data = await res.json();
-    const best = (data.data?.emails ?? [])[0];
-    if (!best?.value) return null;
-    const name = [best.first_name, best.last_name].filter(Boolean).join(" ") || null;
-    return { email: best.value, name };
-  } catch {
+    const emails: Array<Record<string, string>> = data.data?.emails ?? [];
+    if (!emails.length) return null;
+
+    const priority = /(hr|human resource|recruit|admission|talent|owner|director|manager|ceo|founder)/i;
+    const pick =
+      emails.find((e) => priority.test(`${e.position ?? ""} ${e.department ?? ""}`)) ??
+      emails.find((e) => e.type === "personal") ??
+      emails[0];
+    if (!pick?.value) return null;
+    return {
+      email: pick.value,
+      name: [pick.first_name, pick.last_name].filter(Boolean).join(" ") || null,
+      role: pick.position ?? null,
+    };
+  } catch (e) {
+    console.error("Hunter error", e);
     return null;
   }
 }
