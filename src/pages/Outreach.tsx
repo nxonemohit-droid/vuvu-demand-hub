@@ -151,7 +151,15 @@ const Outreach = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
-          <Button onClick={() => schedule(["email"])} disabled={busy !== null}>
+          <Button onClick={autoCampaign} disabled={busy !== null} size="lg">
+            {busy === "auto" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-2 h-4 w-4" />
+            )}
+            Auto send campaign ({ready?.email ?? 0} emails)
+          </Button>
+          <Button onClick={() => schedule(["email"])} disabled={busy !== null} variant="outline">
             {busy === "email" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
             Queue emails ({ready?.email ?? 0})
           </Button>
