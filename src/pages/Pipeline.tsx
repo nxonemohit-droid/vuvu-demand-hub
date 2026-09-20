@@ -259,6 +259,16 @@ const Pipeline = () => {
                         </TableCell>
                         <TableCell className="font-semibold">{l.visa_fit_score}</TableCell>
                         <TableCell>
+                          <Button
+                            size="sm"
+                            variant={l.draft_body ? "secondary" : "outline"}
+                            onClick={() => setMailLead(l as unknown as MailLead)}
+                          >
+                            <Mail className="mr-2 h-4 w-4" />
+                            {l.draft_body ? "Draft dekho" : "Mail banao"}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
                           <Select value={l.stage} onValueChange={(v) => setStageFor(l.id, v as Stage)}>
                             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                             <SelectContent>
