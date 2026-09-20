@@ -67,6 +67,20 @@ const FindLeads = () => {
     refetchInterval: 5000,
   });
 
+  const { data: recent } = useQuery({
+    queryKey: ["recent-leads"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("id, company, website, phone, address, opening_hours, city, country")
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) throw error;
+      return data;
+    },
+    refetchInterval: 5000,
+  });
+
   const toggle = (list: string[], set: (v: string[]) => void, value: string) =>
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
