@@ -207,10 +207,20 @@ const Pipeline = () => {
                     return (
                       <TableRow key={l.id} className={i % 2 ? "bg-muted/40" : undefined}>
                         <TableCell>
-                          <div className="font-medium">{l.company}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{l.company}</span>
+                            <Badge variant={l.kind === "education" ? "secondary" : "outline"}>
+                              {l.kind === "education" ? "College" : "Company"}
+                            </Badge>
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {[l.city, l.sector].filter(Boolean).join(" · ")}
                           </div>
+                          {(l.trades || l.programs) && (
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              {l.trades ?? l.programs}
+                            </div>
+                          )}
                           {l.website && (
                             <a
                               href={l.website}
