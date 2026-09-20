@@ -6,8 +6,54 @@ const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 const HUNTER_KEY = Deno.env.get("HUNTER_API_KEY");
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 
+const UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+
+const SKIP_EMAIL = /(example\.|sentry|wixpress|\.png|\.jpg|\.webp|@2x|domain\.com|email\.com)/i;
+
+/** Free fallback: read the site directly and pull visible text + emails. */
+async function plainFetch(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, "Accept-Language": "en,lv,et,sr;q=0.8" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 400000);
+    const mails = html.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? [];
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const found = [...new Set(mails.filter((m) => !SKIP_EMAIL.test(m)))].slice(0, 10);
+    return `${found.length ? `Emails on page: ${found.join(", ")}\n\n` : ""}${text}`.slice(0, 8000);
+  } catch {
+    return null;
+  }
+}
+
+/** Try the site's usual contact pages for an email address. */
+async function findEmailOnSite(website: string): Promise<string | null> {
+  const base = website.replace(/\/+$/, "");
+  const paths = ["", "/contact", "/contacts", "/kontakt", "/kontakti", "/contact-us", "/about", "/admissions"];
+  for (const p of paths) {
+    const page = await plainFetch(base + p);
+    const m = page?.match(/Emails on page: ([^\n]+)/);
+    if (m) {
+      const list = m[1].split(",").map((s) => s.trim());
+      const priority = /(hr|info|office|admission|kontakt|contact|recruit|jobs|karjera)/i;
+      return list.find((e) => priority.test(e)) ?? list[0];
+    }
+  }
+  return null;
+}
+
 async function scrape(url: string): Promise<string | null> {
-  if (!FIRECRAWL_KEY) return null;
+  if (!FIRECRAWL_KEY) return await plainFetch(url);
   try {
     const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
       method: "POST",
