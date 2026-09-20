@@ -53,11 +53,15 @@ async function findEmailOnSite(website: string): Promise<string | null> {
 }
 
 async function scrape(url: string): Promise<string | null> {
-  if (!FIRECRAWL_KEY) return await plainFetch(url);
+  if (!FIRECRAWL_KEY || !LOVABLE_KEY) return await plainFetch(url);
   try {
-    const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
+    const res = await fetch("https://connector-gateway.lovable.dev/firecrawl/v2/scrape", {
       method: "POST",
-      headers: { Authorization: `Bearer ${FIRECRAWL_KEY}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${LOVABLE_KEY}`,
+        "X-Connection-Api-Key": FIRECRAWL_KEY,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
       signal: AbortSignal.timeout(20000),
     });
