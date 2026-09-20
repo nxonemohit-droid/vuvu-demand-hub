@@ -273,6 +273,11 @@ Deno.serve(async (req) => {
           linkedin: ai.linkedin ?? lead.linkedin,
           hiring_signal: ai.hiring_signal ?? lead.hiring_signal,
           program_type: ai.program_type ?? lead.program_type,
+          profile_summary: ai.profile_summary ?? lead.profile_summary,
+          programs: ai.programs ?? lead.programs,
+          intake_info: ai.intake_info ?? lead.intake_info,
+          trades: ai.trades ?? lead.trades,
+          workforce_size: ai.workforce_size ?? lead.workforce_size,
           country: lead.country,
           website: lead.website,
         };
