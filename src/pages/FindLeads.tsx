@@ -258,6 +258,51 @@ const FindLeads = () => {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Just discovered</CardTitle>
+          <CardDescription>Naam, website, phone, address aur opening hours.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!recent ? (
+            <Skeleton className="h-40 w-full" />
+          ) : !recent.length ? (
+            <p className="text-sm text-muted-foreground">Abhi koi lead nahi mili.</p>
+          ) : (
+            recent.map((l) => (
+              <div key={l.id} className="rounded-lg border p-3 text-sm">
+                <div className="font-medium">{l.company}</div>
+                <div className="text-xs text-muted-foreground">
+                  {[l.city, l.country].filter(Boolean).join(", ")}
+                </div>
+                {l.website && (
+                  <a
+                    href={l.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {l.website.replace(/^https?:\/\//, "")}
+                  </a>
+                )}
+                <div className="mt-1 text-xs">{l.phone ?? "phone nahi mila"}</div>
+                {l.address && <div className="text-xs text-muted-foreground">{l.address}</div>}
+                {l.opening_hours && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-muted-foreground">
+                      Opening hours
+                    </summary>
+                    <pre className="whitespace-pre-wrap text-[11px] text-muted-foreground">
+                      {l.opening_hours}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
