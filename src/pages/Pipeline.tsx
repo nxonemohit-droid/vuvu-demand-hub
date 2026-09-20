@@ -197,6 +197,7 @@ const Pipeline = () => {
                     <TableHead>Address &amp; hours</TableHead>
                     <TableHead>Visa</TableHead>
                     <TableHead>Score</TableHead>
+                    <TableHead>Mail</TableHead>
                     <TableHead>Stage</TableHead>
                   </TableRow>
                 </TableHeader>
