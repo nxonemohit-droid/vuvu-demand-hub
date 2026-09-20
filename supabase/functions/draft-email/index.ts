@@ -1,11 +1,11 @@
-// Personalised mail drafting for Voynova leads.
+// Personalised mail + WhatsApp drafting and AI scoring for Voynova leads.
 // Employer leads get a blue-collar mobilisation pitch, education leads get a
 // student-pipeline pitch. Both are written from the enriched lead profile.
+// Uses the workspace Gemini key when available, else the Lovable AI gateway.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient } from "../_shared/supabase.ts";
 import { marketFor } from "../_shared/markets.ts";
-
-const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
+import { aiJson, aiProvider } from "../_shared/ai.ts";
 
 const SIGNATURE = `Mohit Gururani
 Founder & CEO | Voynova Global Solutions Pvt. Ltd.
@@ -18,8 +18,11 @@ const SCHEMA = {
   properties: {
     subject: { type: "string" },
     body: { type: "string" },
+    whatsapp: { type: "string" },
+    score: { type: "integer" },
+    reason: { type: "string" },
   },
-  required: ["subject", "body"],
+  required: ["subject", "body", "whatsapp", "score", "reason"],
 };
 
 type Lead = Record<string, string | number | null>;
@@ -36,6 +39,8 @@ function leadFacts(lead: Lead): string {
     ["Address", lead.address],
     ["Contact person", lead.contact_name],
     ["Contact role", lead.contact_role],
+    ["Email", lead.email],
+    ["Phone / WhatsApp", lead.whatsapp ?? lead.phone],
     ["What they do", lead.profile_summary],
     ["Courses offered", lead.programs],
     ["Programme type", lead.program_type],
@@ -53,14 +58,18 @@ function leadFacts(lead: Lead): string {
 
 function instructionFor(lead: Lead): string {
   const shared = [
-    "You write B2B outreach email for Voynova Global Solutions Pvt. Ltd. (India), a compliance-first international workforce partner that mobilises skilled and semi-skilled workers and students from India, Nepal and Bangladesh to Europe and the Balkans.",
+    "You write B2B outreach for Voynova Global Solutions Pvt. Ltd. (India), a compliance-first international workforce partner that mobilises skilled and semi-skilled workers and students from India, Nepal and Bangladesh to Europe and the Balkans.",
     "Sender: Mohit Gururani, Founder & CEO.",
-    "Tone: warm, consultative, professional. Simple B1-B2 English. Short paragraphs, 130-200 words.",
+    "Tone: warm, consultative, professional. Simple B1-B2 English. Short paragraphs.",
     "Personalise using the facts given: name the organisation, its city, its actual courses or trades, and its country's permit timeline. Never invent facts that are not listed.",
     "Never promise guaranteed jobs, guaranteed visas, salary figures or processing guarantees.",
     "End with ONE clear call to action: a short 15-minute call this week.",
-    "Do not include a signature block, the sender name, or links in the body — those are appended separately.",
-    "Return json with a subject line (max 78 characters, no emoji) and the email body starting with the greeting.",
+    "Return json with these fields:",
+    "subject: email subject line, max 78 characters, no emoji.",
+    "body: the email body, 130-200 words, starting with the greeting. No signature block, no sender name, no links — those are appended separately.",
+    "whatsapp: a separate WhatsApp first message, max 60 words, friendly, one short intro line plus one question. No formatting markup. End with https://voynovaglobal.com",
+    "score: integer 0-100 for how good this lead is for Voynova right now. Judge on: is this really an employer of blue-collar workers or a vocational institute, does the country allow a work or study permit within about two months, is there a reachable decision maker and contact channel, and any hiring signal. A tiny shop, a consultancy, an agency competitor or a country with slow permits scores low.",
+    "reason: one short sentence, max 20 words, explaining the score.",
   ];
   if (lead.kind === "education") {
     shared.push(
@@ -74,13 +83,17 @@ function instructionFor(lead: Lead): string {
   return shared.join(" ");
 }
 
+type Draft = { subject: string; body: string; whatsapp: string; score: number | null; reason: string | null };
+
 /** Deterministic fallback so drafting never blocks the campaign. */
-function fallback(lead: Lead) {
+function fallback(lead: Lead): Draft {
   const first = String(lead.contact_name ?? "").trim().split(/\s+/)[0];
   const greeting = first ? `Hi ${first},` : "Hello,";
+  const hello = first ? `Hello ${first}` : "Hello";
   const company = lead.company ?? "your team";
   const country = lead.country ?? "Europe";
   const m = marketFor(String(country));
+
   if (lead.kind === "education") {
     return {
       subject: `Student pipeline from India & Nepal for ${company}`,
@@ -93,8 +106,12 @@ ${lead.programs ? `Your ${lead.programs} courses match what our applicants are l
 Would a 15-minute call this week work to agree intake numbers and entry requirements?
 
 Best regards,`,
+      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We prepare students from India and Nepal for short skill programmes in ${country}. Can we send ${company} a first batch of screened applicants? More: https://voynovaglobal.com`,
+      score: null,
+      reason: null,
     };
   }
+
   return {
     subject: `Work-ready ${lead.trades ?? lead.sector ?? "blue-collar"} workers for ${company}`,
     body: `${greeting}
@@ -108,62 +125,24 @@ We can usually present a first shortlist within 7-10 days of your requirement.
 Would a 15-minute call this week work to share profiles and rates?
 
 Best regards,`,
+    whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We supply vetted ${lead.trades ?? lead.sector ?? "blue-collar"} workers from India and Nepal to employers in ${country}, with permits and visas handled end to end. Would you like a shortlist for ${company}? More: https://voynovaglobal.com`,
+    score: null,
+    reason: null,
   };
 }
 
-async function draft(lead: Lead): Promise<{ subject: string; body: string }> {
-  if (!LOVABLE_KEY) return fallback(lead);
-
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": LOVABLE_KEY,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
-      model: "openai/gpt-6-astra",
-      stream: true,
-      reasoning: { effort: "low", summary: "auto" },
-      include: ["reasoning.encrypted_content"],
-      store: false,
-      instructions: instructionFor(lead),
-      input: [{ role: "user", content: [{ type: "input_text", text: leadFacts(lead) }] }],
-      text: { format: { type: "json_schema", name: "mail", strict: true, schema: SCHEMA } },
-    }),
-  });
-
-  if (!res.ok) {
-    console.error(`AI ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    return fallback(lead);
-  }
-
-  const reader = res.body!.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  let text = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice(5).trim();
-      if (!payload || payload === "[DONE]") continue;
-      try {
-        const ev = JSON.parse(payload);
-        if (ev.type === "response.output_text.delta" && ev.delta) text += ev.delta;
-      } catch { /* partial frame */ }
-    }
-  }
-
-  try {
-    const out = JSON.parse(text);
-    if (out?.subject && out?.body) return { subject: String(out.subject), body: String(out.body) };
-  } catch { /* fall through */ }
-  return fallback(lead);
+async function draft(lead: Lead): Promise<Draft> {
+  const out = await aiJson(instructionFor(lead), leadFacts(lead), SCHEMA);
+  if (!out?.subject || !out?.body) return fallback(lead);
+  const fb = fallback(lead);
+  const rawScore = Number(out.score);
+  return {
+    subject: String(out.subject),
+    body: String(out.body),
+    whatsapp: out.whatsapp ? String(out.whatsapp) : fb.whatsapp,
+    score: Number.isFinite(rawScore) ? Math.max(0, Math.min(100, Math.round(rawScore))) : null,
+    reason: out.reason ? String(out.reason).slice(0, 200) : null,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -188,16 +167,25 @@ Deno.serve(async (req) => {
     const { data: leads, error } = await q;
     if (error) throw error;
 
-    const drafts: Array<{ id: string; company: string; subject: string; body: string }> = [];
+    const drafts: Array<
+      { id: string; company: string; subject: string; body: string; whatsapp: string; score: number | null; reason: string | null }
+    > = [];
+
     for (const lead of leads ?? []) {
       if (!redraft && !leadIds && lead.draft_body) continue;
       const d = await draft(lead as Lead);
       const full = `${d.body.trimEnd()}\n\n${SIGNATURE}`;
-      drafts.push({ id: lead.id, company: lead.company, subject: d.subject, body: full });
+      drafts.push({ id: lead.id, company: lead.company, ...d, body: full });
       if (!preview) {
         await supa
           .from("leads")
-          .update({ draft_subject: d.subject, draft_body: full, drafted_at: new Date().toISOString() })
+          .update({
+            draft_subject: d.subject,
+            draft_body: full,
+            draft_whatsapp: d.whatsapp,
+            drafted_at: new Date().toISOString(),
+            ...(d.score !== null ? { ai_score: d.score, ai_reason: d.reason } : {}),
+          })
           .eq("id", lead.id);
       }
     }
@@ -209,9 +197,10 @@ Deno.serve(async (req) => {
       .is("draft_body", null)
       .neq("stage", "rejected");
 
-    return new Response(JSON.stringify({ drafted: drafts.length, remaining: count ?? 0, drafts }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ drafted: drafts.length, remaining: count ?? 0, provider: aiProvider(), drafts }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (e) {
     console.error("draft-email failed", e);
     return new Response(JSON.stringify({ error: String(e) }), {
