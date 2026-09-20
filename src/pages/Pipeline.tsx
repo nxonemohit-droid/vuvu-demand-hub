@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Download } from "lucide-react";
+import { Download, Loader2, Mail, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { MARKETS, STAGES, STAGE_LABELS, marketFor, type Stage } from "@/lib/markets";
 import { PageHeader } from "@/components/PageHeader";
+import { LeadMailDialog, type MailLead } from "@/components/LeadMailDialog";
 
 
 const Pipeline = () => {
@@ -32,6 +33,25 @@ const Pipeline = () => {
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState("all");
   const [stage, setStage] = useState("all");
+  const [mailLead, setMailLead] = useState<MailLead | null>(null);
+  const [drafting, setDrafting] = useState(false);
+
+  /** Draft personalised mails for the next batch of leads that have an email. */
+  const draftBatch = async () => {
+    setDrafting(true);
+    let total = 0;
+    for (let i = 0; i < 6; i++) {
+      const { data, error } = await supabase.functions.invoke("draft-email", { body: { limit: 5 } });
+      if (error) break;
+      total += data?.drafted ?? 0;
+      if (!data?.drafted) break;
+    }
+    setDrafting(false);
+    qc.invalidateQueries({ queryKey: ["pipeline-leads"] });
+    toast[total ? "success" : "info"](
+      total ? `${total} personalised mail draft ban gaye.` : "Sab leads ke draft pehle se ready hain.",
+    );
+  };
 
   const { data: leads, isLoading } = useQuery({
     queryKey: ["pipeline-leads"],
