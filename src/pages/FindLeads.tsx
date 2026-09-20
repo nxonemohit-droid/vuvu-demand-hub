@@ -110,8 +110,8 @@ const FindLeads = () => {
   const enrichBatch = async () => {
     setEnriching(true);
     try {
-      for (let i = 0; i < 6; i++) {
-        const { data, error } = await supabase.functions.invoke("enrich-lead", { body: { limit: 5 } });
+      for (let i = 0; i < 12; i++) {
+        const { data, error } = await supabase.functions.invoke("enrich-lead", { body: { limit: 4 } });
         if (error) throw error;
         qc.invalidateQueries({ queryKey: ["lead-counts"] });
         if (!data?.processed || !data?.remaining) break;
