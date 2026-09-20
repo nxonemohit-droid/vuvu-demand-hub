@@ -18,6 +18,12 @@ type Hit = {
   company?: string;
   phone?: string | null;
   city?: string | null;
+  address?: string | null;
+  openingHours?: string | null;
+  rating?: number | null;
+  ratingCount?: number | null;
+  placeId?: string | null;
+  contactName?: string | null;
 };
 
 /** Google Maps Places (New) text search — reliable employer discovery with phone numbers. */
@@ -31,7 +37,7 @@ async function mapsSearch(q: string): Promise<Hit[]> {
         "X-Connection-Api-Key": MAPS_KEY,
         "Content-Type": "application/json",
         "X-Goog-FieldMask":
-          "places.displayName,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.formattedAddress,places.shortFormattedAddress",
+          "places.id,places.displayName,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.formattedAddress,places.shortFormattedAddress,places.regularOpeningHours.weekdayDescriptions,places.rating,places.userRatingCount,places.primaryTypeDisplayName",
       },
       body: JSON.stringify({ textQuery: q, pageSize: 20 }),
     });
