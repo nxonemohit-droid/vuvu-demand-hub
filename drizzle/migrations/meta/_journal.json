@@ -15,6 +15,13 @@
       "when": 1789887135191,
       "tag": "0001_add_lead_place_details",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789893340620,
+      "tag": "0002_add_lead_profile_and_draft",
+      "breakpoints": true
     }
   ]
 }

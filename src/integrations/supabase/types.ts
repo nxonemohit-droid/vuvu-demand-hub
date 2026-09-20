@@ -1498,12 +1498,16 @@ export type Database = {
           created_at: string
           created_by: string | null
           dedup_hash: string | null
+          draft_body: string | null
+          draft_subject: string | null
+          drafted_at: string | null
           email: string | null
           email_source: string | null
           enrich_attempts: number
           enriched: boolean
           hiring_signal: string | null
           id: string
+          intake_info: string | null
           kind: Database["public"]["Enums"]["lead_kind"]
           last_error: string | null
           linkedin: string | null
@@ -1511,7 +1515,9 @@ export type Database = {
           opening_hours: string | null
           phone: string | null
           place_id: string | null
+          profile_summary: string | null
           program_type: string | null
+          programs: string | null
           rating: number | null
           rating_count: number | null
           role: string | null
@@ -1519,11 +1525,13 @@ export type Database = {
           source: string
           source_url: string | null
           stage: Database["public"]["Enums"]["lead_stage"]
+          trades: string | null
           updated_at: string
           visa_fit_score: number
           visa_speed: string | null
           website: string | null
           whatsapp: string | null
+          workforce_size: string | null
         }
         Insert: {
           address?: string | null
@@ -1535,12 +1543,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dedup_hash?: string | null
+          draft_body?: string | null
+          draft_subject?: string | null
+          drafted_at?: string | null
           email?: string | null
           email_source?: string | null
           enrich_attempts?: number
           enriched?: boolean
           hiring_signal?: string | null
           id?: string
+          intake_info?: string | null
           kind?: Database["public"]["Enums"]["lead_kind"]
           last_error?: string | null
           linkedin?: string | null
@@ -1548,7 +1560,9 @@ export type Database = {
           opening_hours?: string | null
           phone?: string | null
           place_id?: string | null
+          profile_summary?: string | null
           program_type?: string | null
+          programs?: string | null
           rating?: number | null
           rating_count?: number | null
           role?: string | null
@@ -1556,11 +1570,13 @@ export type Database = {
           source?: string
           source_url?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
+          trades?: string | null
           updated_at?: string
           visa_fit_score?: number
           visa_speed?: string | null
           website?: string | null
           whatsapp?: string | null
+          workforce_size?: string | null
         }
         Update: {
           address?: string | null
@@ -1572,12 +1588,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dedup_hash?: string | null
+          draft_body?: string | null
+          draft_subject?: string | null
+          drafted_at?: string | null
           email?: string | null
           email_source?: string | null
           enrich_attempts?: number
           enriched?: boolean
           hiring_signal?: string | null
           id?: string
+          intake_info?: string | null
           kind?: Database["public"]["Enums"]["lead_kind"]
           last_error?: string | null
           linkedin?: string | null
@@ -1585,7 +1605,9 @@ export type Database = {
           opening_hours?: string | null
           phone?: string | null
           place_id?: string | null
+          profile_summary?: string | null
           program_type?: string | null
+          programs?: string | null
           rating?: number | null
           rating_count?: number | null
           role?: string | null
@@ -1593,11 +1615,13 @@ export type Database = {
           source?: string
           source_url?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
+          trades?: string | null
           updated_at?: string
           visa_fit_score?: number
           visa_speed?: string | null
           website?: string | null
           whatsapp?: string | null
+          workforce_size?: string | null
         }
         Relationships: []
       }
