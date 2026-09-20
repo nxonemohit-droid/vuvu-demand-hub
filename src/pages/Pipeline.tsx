@@ -162,7 +162,8 @@ const Pipeline = () => {
                   <TableRow>
                     <TableHead>Company</TableHead>
                     <TableHead>Country</TableHead>
-                    <TableHead>Contact</TableHead>
+                    <TableHead>Contact person</TableHead>
+                    <TableHead>Address &amp; hours</TableHead>
                     <TableHead>Visa</TableHead>
                     <TableHead>Score</TableHead>
                     <TableHead>Stage</TableHead>
