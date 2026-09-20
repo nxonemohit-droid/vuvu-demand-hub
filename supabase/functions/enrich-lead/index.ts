@@ -61,12 +61,12 @@ async function scrape(url: string): Promise<string | null> {
       body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
       signal: AbortSignal.timeout(20000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return await plainFetch(url);
     const data = await res.json();
     const md = data.markdown ?? data.data?.markdown ?? null;
-    return md ? String(md).slice(0, 8000) : null;
+    return md ? String(md).slice(0, 8000) : await plainFetch(url);
   } catch {
-    return null;
+    return await plainFetch(url);
   }
 }
 
