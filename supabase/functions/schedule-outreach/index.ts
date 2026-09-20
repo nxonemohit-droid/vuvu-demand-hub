@@ -33,6 +33,13 @@ Bridging Indian & Nepali talent with global opportunities
 https://voynovaglobal.com | https://voy-nova-profiles.live/company-profile`;
 
 function emailFor(lead: Record<string, string | null>) {
+  // A personalised AI draft (from draft-email) always wins over the template.
+  if (lead.draft_body) {
+    return {
+      subject: lead.draft_subject ?? `Voynova Global Solutions — ${lead.company ?? "partnership"}`,
+      body: lead.draft_body,
+    };
+  }
   const first = (lead.contact_name ?? "").trim().split(/\s+/)[0];
   const greeting = first ? `Hi ${first},` : "Hello,";
   const company = lead.company ?? "your team";

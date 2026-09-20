@@ -121,10 +121,16 @@ const SCHEMA = {
     linkedin: { type: ["string", "null"] },
     hiring_signal: { type: ["string", "null"] },
     program_type: { type: ["string", "null"] },
+    profile_summary: { type: ["string", "null"] },
+    programs: { type: ["string", "null"] },
+    intake_info: { type: ["string", "null"] },
+    trades: { type: ["string", "null"] },
+    workforce_size: { type: ["string", "null"] },
   },
   required: [
     "company", "city", "sector", "role", "contact_name", "contact_role",
     "email", "phone", "whatsapp", "linkedin", "hiring_signal", "program_type",
+    "profile_summary", "programs", "intake_info", "trades", "workforce_size",
   ],
 };
 
@@ -132,8 +138,22 @@ async function extract(markdown: string, kind: string): Promise<Record<string, s
   if (!LOVABLE_KEY) return {};
   const instruction =
     kind === "education"
-      ? "This is a college/vocational school page. Extract the institution details, admissions contact, and in program_type describe the short skill course or learn-and-earn programme offered."
-      : "This is an employer or recruiter page. Extract the company details, hiring/HR contact, the blue-collar roles they hire for, and a short hiring_signal quote showing they are recruiting.";
+      ? [
+          "This is a college / vocational school page.",
+          "Extract institution details and the admissions or international-office contact.",
+          "program_type: the single best-fit short skill or learn-and-earn programme.",
+          "programs: comma-separated list of vocational / diploma courses they actually run (hospitality, culinary, nursing, construction trades, IT, logistics...).",
+          "intake_info: intake months, application deadlines or tuition info if stated.",
+          "profile_summary: 2 factual sentences about what this institution is, who it teaches and anything about international students.",
+        ].join(" ")
+      : [
+          "This is an employer or recruiter page.",
+          "Extract company details and the HR / hiring / owner contact.",
+          "trades: comma-separated blue-collar trades or job titles they employ (welder, mason, electrician, housekeeper, warehouse operator, driver...).",
+          "workforce_size: number of employees or project scale if stated.",
+          "hiring_signal: a short quote or fact showing they are recruiting now.",
+          "profile_summary: 2 factual sentences about what this company does and where it operates.",
+        ].join(" ");
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
     method: "POST",
@@ -253,6 +273,11 @@ Deno.serve(async (req) => {
           linkedin: ai.linkedin ?? lead.linkedin,
           hiring_signal: ai.hiring_signal ?? lead.hiring_signal,
           program_type: ai.program_type ?? lead.program_type,
+          profile_summary: ai.profile_summary ?? lead.profile_summary,
+          programs: ai.programs ?? lead.programs,
+          intake_info: ai.intake_info ?? lead.intake_info,
+          trades: ai.trades ?? lead.trades,
+          workforce_size: ai.workforce_size ?? lead.workforce_size,
           country: lead.country,
           website: lead.website,
         };

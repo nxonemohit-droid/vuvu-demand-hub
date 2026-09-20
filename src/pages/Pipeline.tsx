@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Download } from "lucide-react";
+import { Download, Loader2, Mail, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { MARKETS, STAGES, STAGE_LABELS, marketFor, type Stage } from "@/lib/markets";
 import { PageHeader } from "@/components/PageHeader";
+import { LeadMailDialog, type MailLead } from "@/components/LeadMailDialog";
 
 
 const Pipeline = () => {
@@ -32,6 +33,25 @@ const Pipeline = () => {
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState("all");
   const [stage, setStage] = useState("all");
+  const [mailLead, setMailLead] = useState<MailLead | null>(null);
+  const [drafting, setDrafting] = useState(false);
+
+  /** Draft personalised mails for the next batch of leads that have an email. */
+  const draftBatch = async () => {
+    setDrafting(true);
+    let total = 0;
+    for (let i = 0; i < 6; i++) {
+      const { data, error } = await supabase.functions.invoke("draft-email", { body: { limit: 5 } });
+      if (error) break;
+      total += data?.drafted ?? 0;
+      if (!data?.drafted) break;
+    }
+    setDrafting(false);
+    qc.invalidateQueries({ queryKey: ["pipeline-leads"] });
+    toast[total ? "success" : "info"](
+      total ? `${total} personalised mail draft ban gaye.` : "Sab leads ke draft pehle se ready hain.",
+    );
+  };
 
   const { data: leads, isLoading } = useQuery({
     queryKey: ["pipeline-leads"],
@@ -99,11 +119,21 @@ const Pipeline = () => {
       <PageHeader
         step={3}
         title="Pipeline"
-        description="Har lead ka stage yahi se badlo."
+        description="Har lead ka stage badlo aur uske liye personalised mail banao."
         action={
-          <Button variant="outline" onClick={exportCsv}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={draftBatch} disabled={drafting}>
+              {drafting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Personalised mails banao
+            </Button>
+            <Button variant="outline" onClick={exportCsv}>
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+          </div>
         }
       />
 
@@ -167,6 +197,7 @@ const Pipeline = () => {
                     <TableHead>Address &amp; hours</TableHead>
                     <TableHead>Visa</TableHead>
                     <TableHead>Score</TableHead>
+                    <TableHead>Mail</TableHead>
                     <TableHead>Stage</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -176,10 +207,20 @@ const Pipeline = () => {
                     return (
                       <TableRow key={l.id} className={i % 2 ? "bg-muted/40" : undefined}>
                         <TableCell>
-                          <div className="font-medium">{l.company}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{l.company}</span>
+                            <Badge variant={l.kind === "education" ? "secondary" : "outline"}>
+                              {l.kind === "education" ? "College" : "Company"}
+                            </Badge>
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {[l.city, l.sector].filter(Boolean).join(" · ")}
                           </div>
+                          {(l.trades || l.programs) && (
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              {l.trades ?? l.programs}
+                            </div>
+                          )}
                           {l.website && (
                             <a
                               href={l.website}
@@ -218,6 +259,16 @@ const Pipeline = () => {
                         </TableCell>
                         <TableCell className="font-semibold">{l.visa_fit_score}</TableCell>
                         <TableCell>
+                          <Button
+                            size="sm"
+                            variant={l.draft_body ? "secondary" : "outline"}
+                            onClick={() => setMailLead(l as unknown as MailLead)}
+                          >
+                            <Mail className="mr-2 h-4 w-4" />
+                            {l.draft_body ? "Draft dekho" : "Mail banao"}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
                           <Select value={l.stage} onValueChange={(v) => setStageFor(l.id, v as Stage)}>
                             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                             <SelectContent>
@@ -236,6 +287,12 @@ const Pipeline = () => {
           )}
         </CardContent>
       </Card>
+
+      <LeadMailDialog
+        lead={mailLead}
+        onClose={() => setMailLead(null)}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["pipeline-leads"] })}
+      />
     </div>
   );
 };
