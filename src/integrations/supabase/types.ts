@@ -1490,6 +1490,8 @@ export type Database = {
       leads: {
         Row: {
           address: string | null
+          ai_reason: string | null
+          ai_score: number | null
           city: string | null
           company: string
           contact_name: string | null
@@ -1500,6 +1502,7 @@ export type Database = {
           dedup_hash: string | null
           draft_body: string | null
           draft_subject: string | null
+          draft_whatsapp: string | null
           drafted_at: string | null
           email: string | null
           email_source: string | null
@@ -1535,6 +1538,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_reason?: string | null
+          ai_score?: number | null
           city?: string | null
           company: string
           contact_name?: string | null
@@ -1545,6 +1550,7 @@ export type Database = {
           dedup_hash?: string | null
           draft_body?: string | null
           draft_subject?: string | null
+          draft_whatsapp?: string | null
           drafted_at?: string | null
           email?: string | null
           email_source?: string | null
@@ -1580,6 +1586,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_reason?: string | null
+          ai_score?: number | null
           city?: string | null
           company?: string
           contact_name?: string | null
@@ -1590,6 +1598,7 @@ export type Database = {
           dedup_hash?: string | null
           draft_body?: string | null
           draft_subject?: string | null
+          draft_whatsapp?: string | null
           drafted_at?: string | null
           email?: string | null
           email_source?: string | null

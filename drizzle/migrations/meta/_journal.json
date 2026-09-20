@@ -22,6 +22,13 @@
       "when": 1789893340620,
       "tag": "0002_add_lead_profile_and_draft",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789919964869,
+      "tag": "0003_add_ai_score_and_whatsapp_draft",
+      "breakpoints": true
     }
   ]
 }
