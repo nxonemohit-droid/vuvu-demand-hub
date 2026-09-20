@@ -17,11 +17,14 @@ import { PageHeader } from "@/components/PageHeader";
 
 
 const FAST = MARKETS.filter((m) => m.speed === "fast").map((m) => m.country);
+// Main focus corridor: less explored Europe markets with quick work visas.
+const FOCUS = ["Latvia", "Serbia", "Cyprus", "Estonia"];
+const ALL_COUNTRIES = MARKETS.map((m) => m.country);
 
 const FindLeads = () => {
   const qc = useQueryClient();
   const [kind, setKind] = useState<"employer" | "education">("employer");
-  const [countries, setCountries] = useState<string[]>(["Latvia", "Serbia"]);
+  const [countries, setCountries] = useState<string[]>(FOCUS);
   const [sectors, setSectors] = useState<string[]>(["construction", "hospitality"]);
   const [keywords, setKeywords] = useState("");
   const [starting, setStarting] = useState(false);
