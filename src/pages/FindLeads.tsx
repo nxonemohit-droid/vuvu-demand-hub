@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MARKETS, SECTORS, SUPPLY_COUNTRIES, type LeadKind } from "@/lib/markets";
+import { MARKETS, SECTORS, type LeadKind } from "@/lib/markets";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -48,16 +48,15 @@ const FindLeads = () => {
   const { data: counts } = useQuery({
     queryKey: ["lead-counts"],
     queryFn: async () => {
-      const total = await supabase.from("leads").select("id", { count: "exact", head: true });
-      const withEmail = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .not("email", "is", null);
-      const pending = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .eq("enriched", false)
-        .lt("enrich_attempts", 3);
+      // Europe engine only — recruiter partners have their own screen.
+      const base = () =>
+        supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true })
+          .in("kind", ["employer", "education"]);
+      const total = await base();
+      const withEmail = await base().not("email", "is", null);
+      const pending = await base().eq("enriched", false).lt("enrich_attempts", 3);
       return {
         total: total.count ?? 0,
         withEmail: withEmail.count ?? 0,
@@ -73,6 +72,7 @@ const FindLeads = () => {
       const { data, error } = await supabase
         .from("leads")
         .select("id, company, website, phone, address, opening_hours, city, country")
+        .in("kind", ["employer", "education"])
         .order("created_at", { ascending: false })
         .limit(25);
       if (error) throw error;
@@ -111,7 +111,9 @@ const FindLeads = () => {
     setEnriching(true);
     try {
       for (let i = 0; i < 12; i++) {
-        const { data, error } = await supabase.functions.invoke("enrich-lead", { body: { limit: 4 } });
+        const { data, error } = await supabase.functions.invoke("enrich-lead", {
+          body: { limit: 4, kinds: ["employer", "education"] },
+        });
         if (error) throw error;
         qc.invalidateQueries({ queryKey: ["lead-counts"] });
         if (!data?.processed || !data?.remaining) break;
@@ -132,8 +134,8 @@ const FindLeads = () => {
     <div className="p-6 space-y-6 max-w-6xl">
       <PageHeader
         step={1}
-        title="Find Leads"
-        description="Europe ke un markets me employers dhundo jahan work visa 2 mahine ke andar lag jata hai."
+        title="Europe Employers & Colleges"
+        description="Europe ke un markets me employers aur learn & earn colleges dhundo jahan work visa 2 mahine ke andar lag jata hai. Recruiter partners ke liye alag Recruiter Engine hai."
       />
 
 
@@ -149,98 +151,56 @@ const FindLeads = () => {
           <CardDescription>Country aur sector chuno, baaki sab apne aap ho jayega.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <Tabs
-            value={kind}
-            onValueChange={(v) => {
-              const next = v as LeadKind;
-              setKind(next);
-              setCountries(next === "supply" ? SUPPLY_COUNTRIES : FOCUS);
-            }}
-          >
+          <Tabs value={kind} onValueChange={(v) => setKind(v as LeadKind)}>
             <TabsList>
               <TabsTrigger value="employer">Employers hiring workers</TabsTrigger>
               <TabsTrigger value="education">Colleges (learn &amp; earn)</TabsTrigger>
-              <TabsTrigger value="supply">Partners who supply workers</TabsTrigger>
             </TabsList>
           </Tabs>
 
-          {kind === "supply" ? (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label>Source countries</Label>
-                <Button variant="ghost" size="sm" onClick={() => setCountries(SUPPLY_COUNTRIES)}>
-                  Select all
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label>Countries</Label>
+              <div className="flex flex-wrap gap-1">
+                <Button variant="secondary" size="sm" onClick={() => setCountries(FOCUS)}>
+                  Main focus (Latvia, Serbia, Cyprus, Estonia)
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setCountries(FAST)}>
+                  Fastest visa
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setCountries(ALL_COUNTRIES)}>
+                  All Europe
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Manpower agencies, recruitment agents aur study abroad / visa counsellors — jo hume
-                workers aur students supply kar sakte hain.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {SUPPLY_COUNTRIES.map((c) => {
-                  const active = countries.includes(c);
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => toggle(countries, setCountries, c)}
-                      className={cn(
-                        "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                        active ? "border-primary bg-primary/10" : "hover:bg-muted",
-                      )}
-                    >
-                      <div className="font-medium">{c}</div>
-                      <div className="text-[11px] text-muted-foreground">Agencies &amp; counsellors</div>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label>Countries</Label>
-                <div className="flex flex-wrap gap-1">
-                  <Button variant="secondary" size="sm" onClick={() => setCountries(FOCUS)}>
-                    Main focus (Latvia, Serbia, Cyprus, Estonia)
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setCountries(FAST)}>
-                    Fastest visa
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setCountries(ALL_COUNTRIES)}>
-                    All Europe
-                  </Button>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {MARKETS.map((m) => {
-                  const active = countries.includes(m.country);
-                  return (
-                    <button
-                      key={m.country}
-                      type="button"
-                      onClick={() => toggle(countries, setCountries, m.country)}
-                      className={cn(
-                        "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                        active ? "border-primary bg-primary/10" : "hover:bg-muted",
-                      )}
-                    >
-                      <div className="font-medium">{m.country}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {m.days}
-                        <Badge
-                          variant={m.speed === "fast" ? "default" : "secondary"}
-                          className="ml-2 px-1.5 py-0 text-[10px]"
-                        >
-                          {m.speed === "fast" ? "Fast" : "Medium"}
-                        </Badge>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="flex flex-wrap gap-2">
+              {MARKETS.map((m) => {
+                const active = countries.includes(m.country);
+                return (
+                  <button
+                    key={m.country}
+                    type="button"
+                    onClick={() => toggle(countries, setCountries, m.country)}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                      active ? "border-primary bg-primary/10" : "hover:bg-muted",
+                    )}
+                  >
+                    <div className="font-medium">{m.country}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {m.days}
+                      <Badge
+                        variant={m.speed === "fast" ? "default" : "secondary"}
+                        className="ml-2 px-1.5 py-0 text-[10px]"
+                      >
+                        {m.speed === "fast" ? "Fast" : "Medium"}
+                      </Badge>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
 
           {kind === "employer" && (
             <div className="space-y-2">

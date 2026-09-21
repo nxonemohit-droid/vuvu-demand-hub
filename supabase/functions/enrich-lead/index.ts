@@ -219,11 +219,19 @@ Deno.serve(async (req) => {
     const limit = Math.min(Number(body.limit) || 5, 10);
     const supa = adminClient();
 
-    const { data: leads, error } = await supa
+    const allowedKinds = ["employer", "education", "supply"] as const;
+    const kinds = Array.isArray(body.kinds)
+      ? (body.kinds as string[]).filter((k) => (allowedKinds as readonly string[]).includes(k))
+      : [];
+
+    let query = supa
       .from("leads")
       .select("*")
       .eq("enriched", false)
-      .lt("enrich_attempts", 3)
+      .lt("enrich_attempts", 3);
+    if (kinds.length) query = query.in("kind", kinds);
+
+    const { data: leads, error } = await query
       .order("created_at", { ascending: true })
       .limit(limit);
     if (error) throw error;

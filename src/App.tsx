@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import AppLayout from "./components/AppLayout";
 import Auth from "./pages/Auth.tsx";
 import FindLeads from "./pages/FindLeads.tsx";
+import Recruiters from "./pages/Recruiters.tsx";
 import Outreach from "./pages/Outreach.tsx";
 import Pipeline from "./pages/Pipeline.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -23,6 +24,8 @@ const App = () => (
           <Route element={<AppLayout />}>
             <Route path="/" element={<Navigate to="/find" replace />} />
             <Route path="/find" element={<FindLeads />} />
+            <Route path="/recruiters" element={<Recruiters />} />
+
             <Route path="/outreach" element={<Outreach />} />
             <Route path="/pipeline" element={<Pipeline />} />
           </Route>

@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useId } from "react";
-import { Radar, LogOut, HelpCircle, Send, BarChart3 } from "lucide-react";
+import { Radar, LogOut, HelpCircle, Send, BarChart3, Handshake } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +47,8 @@ const VArrowLogo = ({ className }: { className?: string }) => {
 };
 
 const navItems = [
-  { to: "/find", label: "Find Leads", icon: Radar },
+  { to: "/find", label: "Europe Employers", icon: Radar },
+  { to: "/recruiters", label: "Recruiter Engine", icon: Handshake },
   { to: "/outreach", label: "Outreach", icon: Send },
   { to: "/pipeline", label: "Pipeline", icon: BarChart3 },
 ];
