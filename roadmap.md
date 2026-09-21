@@ -16,3 +16,7 @@
 - [x] Separate partnership outreach block (email + WhatsApp, `kinds: ["supply"]` filter in schedule-outreach)
 - [x] Two separate engines: Europe Employers & Colleges (/find) and Recruiter Engine (/recruiters)
 - [x] Recruiter Engine: per-country blocks (India, Nepal, Bangladesh, Sri Lanka + Uzbekistan, Philippines), partner-type filters, per-country search + enrichment
+- [x] Country-specific recruiter email + WhatsApp pitches (India eMigrate, Nepal DoFE, Bangladesh BAIRA, Sri Lanka SLBFE) with Europe job orders + Learn & Earn seats
+- [x] Recruiter pipeline stages: New, Qualified, Contacted, Replied, Meeting booked, Partner onboarded
+- [x] Duplicate detection + merge for recruiter leads (email, phone, website, agency name) via `recruiter-tools`
+- [x] 0–100 partner priority score (country, partner type, contact quality, supply capacity)
