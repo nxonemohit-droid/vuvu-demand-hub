@@ -76,15 +76,37 @@ const EDUCATION_PATTERNS = [
   '{country} private college intake admission international students part time work',
 ];
 
+// Supply-side patterns: partners who can send us workers and students.
+const SUPPLY_PATTERNS = [
+  '{country} manpower recruitment agency overseas jobs Europe contact email',
+  '{country} licensed overseas employment agency blue collar workers "contact us" email',
+  '{country} recruitment agent workers for Europe "email" "phone" agency',
+  '{country} study abroad consultant Europe student visa counsellor contact email',
+  '{country} overseas education consultancy Europe admissions partner contact',
+  '{country} visa consultant work visa Europe agency email',
+];
+
+// Supply-side cities that concentrate agencies and counsellors.
+const SUPPLY_CITIES: Record<string, string[]> = {
+  India: ["Delhi", "Mumbai", "Chandigarh", "Hyderabad", "Kochi", "Lucknow"],
+  Nepal: ["Kathmandu", "Pokhara"],
+  Bangladesh: ["Dhaka", "Chittagong"],
+  "Sri Lanka": ["Colombo"],
+  Uzbekistan: ["Tashkent"],
+  Philippines: ["Manila", "Cebu"],
+};
+
 export function buildQueries(
-  kind: "employer" | "education",
+  kind: LeadKind,
   countries: string[],
   sectors: string[],
   extraKeywords: string[],
 ): string[] {
   const out: string[] = [];
   for (const country of countries) {
-    if (kind === "education") {
+    if (kind === "supply") {
+      for (const p of SUPPLY_PATTERNS) out.push(p.replace(/\{country\}/g, country));
+    } else if (kind === "education") {
       for (const p of EDUCATION_PATTERNS) out.push(p.replace(/\{country\}/g, country));
     } else {
       const secs = sectors.length ? sectors : ["construction", "hospitality"];
