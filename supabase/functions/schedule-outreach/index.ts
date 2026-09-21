@@ -47,6 +47,22 @@ function emailFor(lead: Record<string, string | null>) {
   const market = marketFor(country);
   const sector = lead.sector ? ` in ${lead.sector}` : "";
 
+  if (lead.kind === "supply") {
+    return {
+      subject: `Partnership: Europe job orders & college seats for ${company}`,
+      body: `${greeting}
+
+I am reaching out from Voynova Global Solutions. We work directly with employers and colleges in Europe and the Balkans — Latvia, Serbia, Cyprus and Estonia — where a work or study permit is usually completed within about two months.
+
+We are looking for sourcing partners in ${country} who can supply screened blue-collar candidates and students. We share the live job orders and admission seats; your team sources and pre-screens. We handle employer contracts, permits, visa paperwork and arrival support, with transparent commercials and no fee charged to the worker.
+
+Would a 15-minute call this week work to share our current requirements?
+
+Best regards,
+${SIGNATURE}`,
+    };
+  }
+
   if (lead.kind === "education") {
     return {
       subject: `Student pipeline from India & Nepal for ${company}`,
