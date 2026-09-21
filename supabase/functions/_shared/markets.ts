@@ -88,11 +88,24 @@ const SUPPLY_PATTERNS = [
 
 // Supply-side cities that concentrate agencies and counsellors.
 const SUPPLY_CITIES: Record<string, string[]> = {
-  India: ["Delhi", "Mumbai", "Chandigarh", "Hyderabad", "Kochi", "Lucknow"],
-  Nepal: ["Kathmandu", "Pokhara"],
-  Bangladesh: ["Dhaka", "Chittagong"],
-  "Sri Lanka": ["Colombo"],
-  Uzbekistan: ["Tashkent"],
+  India: [
+    "Delhi",
+    "Mumbai",
+    "Chandigarh",
+    "Hyderabad",
+    "Kochi",
+    "Lucknow",
+    "Jalandhar",
+    "Ahmedabad",
+    "Chennai",
+    "Bengaluru",
+    "Pune",
+    "Kolkata",
+  ],
+  Nepal: ["Kathmandu", "Pokhara", "Butwal", "Biratnagar"],
+  Bangladesh: ["Dhaka", "Chittagong", "Sylhet"],
+  "Sri Lanka": ["Colombo", "Kandy", "Negombo"],
+  Uzbekistan: ["Tashkent", "Samarkand"],
   Philippines: ["Manila", "Cebu"],
 };
 

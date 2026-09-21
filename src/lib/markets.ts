@@ -34,6 +34,47 @@ export const SUPPLY_COUNTRIES = [
   "Philippines",
 ];
 
+/** Main South Asia recruiter corridor — each country gets its own block. */
+export const RECRUITER_COUNTRIES = ["India", "Nepal", "Bangladesh", "Sri Lanka"];
+
+/** Extra recruiter countries we search on demand. */
+export const EXTRA_RECRUITER_COUNTRIES = ["Uzbekistan", "Philippines"];
+
+export type RecruiterType = {
+  id: string;
+  label: string;
+  hint: string;
+  keywords: string[];
+};
+
+/** Partner types the recruiter engine can search for, one at a time or together. */
+export const RECRUITER_TYPES: RecruiterType[] = [
+  {
+    id: "manpower",
+    label: "Manpower agencies",
+    hint: "Licensed overseas employment agencies",
+    keywords: ["manpower recruitment agency", "overseas employment agency"],
+  },
+  {
+    id: "agents",
+    label: "Recruitment agents",
+    hint: "Local agents who mobilise workers",
+    keywords: ["recruitment agent workers Europe", "labour supply agent"],
+  },
+  {
+    id: "study",
+    label: "Study abroad counsellors",
+    hint: "Learn & earn student partners",
+    keywords: ["study abroad consultant Europe", "overseas education consultancy"],
+  },
+  {
+    id: "visa",
+    label: "Visa counsellors",
+    hint: "Work visa and documentation consultants",
+    keywords: ["work visa consultant Europe", "visa counsellor overseas jobs"],
+  },
+];
+
 export const SECTORS = [
   "construction",
   "hospitality",
