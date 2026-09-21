@@ -97,8 +97,12 @@ const Outreach = () => {
     return data;
   };
 
-  const schedule = async (channels: string[]) => {
-    const data = await run("schedule-outreach", { channels }, channels.join("+"));
+  const schedule = async (channels: string[], kinds?: string[], label?: string) => {
+    const data = await run(
+      "schedule-outreach",
+      kinds ? { channels, kinds } : { channels },
+      label ?? channels.join("+"),
+    );
     if (!data) return;
     const added = (data.email ?? 0) + (data.whatsapp ?? 0);
     toast.success(
