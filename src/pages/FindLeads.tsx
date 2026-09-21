@@ -134,8 +134,8 @@ const FindLeads = () => {
     <div className="p-6 space-y-6 max-w-6xl">
       <PageHeader
         step={1}
-        title="Find Leads"
-        description="Europe ke un markets me employers dhundo jahan work visa 2 mahine ke andar lag jata hai."
+        title="Europe Employers & Colleges"
+        description="Europe ke un markets me employers aur learn & earn colleges dhundo jahan work visa 2 mahine ke andar lag jata hai. Recruiter partners ke liye alag Recruiter Engine hai."
       />
 
 

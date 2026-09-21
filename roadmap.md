@@ -14,3 +14,5 @@
 - [x] Paid Gemini key for AI scoring + personalised email/WhatsApp drafting
 - [x] Supply-side leads (`supply` kind): manpower agencies, agents, study abroad / visa counsellors in India, Nepal, Bangladesh, Sri Lanka, Uzbekistan, Philippines
 - [x] Separate partnership outreach block (email + WhatsApp, `kinds: ["supply"]` filter in schedule-outreach)
+- [x] Two separate engines: Europe Employers & Colleges (/find) and Recruiter Engine (/recruiters)
+- [x] Recruiter Engine: per-country blocks (India, Nepal, Bangladesh, Sri Lanka + Uzbekistan, Philippines), partner-type filters, per-country search + enrichment
