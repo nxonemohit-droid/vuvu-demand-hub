@@ -48,16 +48,15 @@ const FindLeads = () => {
   const { data: counts } = useQuery({
     queryKey: ["lead-counts"],
     queryFn: async () => {
-      const total = await supabase.from("leads").select("id", { count: "exact", head: true });
-      const withEmail = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .not("email", "is", null);
-      const pending = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .eq("enriched", false)
-        .lt("enrich_attempts", 3);
+      // Europe engine only — recruiter partners have their own screen.
+      const base = () =>
+        supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true })
+          .in("kind", ["employer", "education"]);
+      const total = await base();
+      const withEmail = await base().not("email", "is", null);
+      const pending = await base().eq("enriched", false).lt("enrich_attempts", 3);
       return {
         total: total.count ?? 0,
         withEmail: withEmail.count ?? 0,
@@ -73,6 +72,7 @@ const FindLeads = () => {
       const { data, error } = await supabase
         .from("leads")
         .select("id, company, website, phone, address, opening_hours, city, country")
+        .in("kind", ["employer", "education"])
         .order("created_at", { ascending: false })
         .limit(25);
       if (error) throw error;
@@ -111,7 +111,9 @@ const FindLeads = () => {
     setEnriching(true);
     try {
       for (let i = 0; i < 12; i++) {
-        const { data, error } = await supabase.functions.invoke("enrich-lead", { body: { limit: 4 } });
+        const { data, error } = await supabase.functions.invoke("enrich-lead", {
+          body: { limit: 4, kinds: ["employer", "education"] },
+        });
         if (error) throw error;
         qc.invalidateQueries({ queryKey: ["lead-counts"] });
         if (!data?.processed || !data?.remaining) break;
