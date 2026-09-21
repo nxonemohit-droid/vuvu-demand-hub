@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
         )
       : [];
 
-    let q = supa.from("leads").select("*").neq("stage", "rejected");
+    let q = supa.from("leads").select("*").neq("stage", "rejected").is("merged_into", null);
     if (leadIds) q = q.in("id", leadIds);
     if (kinds.length) q = q.in("kind", kinds);
     const { data: leads, error } = await q.limit(1000);
