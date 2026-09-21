@@ -15,6 +15,8 @@ import {
   RECRUITER_TYPES,
 } from "@/lib/markets";
 import { cn } from "@/lib/utils";
+import { RecruiterPipeline } from "@/components/RecruiterPipeline";
+import { RecruiterDuplicates } from "@/components/RecruiterDuplicates";
 
 type CountryStat = {
   country: string;
@@ -43,6 +45,7 @@ const Recruiters = () => {
               .from("leads")
               .select("id", { count: "exact", head: true })
               .eq("kind", "supply")
+              .is("merged_into", null)
               .eq("country", country);
           const total = await base();
           const withEmail = await base().not("email", "is", null);
@@ -222,6 +225,10 @@ const Recruiters = () => {
           </div>
         )}
       </div>
+
+      <RecruiterDuplicates />
+
+      <RecruiterPipeline countries={ALL_COUNTRIES} />
     </div>
   );
 };

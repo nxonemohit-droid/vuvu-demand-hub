@@ -6,6 +6,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient } from "../_shared/supabase.ts";
 import { marketFor } from "../_shared/markets.ts";
 import { aiJson, aiProvider } from "../_shared/ai.ts";
+import { pitchFor } from "../_shared/recruiters.ts";
 
 const SIGNATURE = `Mohit Gururani
 Founder & CEO | Voynova Global Solutions Pvt. Ltd.
@@ -79,9 +80,12 @@ function instructionFor(lead: Lead): string {
     "reason: one short sentence, max 20 words, explaining the score.",
   ];
   if (lead.kind === "supply") {
+    const pitch = pitchFor(String(lead.country ?? ""));
     shared.push(
-      "Angle: this is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. Voynova holds confirmed employer and college demand in Europe and the Balkans (Latvia, Serbia, Cyprus, Estonia and nearby) and needs partners who can supply screened blue-collar candidates and students. Offer a simple partnership: Voynova shares live job orders and admission seats, the partner sources and pre-screens candidates, Voynova handles employer contracts, permit and visa paperwork and arrival support, with transparent commercials and an ethical no-worker-fee model.",
-      "For a supply partner, score on: do they actually mobilise blue-collar workers or students abroad, are they licensed or established, do they cover our source countries, and is a decision maker reachable.",
+      "Angle: this is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. Offer a simple partnership: Voynova shares live Europe job orders and Learn & Earn college seats, the partner sources and pre-screens candidates, Voynova handles employer contracts, permit and visa paperwork and arrival support.",
+      `Use this country-specific pitch, written for partners in ${lead.country ?? "South Asia"}: ${pitch.corridor} ${pitch.ask} ${pitch.proof}`,
+      "Mention both revenue lines clearly: (1) Europe blue-collar job orders, (2) Learn & Earn college seats for students who study and work alongside.",
+      "For a supply partner, score on: do they actually mobilise blue-collar workers or students abroad, are they licensed or registered with the local regulator, do they cover our source countries, and is a decision maker reachable.",
     );
   } else if (lead.kind === "education") {
     shared.push(
@@ -107,18 +111,21 @@ function fallback(lead: Lead): Draft {
   const m = marketFor(String(country));
 
   if (lead.kind === "supply") {
+    const pitch = pitchFor(String(country));
     return {
-      subject: `Partnership: Europe job orders & college seats for ${company}`,
+      subject: `${country} partnership: Europe job orders & Learn and Earn seats`,
       body: `${greeting}
 
-I am Mohit Gururani from Voynova Global Solutions. We work directly with employers and colleges in Europe and the Balkans — Latvia, Serbia, Cyprus and Estonia — where a work or study permit is usually completed within about two months.
+I am Mohit Gururani from Voynova Global Solutions. ${pitch.corridor}
 
-We are looking for sourcing partners in ${country}${lead.city ? `, around ${lead.city}` : ""} who can supply screened blue-collar candidates and students. We share the live job orders and admission seats; your team sources and pre-screens. We handle the employer contracts, permits, visa paperwork and arrival support, with transparent commercials and no fee charged to the worker.
+${pitch.ask}${lead.city ? ` We are currently expanding around ${lead.city}.` : ""}
+
+Two things we can share with ${company} from week one: our live Europe job orders for blue-collar trades, and Learn & Earn college seats where students study and work alongside. ${pitch.proof}
 
 Would a 15-minute call this week work to share our current requirements?
 
 Best regards,`,
-      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We hold live job orders and college seats in Europe (Latvia, Serbia, Cyprus, Estonia) and are looking for sourcing partners in ${country}. Open to a short call about working together? More: https://voynovaglobal.com`,
+      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We have live Europe job orders (Latvia, Serbia, Cyprus, Estonia) and Learn & Earn college seats, and we are adding sourcing partners in ${country}. Can we talk for 15 minutes this week about working with ${company}? More: https://voynovaglobal.com`,
       score: null,
       reason: null,
     };

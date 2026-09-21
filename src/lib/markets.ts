@@ -86,16 +86,48 @@ export const SECTORS = [
   "care",
 ];
 
-export const STAGES = ["new", "contacted", "replied", "interested", "deal", "rejected"] as const;
+export const STAGES = [
+  "new",
+  "qualified",
+  "contacted",
+  "replied",
+  "interested",
+  "meeting_booked",
+  "deal",
+  "partner_onboarded",
+  "rejected",
+] as const;
 export type Stage = (typeof STAGES)[number];
 
 export const STAGE_LABELS: Record<Stage, string> = {
   new: "New",
+  qualified: "Qualified",
   contacted: "Contacted",
   replied: "Replied",
   interested: "Interested",
+  meeting_booked: "Meeting booked",
   deal: "Deal",
+  partner_onboarded: "Partner onboarded",
   rejected: "Not a fit",
+};
+
+/** Pipeline stages used by the recruiter (supply partner) engine. */
+export const RECRUITER_STAGES = [
+  "new",
+  "qualified",
+  "contacted",
+  "replied",
+  "meeting_booked",
+  "partner_onboarded",
+] as const;
+export type RecruiterStage = (typeof RECRUITER_STAGES)[number];
+
+export const PARTNER_TYPE_LABELS: Record<string, string> = {
+  manpower: "Manpower agency",
+  agents: "Recruitment agent",
+  study: "Study abroad counsellor",
+  visa: "Visa counsellor",
+  other: "Other partner",
 };
 
 export function marketFor(country?: string | null): Market | undefined {

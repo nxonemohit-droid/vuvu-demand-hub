@@ -1500,6 +1500,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           dedup_hash: string | null
+          dedupe_key: string | null
           draft_body: string | null
           draft_subject: string | null
           draft_whatsapp: string | null
@@ -1514,10 +1515,15 @@ export type Database = {
           kind: Database["public"]["Enums"]["lead_kind"]
           last_error: string | null
           linkedin: string | null
+          merged_at: string | null
+          merged_into: string | null
           notes: string | null
           opening_hours: string | null
+          partner_type: string | null
           phone: string | null
           place_id: string | null
+          priority_reason: string | null
+          priority_score: number | null
           profile_summary: string | null
           program_type: string | null
           programs: string | null
@@ -1528,6 +1534,7 @@ export type Database = {
           source: string
           source_url: string | null
           stage: Database["public"]["Enums"]["lead_stage"]
+          supply_capacity: string | null
           trades: string | null
           updated_at: string
           visa_fit_score: number
@@ -1548,6 +1555,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dedup_hash?: string | null
+          dedupe_key?: string | null
           draft_body?: string | null
           draft_subject?: string | null
           draft_whatsapp?: string | null
@@ -1562,10 +1570,15 @@ export type Database = {
           kind?: Database["public"]["Enums"]["lead_kind"]
           last_error?: string | null
           linkedin?: string | null
+          merged_at?: string | null
+          merged_into?: string | null
           notes?: string | null
           opening_hours?: string | null
+          partner_type?: string | null
           phone?: string | null
           place_id?: string | null
+          priority_reason?: string | null
+          priority_score?: number | null
           profile_summary?: string | null
           program_type?: string | null
           programs?: string | null
@@ -1576,6 +1589,7 @@ export type Database = {
           source?: string
           source_url?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
+          supply_capacity?: string | null
           trades?: string | null
           updated_at?: string
           visa_fit_score?: number
@@ -1596,6 +1610,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dedup_hash?: string | null
+          dedupe_key?: string | null
           draft_body?: string | null
           draft_subject?: string | null
           draft_whatsapp?: string | null
@@ -1610,10 +1625,15 @@ export type Database = {
           kind?: Database["public"]["Enums"]["lead_kind"]
           last_error?: string | null
           linkedin?: string | null
+          merged_at?: string | null
+          merged_into?: string | null
           notes?: string | null
           opening_hours?: string | null
+          partner_type?: string | null
           phone?: string | null
           place_id?: string | null
+          priority_reason?: string | null
+          priority_score?: number | null
           profile_summary?: string | null
           program_type?: string | null
           programs?: string | null
@@ -1624,6 +1644,7 @@ export type Database = {
           source?: string
           source_url?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
+          supply_capacity?: string | null
           trades?: string | null
           updated_at?: string
           visa_fit_score?: number
@@ -1632,7 +1653,15 @@ export type Database = {
           whatsapp?: string | null
           workforce_size?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_merged_into_fkey"
+            columns: ["merged_into"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       normalized_demand: {
         Row: {
@@ -2902,6 +2931,9 @@ export type Database = {
         | "interested"
         | "deal"
         | "rejected"
+        | "qualified"
+        | "meeting_booked"
+        | "partner_onboarded"
       outreach_channel: "email" | "whatsapp"
       priority_tag: "high" | "medium" | "low"
       recruitment_model_tag:
@@ -3093,6 +3125,9 @@ export const Constants = {
         "interested",
         "deal",
         "rejected",
+        "qualified",
+        "meeting_booked",
+        "partner_onboarded",
       ],
       outreach_channel: ["email", "whatsapp"],
       priority_tag: ["high", "medium", "low"],
