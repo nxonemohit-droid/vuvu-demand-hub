@@ -25,6 +25,22 @@ export const MARKETS: Market[] = [
 
 export const COUNTRY_NAMES = MARKETS.map((m) => m.country);
 
+/** Kinds of leads the engine can discover. */
+export type LeadKind = "employer" | "education" | "supply";
+
+/**
+ * Supply-side source countries: where manpower agencies, recruitment agents and
+ * study-abroad / visa counsellors who can supply workers and students sit.
+ */
+export const SUPPLY_COUNTRIES = [
+  "India",
+  "Nepal",
+  "Bangladesh",
+  "Sri Lanka",
+  "Uzbekistan",
+  "Philippines",
+];
+
 export function marketFor(country: string | null | undefined): Market | undefined {
   if (!country) return undefined;
   const c = country.trim().toLowerCase();
@@ -60,15 +76,37 @@ const EDUCATION_PATTERNS = [
   '{country} private college intake admission international students part time work',
 ];
 
+// Supply-side patterns: partners who can send us workers and students.
+const SUPPLY_PATTERNS = [
+  '{country} manpower recruitment agency overseas jobs Europe contact email',
+  '{country} licensed overseas employment agency blue collar workers "contact us" email',
+  '{country} recruitment agent workers for Europe "email" "phone" agency',
+  '{country} study abroad consultant Europe student visa counsellor contact email',
+  '{country} overseas education consultancy Europe admissions partner contact',
+  '{country} visa consultant work visa Europe agency email',
+];
+
+// Supply-side cities that concentrate agencies and counsellors.
+const SUPPLY_CITIES: Record<string, string[]> = {
+  India: ["Delhi", "Mumbai", "Chandigarh", "Hyderabad", "Kochi", "Lucknow"],
+  Nepal: ["Kathmandu", "Pokhara"],
+  Bangladesh: ["Dhaka", "Chittagong"],
+  "Sri Lanka": ["Colombo"],
+  Uzbekistan: ["Tashkent"],
+  Philippines: ["Manila", "Cebu"],
+};
+
 export function buildQueries(
-  kind: "employer" | "education",
+  kind: LeadKind,
   countries: string[],
   sectors: string[],
   extraKeywords: string[],
 ): string[] {
   const out: string[] = [];
   for (const country of countries) {
-    if (kind === "education") {
+    if (kind === "supply") {
+      for (const p of SUPPLY_PATTERNS) out.push(p.replace(/\{country\}/g, country));
+    } else if (kind === "education") {
       for (const p of EDUCATION_PATTERNS) out.push(p.replace(/\{country\}/g, country));
     } else {
       const secs = sectors.length ? sectors : ["construction", "hospitality"];
@@ -85,12 +123,24 @@ export function buildQueries(
 
 /** Plain-language queries for Google Maps Places text search. */
 export function buildMapsQueries(
-  kind: "employer" | "education",
+  kind: LeadKind,
   countries: string[],
   sectors: string[],
 ): string[] {
   const out: string[] = [];
   for (const country of countries) {
+    if (kind === "supply") {
+      const places = SUPPLY_CITIES[country] ?? [country];
+      for (const place of places) {
+        out.push(
+          `manpower recruitment agency in ${place}`,
+          `overseas employment agency in ${place}`,
+          `study abroad consultant in ${place}`,
+          `visa consultant in ${place}`,
+        );
+      }
+      continue;
+    }
     if (kind === "education") {
       out.push(
         `vocational college in ${country}`,
@@ -126,6 +176,7 @@ export function isUsefulUrl(url: string): boolean {
 }
 
 export function scoreLead(lead: {
+  kind?: string | null;
   country?: string | null;
   sector?: string | null;
   email?: string | null;
@@ -137,7 +188,10 @@ export function scoreLead(lead: {
 }): number {
   let s = 0;
   const m = marketFor(lead.country);
-  if (m) s += m.speed === "fast" ? 30 : 18;
+  // Supply-side partners sit in source countries, so the Europe permit speed
+  // does not apply — give them a flat base instead.
+  if (lead.kind === "supply") s += 28;
+  else if (m) s += m.speed === "fast" ? 30 : 18;
   if (m && lead.sector && m.sectors.includes(lead.sector.toLowerCase())) s += 15;
   if (lead.email && lead.email.includes("@")) s += 25;
   if (lead.whatsapp || lead.phone) s += 12;

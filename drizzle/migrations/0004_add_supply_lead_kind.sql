@@ -1,0 +1,1 @@
+ALTER TYPE public.lead_kind ADD VALUE IF NOT EXISTS 'supply';

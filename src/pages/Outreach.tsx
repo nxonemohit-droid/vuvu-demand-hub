@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Mail, MessageCircle, Play, CalendarClock } from "lucide-react";
+import { Loader2, Mail, MessageCircle, Play, CalendarClock, Handshake } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,17 +64,26 @@ const Outreach = () => {
   const { data: ready } = useQuery({
     queryKey: ["outreach-ready"],
     queryFn: async () => {
-      const email = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .not("email", "is", null)
-        .neq("stage", "rejected");
-      const wa = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .not("phone", "is", null)
-        .neq("stage", "rejected");
-      return { email: email.count ?? 0, whatsapp: wa.count ?? 0 };
+      const count = async (
+        channel: "email" | "phone",
+        kinds?: Array<"employer" | "education" | "supply">,
+      ) => {
+        let q = supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true })
+          .not(channel, "is", null)
+          .neq("stage", "rejected");
+        if (kinds) q = q.in("kind", kinds);
+        const { count: c } = await q;
+        return c ?? 0;
+      };
+      const [email, whatsapp, supplyEmail, supplyWa] = await Promise.all([
+        count("email"),
+        count("phone"),
+        count("email", ["supply"]),
+        count("phone", ["supply"]),
+      ]);
+      return { email, whatsapp, supplyEmail, supplyWa };
     },
     refetchInterval: 8000,
   });
@@ -91,8 +100,12 @@ const Outreach = () => {
     return data;
   };
 
-  const schedule = async (channels: string[]) => {
-    const data = await run("schedule-outreach", { channels }, channels.join("+"));
+  const schedule = async (channels: string[], kinds?: string[], label?: string) => {
+    const data = await run(
+      "schedule-outreach",
+      kinds ? { channels, kinds } : { channels },
+      label ?? channels.join("+"),
+    );
     if (!data) return;
     const added = (data.email ?? 0) + (data.whatsapp ?? 0);
     toast.success(
@@ -118,6 +131,25 @@ const Outreach = () => {
     qc.invalidateQueries();
     toast.success(
       `${sched?.email ?? 0} emails queue me, ${sent?.sent ?? 0} abhi bhej diye. Baaki apne aap jayenge.`,
+    );
+  };
+
+  /** Supply-side campaign: only manpower agencies, agents and counsellors. */
+  const supplyCampaign = async () => {
+    setBusy("supply-auto");
+    const { data: sched, error } = await supabase.functions.invoke("schedule-outreach", {
+      body: { channels: ["email"], kinds: ["supply"] },
+    });
+    if (error) {
+      setBusy(null);
+      toast.error("Partner campaign shuru nahi hui, dobara try karo.");
+      return;
+    }
+    const { data: sent } = await supabase.functions.invoke("process-outreach", { body: {} });
+    setBusy(null);
+    qc.invalidateQueries();
+    toast.success(
+      `${sched?.email ?? 0} partner emails queue me, ${sent?.sent ?? 0} abhi bhej diye.`,
     );
   };
 
@@ -170,6 +202,53 @@ const Outreach = () => {
           <Button onClick={flush} disabled={busy !== null} variant="outline">
             {busy === "flush" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
             Send due messages now
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Handshake className="h-5 w-5 text-primary" />
+            Supply partners outreach
+          </CardTitle>
+          <CardDescription>
+            Manpower agencies, recruitment agents aur study abroad / visa counsellors ko alag
+            partnership mail jata hai — hamare Europe job orders aur college seats ke saath.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button onClick={supplyCampaign} disabled={busy !== null} size="lg">
+            {busy === "supply-auto" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-2 h-4 w-4" />
+            )}
+            Auto send to partners ({ready?.supplyEmail ?? 0} emails)
+          </Button>
+          <Button
+            onClick={() => schedule(["email"], ["supply"], "supply-email")}
+            disabled={busy !== null}
+            variant="outline"
+          >
+            {busy === "supply-email" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Mail className="mr-2 h-4 w-4" />
+            )}
+            Queue partner emails ({ready?.supplyEmail ?? 0})
+          </Button>
+          <Button
+            onClick={() => schedule(["whatsapp"], ["supply"], "supply-wa")}
+            disabled={busy !== null}
+            variant="secondary"
+          >
+            {busy === "supply-wa" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <MessageCircle className="mr-2 h-4 w-4" />
+            )}
+            Queue partner WhatsApp ({ready?.supplyWa ?? 0})
           </Button>
         </CardContent>
       </Card>

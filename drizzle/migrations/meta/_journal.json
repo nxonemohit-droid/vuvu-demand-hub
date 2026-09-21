@@ -29,6 +29,13 @@
       "when": 1789919964869,
       "tag": "0003_add_ai_score_and_whatsapp_draft",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789980331114,
+      "tag": "0004_add_supply_lead_kind",
+      "breakpoints": true
     }
   ]
 }

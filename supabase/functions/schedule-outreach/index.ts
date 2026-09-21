@@ -47,6 +47,22 @@ function emailFor(lead: Record<string, string | null>) {
   const market = marketFor(country);
   const sector = lead.sector ? ` in ${lead.sector}` : "";
 
+  if (lead.kind === "supply") {
+    return {
+      subject: `Partnership: Europe job orders & college seats for ${company}`,
+      body: `${greeting}
+
+I am reaching out from Voynova Global Solutions. We work directly with employers and colleges in Europe and the Balkans — Latvia, Serbia, Cyprus and Estonia — where a work or study permit is usually completed within about two months.
+
+We are looking for sourcing partners in ${country} who can supply screened blue-collar candidates and students. We share the live job orders and admission seats; your team sources and pre-screens. We handle employer contracts, permits, visa paperwork and arrival support, with transparent commercials and no fee charged to the worker.
+
+Would a 15-minute call this week work to share our current requirements?
+
+Best regards,
+${SIGNATURE}`,
+    };
+  }
+
   if (lead.kind === "education") {
     return {
       subject: `Student pipeline from India & Nepal for ${company}`,
@@ -89,6 +105,9 @@ function whatsappFor(lead: Record<string, string | null>) {
   const first = (lead.contact_name ?? "").trim().split(/\s+/)[0];
   const hello = first ? `Hello ${first}` : "Hello";
   const company = lead.company ?? "your company";
+  if (lead.kind === "supply") {
+    return `${hello}, this is Mohit from Voynova Global Solutions. We hold live job orders and college seats in Europe (Latvia, Serbia, Cyprus, Estonia) and are looking for sourcing partners in ${lead.country}. Open to a short call about working together with ${company}? More: https://voynovaglobal.com`;
+  }
   if (lead.kind === "education") {
     return `${hello}, this is Mohit from Voynova Global Solutions. We place students from India and Nepal into short skill programmes in ${lead.country}. Can we send ${company} a first batch of screened applicants? More: https://voynovaglobal.com`;
   }
@@ -120,8 +139,17 @@ Deno.serve(async (req) => {
 
     const supa = adminClient();
 
+    // Optional filter so a campaign can target only one audience
+    // (employer / education / supply partners).
+    const kinds: string[] = Array.isArray(body.kinds)
+      ? body.kinds.filter((k: unknown): k is string =>
+          k === "employer" || k === "education" || k === "supply"
+        )
+      : [];
+
     let q = supa.from("leads").select("*").neq("stage", "rejected");
     if (leadIds) q = q.in("id", leadIds);
+    if (kinds.length) q = q.in("kind", kinds);
     const { data: leads, error } = await q.limit(1000);
     if (error) throw error;
 

@@ -30,7 +30,14 @@ type Lead = Record<string, string | number | null>;
 function leadFacts(lead: Lead): string {
   const m = marketFor(String(lead.country ?? ""));
   const rows: Array<[string, unknown]> = [
-    ["Type", lead.kind === "education" ? "College / vocational institute" : "Employer / recruiter"],
+    [
+      "Type",
+      lead.kind === "education"
+        ? "College / vocational institute"
+        : lead.kind === "supply"
+        ? "Manpower agency / recruitment agent / study-abroad counsellor (supply partner)"
+        : "Employer / recruiter",
+    ],
     ["Name", lead.company],
     ["Country", lead.country],
     ["City", lead.city],
@@ -71,7 +78,12 @@ function instructionFor(lead: Lead): string {
     "score: integer 0-100 for how good this lead is for Voynova right now. Judge on: is this really an employer of blue-collar workers or a vocational institute, does the country allow a work or study permit within about two months, is there a reachable decision maker and contact channel, and any hiring signal. A tiny shop, a consultancy, an agency competitor or a country with slow permits scores low.",
     "reason: one short sentence, max 20 words, explaining the score.",
   ];
-  if (lead.kind === "education") {
+  if (lead.kind === "supply") {
+    shared.push(
+      "Angle: this is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. Voynova holds confirmed employer and college demand in Europe and the Balkans (Latvia, Serbia, Cyprus, Estonia and nearby) and needs partners who can supply screened blue-collar candidates and students. Offer a simple partnership: Voynova shares live job orders and admission seats, the partner sources and pre-screens candidates, Voynova handles employer contracts, permit and visa paperwork and arrival support, with transparent commercials and an ethical no-worker-fee model.",
+      "For a supply partner, score on: do they actually mobilise blue-collar workers or students abroad, are they licensed or established, do they cover our source countries, and is a decision maker reachable.",
+    );
+  } else if (lead.kind === "education") {
     shared.push(
       "Angle: Voynova can send this institute screened, document-ready applicants from India and Nepal for their short skill / vocational programmes, handling document preparation, English readiness and visa paperwork so admissions receive complete files.",
     );
@@ -93,6 +105,24 @@ function fallback(lead: Lead): Draft {
   const company = lead.company ?? "your team";
   const country = lead.country ?? "Europe";
   const m = marketFor(String(country));
+
+  if (lead.kind === "supply") {
+    return {
+      subject: `Partnership: Europe job orders & college seats for ${company}`,
+      body: `${greeting}
+
+I am Mohit Gururani from Voynova Global Solutions. We work directly with employers and colleges in Europe and the Balkans — Latvia, Serbia, Cyprus and Estonia — where a work or study permit is usually completed within about two months.
+
+We are looking for sourcing partners in ${country}${lead.city ? `, around ${lead.city}` : ""} who can supply screened blue-collar candidates and students. We share the live job orders and admission seats; your team sources and pre-screens. We handle the employer contracts, permits, visa paperwork and arrival support, with transparent commercials and no fee charged to the worker.
+
+Would a 15-minute call this week work to share our current requirements?
+
+Best regards,`,
+      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We hold live job orders and college seats in Europe (Latvia, Serbia, Cyprus, Estonia) and are looking for sourcing partners in ${country}. Open to a short call about working together? More: https://voynovaglobal.com`,
+      score: null,
+      reason: null,
+    };
+  }
 
   if (lead.kind === "education") {
     return {
