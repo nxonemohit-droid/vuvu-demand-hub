@@ -19,6 +19,21 @@ export const MARKETS: Market[] = [
   { country: "Moldova", speed: "medium", days: "45–60 days", permit: "D visa (employment) + temporary stay", sectors: ["construction", "agriculture", "manufacturing"] },
 ];
 
+export type LeadKind = "employer" | "education" | "supply";
+
+/**
+ * Source countries for supply partners: manpower agencies, recruitment agents
+ * and study-abroad / visa counsellors who can send us workers and students.
+ */
+export const SUPPLY_COUNTRIES = [
+  "India",
+  "Nepal",
+  "Bangladesh",
+  "Sri Lanka",
+  "Uzbekistan",
+  "Philippines",
+];
+
 export const SECTORS = [
   "construction",
   "hospitality",
