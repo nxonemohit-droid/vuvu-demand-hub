@@ -67,6 +67,24 @@ export function pitchFor(country?: string | null): CountryPitch {
   return key ? COUNTRY_PITCHES[key] : DEFAULT_PITCH;
 }
 
+const WA_HOOKS: Record<string, string> = {
+  India:
+    "We work with eMigrate-registered agencies and education consultants in India",
+  Nepal: "We work with DoFE-licensed agencies in Nepal",
+  Bangladesh: "We work with BAIRA-member recruiting agencies in Bangladesh",
+  "Sri Lanka": "We work with SLBFE-licensed agencies in Sri Lanka",
+};
+
+/** Short WhatsApp first message for a recruiter lead, tuned per country. */
+export function recruiterWhatsApp(opts: {
+  hello: string;
+  company: string;
+  country: string;
+}): string {
+  const hook = WA_HOOKS[opts.country] ?? `We work with sourcing partners in ${opts.country}`;
+  return `${opts.hello}, this is Mohit from Voynova Global Solutions. ${hook}. We have live Europe job orders (Latvia, Serbia, Cyprus, Estonia) for blue-collar trades plus Learn & Earn college seats. Can we talk 15 minutes this week about a partnership with ${opts.company}? More: https://voynovaglobal.com`;
+}
+
 /** ---------------- Partner type ---------------- */
 
 export type PartnerTypeId = "manpower" | "agents" | "study" | "visa" | "other";
