@@ -78,7 +78,12 @@ function instructionFor(lead: Lead): string {
     "score: integer 0-100 for how good this lead is for Voynova right now. Judge on: is this really an employer of blue-collar workers or a vocational institute, does the country allow a work or study permit within about two months, is there a reachable decision maker and contact channel, and any hiring signal. A tiny shop, a consultancy, an agency competitor or a country with slow permits scores low.",
     "reason: one short sentence, max 20 words, explaining the score.",
   ];
-  if (lead.kind === "education") {
+  if (lead.kind === "supply") {
+    shared.push(
+      "Angle: this is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. Voynova holds confirmed employer and college demand in Europe and the Balkans (Latvia, Serbia, Cyprus, Estonia and nearby) and needs partners who can supply screened blue-collar candidates and students. Offer a simple partnership: Voynova shares live job orders and admission seats, the partner sources and pre-screens candidates, Voynova handles employer contracts, permit and visa paperwork and arrival support, with transparent commercials and an ethical no-worker-fee model.",
+      "For a supply partner, score on: do they actually mobilise blue-collar workers or students abroad, are they licensed or established, do they cover our source countries, and is a decision maker reachable.",
+    );
+  } else if (lead.kind === "education") {
     shared.push(
       "Angle: Voynova can send this institute screened, document-ready applicants from India and Nepal for their short skill / vocational programmes, handling document preparation, English readiness and visa paperwork so admissions receive complete files.",
     );
