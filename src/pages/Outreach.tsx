@@ -203,6 +203,53 @@ const Outreach = () => {
         </CardContent>
       </Card>
 
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Handshake className="h-5 w-5 text-primary" />
+            Supply partners outreach
+          </CardTitle>
+          <CardDescription>
+            Manpower agencies, recruitment agents aur study abroad / visa counsellors ko alag
+            partnership mail jata hai — hamare Europe job orders aur college seats ke saath.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button onClick={supplyCampaign} disabled={busy !== null} size="lg">
+            {busy === "supply-auto" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-2 h-4 w-4" />
+            )}
+            Auto send to partners ({ready?.supplyEmail ?? 0} emails)
+          </Button>
+          <Button
+            onClick={() => schedule(["email"], ["supply"], "supply-email")}
+            disabled={busy !== null}
+            variant="outline"
+          >
+            {busy === "supply-email" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Mail className="mr-2 h-4 w-4" />
+            )}
+            Queue partner emails ({ready?.supplyEmail ?? 0})
+          </Button>
+          <Button
+            onClick={() => schedule(["whatsapp"], ["supply"], "supply-wa")}
+            disabled={busy !== null}
+            variant="secondary"
+          >
+            {busy === "supply-wa" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <MessageCircle className="mr-2 h-4 w-4" />
+            )}
+            Queue partner WhatsApp ({ready?.supplyWa ?? 0})
+          </Button>
+        </CardContent>
+      </Card>
+
       <Alert>
         <CalendarClock className="h-4 w-4" />
         <AlertTitle>WhatsApp automatic sending</AlertTitle>
