@@ -105,6 +105,9 @@ function whatsappFor(lead: Record<string, string | null>) {
   const first = (lead.contact_name ?? "").trim().split(/\s+/)[0];
   const hello = first ? `Hello ${first}` : "Hello";
   const company = lead.company ?? "your company";
+  if (lead.kind === "supply") {
+    return `${hello}, this is Mohit from Voynova Global Solutions. We hold live job orders and college seats in Europe (Latvia, Serbia, Cyprus, Estonia) and are looking for sourcing partners in ${lead.country}. Open to a short call about working together with ${company}? More: https://voynovaglobal.com`;
+  }
   if (lead.kind === "education") {
     return `${hello}, this is Mohit from Voynova Global Solutions. We place students from India and Nepal into short skill programmes in ${lead.country}. Can we send ${company} a first batch of screened applicants? More: https://voynovaglobal.com`;
   }
