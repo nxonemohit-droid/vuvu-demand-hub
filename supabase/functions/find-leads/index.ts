@@ -301,7 +301,11 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const kind: "employer" | "education" = body.kind === "education" ? "education" : "employer";
+    const kind: LeadKind = body.kind === "education"
+      ? "education"
+      : body.kind === "supply"
+      ? "supply"
+      : "employer";
     const countries: string[] = Array.isArray(body.countries) ? body.countries : [];
     const sectors: string[] = Array.isArray(body.sectors) ? body.sectors : [];
     const keywords: string[] = Array.isArray(body.keywords) ? body.keywords : [];
