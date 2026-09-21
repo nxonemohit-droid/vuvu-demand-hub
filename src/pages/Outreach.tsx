@@ -64,17 +64,23 @@ const Outreach = () => {
   const { data: ready } = useQuery({
     queryKey: ["outreach-ready"],
     queryFn: async () => {
-      const email = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .not("email", "is", null)
-        .neq("stage", "rejected");
-      const wa = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .not("phone", "is", null)
-        .neq("stage", "rejected");
-      return { email: email.count ?? 0, whatsapp: wa.count ?? 0 };
+      const count = async (channel: "email" | "phone", kinds?: string[]) => {
+        let q = supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true })
+          .not(channel, "is", null)
+          .neq("stage", "rejected");
+        if (kinds) q = q.in("kind", kinds);
+        const { count: c } = await q;
+        return c ?? 0;
+      };
+      const [email, whatsapp, supplyEmail, supplyWa] = await Promise.all([
+        count("email"),
+        count("phone"),
+        count("email", ["supply"]),
+        count("phone", ["supply"]),
+      ]);
+      return { email, whatsapp, supplyEmail, supplyWa };
     },
     refetchInterval: 8000,
   });
