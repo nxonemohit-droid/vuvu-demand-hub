@@ -3,8 +3,8 @@ import { adminClient } from "../_shared/supabase.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM = Deno.env.get("RESEND_FROM_EMAIL") ?? "Voynova <onboarding@resend.dev>";
-const WA_PHONE_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
-const WA_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
+const WA_CONNECTOR_KEY = Deno.env.get("WHATSAPP_API_KEY");
 const WA_TEMPLATE = Deno.env.get("WHATSAPP_TEMPLATE_NAME");
 
 async function sendEmail(to: string, subject: string, body: string) {
@@ -25,8 +25,9 @@ async function sendEmail(to: string, subject: string, body: string) {
 }
 
 async function sendWhatsapp(to: string, body: string) {
-  if (!WA_PHONE_ID || !WA_TOKEN) throw new Error("WhatsApp not configured");
+  if (!LOVABLE_KEY || !WA_CONNECTOR_KEY) throw new Error("WhatsApp connector not configured");
   const digits = to.replace(/[^\d]/g, "");
+  if (digits.length < 8 || digits.length > 15) throw new Error("WhatsApp number is not valid E.164");
   const payload = WA_TEMPLATE
     ? {
         messaging_product: "whatsapp",
@@ -34,15 +35,19 @@ async function sendWhatsapp(to: string, body: string) {
         type: "template",
         template: {
           name: WA_TEMPLATE,
-          language: { code: "en" },
+          language: { code: "en_US" },
           components: [{ type: "body", parameters: [{ type: "text", text: body.slice(0, 900) }] }],
         },
       }
     : { messaging_product: "whatsapp", to: digits, type: "text", text: { body: body.slice(0, 4000) } };
 
-  const res = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+  const res = await fetch("https://connector-gateway.lovable.dev/whatsapp/messages", {
     method: "POST",
-    headers: { Authorization: `Bearer ${WA_TOKEN}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${LOVABLE_KEY}`,
+      "X-Connection-Api-Key": WA_CONNECTOR_KEY,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(payload),
   });
   const text = await res.text();
@@ -69,7 +74,7 @@ Deno.serve(async (req) => {
     let paused = 0;
 
     for (const row of due ?? []) {
-      if (row.channel === "whatsapp" && (!WA_PHONE_ID || !WA_TOKEN)) {
+      if (row.channel === "whatsapp" && (!LOVABLE_KEY || !WA_CONNECTOR_KEY)) {
         paused++;
         continue;
       }

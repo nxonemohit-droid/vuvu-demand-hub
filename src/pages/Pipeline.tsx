@@ -59,7 +59,7 @@ const Pipeline = () => {
       const { data, error } = await supabase
         .from("leads")
         .select("*")
-        .order("visa_fit_score", { ascending: false })
+        .order("ai_score", { ascending: false, nullsFirst: false })
         .limit(1000);
       if (error) throw error;
       return data;
@@ -99,7 +99,7 @@ const Pipeline = () => {
     const cols = [
       "company", "country", "city", "sector", "role", "contact_name", "contact_role",
       "email", "email_source", "phone", "whatsapp", "website", "address", "opening_hours",
-      "visa_speed", "visa_fit_score", "stage",
+      "visa_speed", "visa_fit_score", "ai_score", "ai_reason", "draft_whatsapp", "stage",
     ];
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const csv = [
@@ -119,7 +119,7 @@ const Pipeline = () => {
       <PageHeader
         step={3}
         title="Pipeline"
-        description="Har lead ka stage badlo aur uske liye personalised mail banao."
+        description="Gemini score dekho aur har lead ke liye personalised email aur WhatsApp message banao."
         action={
           <div className="flex gap-2">
             <Button onClick={draftBatch} disabled={drafting}>
@@ -128,7 +128,7 @@ const Pipeline = () => {
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              Personalised mails banao
+              Score + drafts banao
             </Button>
             <Button variant="outline" onClick={exportCsv}>
               <Download className="mr-2 h-4 w-4" /> Export CSV
@@ -257,7 +257,10 @@ const Pipeline = () => {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="font-semibold">{l.visa_fit_score}</TableCell>
+                        <TableCell>
+                          <div className="font-semibold">{l.ai_score ?? l.visa_fit_score}</div>
+                          {l.ai_reason && <div className="max-w-40 text-[11px] text-muted-foreground">{l.ai_reason}</div>}
+                        </TableCell>
                         <TableCell>
                           <Button
                             size="sm"
@@ -265,7 +268,7 @@ const Pipeline = () => {
                             onClick={() => setMailLead(l as unknown as MailLead)}
                           >
                             <Mail className="mr-2 h-4 w-4" />
-                            {l.draft_body ? "Draft dekho" : "Mail banao"}
+                            {l.draft_body ? "Drafts dekho" : "Drafts banao"}
                           </Button>
                         </TableCell>
                         <TableCell>
