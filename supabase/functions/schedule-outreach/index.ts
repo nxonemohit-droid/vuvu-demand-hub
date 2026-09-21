@@ -1,6 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient } from "../_shared/supabase.ts";
 import { marketFor } from "../_shared/markets.ts";
+import { pitchFor } from "../_shared/recruiters.ts";
 
 const IST_OFFSET_MIN = 330;
 const WINDOW_START = 9;
@@ -48,13 +49,16 @@ function emailFor(lead: Record<string, string | null>) {
   const sector = lead.sector ? ` in ${lead.sector}` : "";
 
   if (lead.kind === "supply") {
+    const pitch = pitchFor(country);
     return {
-      subject: `Partnership: Europe job orders & college seats for ${company}`,
+      subject: `${country} partnership: Europe job orders & Learn and Earn seats`,
       body: `${greeting}
 
-I am reaching out from Voynova Global Solutions. We work directly with employers and colleges in Europe and the Balkans — Latvia, Serbia, Cyprus and Estonia — where a work or study permit is usually completed within about two months.
+I am reaching out from Voynova Global Solutions. ${pitch.corridor}
 
-We are looking for sourcing partners in ${country} who can supply screened blue-collar candidates and students. We share the live job orders and admission seats; your team sources and pre-screens. We handle employer contracts, permits, visa paperwork and arrival support, with transparent commercials and no fee charged to the worker.
+${pitch.ask}
+
+Two things we can share with ${company} from week one: our live Europe job orders for blue-collar trades, and Learn & Earn college seats where students study and work alongside. ${pitch.proof}
 
 Would a 15-minute call this week work to share our current requirements?
 
