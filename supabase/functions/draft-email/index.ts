@@ -6,6 +6,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient } from "../_shared/supabase.ts";
 import { marketFor } from "../_shared/markets.ts";
 import { aiJson, aiProvider } from "../_shared/ai.ts";
+import { pitchFor } from "../_shared/recruiters.ts";
 
 const SIGNATURE = `Mohit Gururani
 Founder & CEO | Voynova Global Solutions Pvt. Ltd.
@@ -79,9 +80,12 @@ function instructionFor(lead: Lead): string {
     "reason: one short sentence, max 20 words, explaining the score.",
   ];
   if (lead.kind === "supply") {
+    const pitch = pitchFor(String(lead.country ?? ""));
     shared.push(
-      "Angle: this is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. Voynova holds confirmed employer and college demand in Europe and the Balkans (Latvia, Serbia, Cyprus, Estonia and nearby) and needs partners who can supply screened blue-collar candidates and students. Offer a simple partnership: Voynova shares live job orders and admission seats, the partner sources and pre-screens candidates, Voynova handles employer contracts, permit and visa paperwork and arrival support, with transparent commercials and an ethical no-worker-fee model.",
-      "For a supply partner, score on: do they actually mobilise blue-collar workers or students abroad, are they licensed or established, do they cover our source countries, and is a decision maker reachable.",
+      "Angle: this is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. Offer a simple partnership: Voynova shares live Europe job orders and Learn & Earn college seats, the partner sources and pre-screens candidates, Voynova handles employer contracts, permit and visa paperwork and arrival support.",
+      `Use this country-specific pitch, written for partners in ${lead.country ?? "South Asia"}: ${pitch.corridor} ${pitch.ask} ${pitch.proof}`,
+      "Mention both revenue lines clearly: (1) Europe blue-collar job orders, (2) Learn & Earn college seats for students who study and work alongside.",
+      "For a supply partner, score on: do they actually mobilise blue-collar workers or students abroad, are they licensed or registered with the local regulator, do they cover our source countries, and is a decision maker reachable.",
     );
   } else if (lead.kind === "education") {
     shared.push(
