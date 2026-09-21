@@ -2894,7 +2894,7 @@ export type Database = {
         | "in_progress"
         | "converted"
         | "rejected"
-      lead_kind: "employer" | "education"
+      lead_kind: "employer" | "education" | "supply"
       lead_stage:
         | "new"
         | "contacted"
@@ -3085,7 +3085,7 @@ export const Constants = {
         "converted",
         "rejected",
       ],
-      lead_kind: ["employer", "education"],
+      lead_kind: ["employer", "education", "supply"],
       lead_stage: [
         "new",
         "contacted",
