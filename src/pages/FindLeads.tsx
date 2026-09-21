@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MARKETS, SECTORS } from "@/lib/markets";
+import { MARKETS, SECTORS, SUPPLY_COUNTRIES, type LeadKind } from "@/lib/markets";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -23,7 +23,7 @@ const ALL_COUNTRIES = MARKETS.map((m) => m.country);
 
 const FindLeads = () => {
   const qc = useQueryClient();
-  const [kind, setKind] = useState<"employer" | "education">("employer");
+  const [kind, setKind] = useState<LeadKind>("employer");
   const [countries, setCountries] = useState<string[]>(FOCUS);
   const [sectors, setSectors] = useState<string[]>(["construction", "hospitality"]);
   const [keywords, setKeywords] = useState("");
