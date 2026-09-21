@@ -64,7 +64,10 @@ const Outreach = () => {
   const { data: ready } = useQuery({
     queryKey: ["outreach-ready"],
     queryFn: async () => {
-      const count = async (channel: "email" | "phone", kinds?: string[]) => {
+      const count = async (
+        channel: "email" | "phone",
+        kinds?: Array<"employer" | "education" | "supply">,
+      ) => {
         let q = supabase
           .from("leads")
           .select("id", { count: "exact", head: true })
