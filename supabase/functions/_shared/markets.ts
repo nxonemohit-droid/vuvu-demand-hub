@@ -25,6 +25,22 @@ export const MARKETS: Market[] = [
 
 export const COUNTRY_NAMES = MARKETS.map((m) => m.country);
 
+/** Kinds of leads the engine can discover. */
+export type LeadKind = "employer" | "education" | "supply";
+
+/**
+ * Supply-side source countries: where manpower agencies, recruitment agents and
+ * study-abroad / visa counsellors who can supply workers and students sit.
+ */
+export const SUPPLY_COUNTRIES = [
+  "India",
+  "Nepal",
+  "Bangladesh",
+  "Sri Lanka",
+  "Uzbekistan",
+  "Philippines",
+];
+
 export function marketFor(country: string | null | undefined): Market | undefined {
   if (!country) return undefined;
   const c = country.trim().toLowerCase();
