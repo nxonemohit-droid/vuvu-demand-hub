@@ -111,18 +111,21 @@ function fallback(lead: Lead): Draft {
   const m = marketFor(String(country));
 
   if (lead.kind === "supply") {
+    const pitch = pitchFor(String(country));
     return {
-      subject: `Partnership: Europe job orders & college seats for ${company}`,
+      subject: `${country} partnership: Europe job orders & Learn and Earn seats`,
       body: `${greeting}
 
-I am Mohit Gururani from Voynova Global Solutions. We work directly with employers and colleges in Europe and the Balkans — Latvia, Serbia, Cyprus and Estonia — where a work or study permit is usually completed within about two months.
+I am Mohit Gururani from Voynova Global Solutions. ${pitch.corridor}
 
-We are looking for sourcing partners in ${country}${lead.city ? `, around ${lead.city}` : ""} who can supply screened blue-collar candidates and students. We share the live job orders and admission seats; your team sources and pre-screens. We handle the employer contracts, permits, visa paperwork and arrival support, with transparent commercials and no fee charged to the worker.
+${pitch.ask}${lead.city ? ` We are currently expanding around ${lead.city}.` : ""}
+
+Two things we can share with ${company} from week one: our live Europe job orders for blue-collar trades, and Learn & Earn college seats where students study and work alongside. ${pitch.proof}
 
 Would a 15-minute call this week work to share our current requirements?
 
 Best regards,`,
-      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We hold live job orders and college seats in Europe (Latvia, Serbia, Cyprus, Estonia) and are looking for sourcing partners in ${country}. Open to a short call about working together? More: https://voynovaglobal.com`,
+      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We have live Europe job orders (Latvia, Serbia, Cyprus, Estonia) and Learn & Earn college seats, and we are adding sourcing partners in ${country}. Can we talk for 15 minutes this week about working with ${company}? More: https://voynovaglobal.com`,
       score: null,
       reason: null,
     };
