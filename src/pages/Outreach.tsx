@@ -178,8 +178,8 @@ const Outreach = () => {
         <CalendarClock className="h-4 w-4" />
         <AlertTitle>WhatsApp automatic sending</AlertTitle>
         <AlertDescription>
-          WhatsApp messages queue ho jate hain, par bhejna tab shuru hoga jab tera WhatsApp Business
-          account jud jayega. Tab tak email poora chalta rahega.
+          WhatsApp messages queue ho jate hain. Business-initiated messages approved Meta template se
+          connector ke through jayenge; connection hone tak WhatsApp queue paused rahegi.
         </AlertDescription>
       </Alert>
 

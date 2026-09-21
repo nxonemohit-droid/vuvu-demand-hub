@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Sparkles, Send } from "lucide-react";
+import { Loader2, MessageCircle, Sparkles, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,11 @@ export type MailLead = {
   trades: string | null;
   draft_subject: string | null;
   draft_body: string | null;
+  draft_whatsapp: string | null;
+  ai_score: number | null;
+  ai_reason: string | null;
+  phone: string | null;
+  whatsapp: string | null;
 };
 
 type Props = {
@@ -42,11 +47,17 @@ type Props = {
 export const LeadMailDialog = ({ lead, onClose, onSaved }: Props) => {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [busy, setBusy] = useState<"draft" | "save" | "queue" | null>(null);
+  const [whatsapp, setWhatsapp] = useState("");
+  const [score, setScore] = useState<number | null>(null);
+  const [reason, setReason] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"draft" | "save" | "queue" | "whatsapp" | null>(null);
 
   useEffect(() => {
     setSubject(lead?.draft_subject ?? "");
     setBody(lead?.draft_body ?? "");
+    setWhatsapp(lead?.draft_whatsapp ?? "");
+    setScore(lead?.ai_score ?? null);
+    setReason(lead?.ai_reason ?? null);
   }, [lead]);
 
   if (!lead) return null;
@@ -63,14 +74,24 @@ export const LeadMailDialog = ({ lead, onClose, onSaved }: Props) => {
     }
     setSubject(data.drafts[0].subject);
     setBody(data.drafts[0].body);
-    toast.success("Personalised mail ready hai — padh ke edit kar lo.");
+    setWhatsapp(data.drafts[0].whatsapp ?? "");
+    setScore(data.drafts[0].score ?? null);
+    setReason(data.drafts[0].reason ?? null);
+    toast.success("Score, email aur WhatsApp draft ready hain.");
   };
 
   const save = async () => {
     setBusy("save");
     const { error } = await supabase
       .from("leads")
-      .update({ draft_subject: subject, draft_body: body, drafted_at: new Date().toISOString() })
+      .update({
+        draft_subject: subject,
+        draft_body: body,
+        draft_whatsapp: whatsapp,
+        ai_score: score,
+        ai_reason: reason,
+        drafted_at: new Date().toISOString(),
+      })
       .eq("id", lead.id);
     setBusy(null);
     if (error) {
@@ -89,7 +110,7 @@ export const LeadMailDialog = ({ lead, onClose, onSaved }: Props) => {
     setBusy("queue");
     const { error: saveErr } = await supabase
       .from("leads")
-      .update({ draft_subject: subject, draft_body: body, drafted_at: new Date().toISOString() })
+      .update({ draft_subject: subject, draft_body: body, draft_whatsapp: whatsapp, ai_score: score, ai_reason: reason, drafted_at: new Date().toISOString() })
       .eq("id", lead.id);
     if (saveErr) {
       setBusy(null);
@@ -105,6 +126,38 @@ export const LeadMailDialog = ({ lead, onClose, onSaved }: Props) => {
       return;
     }
     toast.success("Mail queue me add ho gaya.");
+    onSaved();
+    onClose();
+  };
+
+  const queueWhatsapp = async () => {
+    if (!(lead.whatsapp ?? lead.phone)) {
+      toast.error("Is lead pe WhatsApp number nahi hai.");
+      return;
+    }
+    if (!whatsapp) {
+      toast.error("Pehle personalised message banao.");
+      return;
+    }
+    setBusy("whatsapp");
+    const { error: saveErr } = await supabase
+      .from("leads")
+      .update({ draft_whatsapp: whatsapp, ai_score: score, ai_reason: reason, drafted_at: new Date().toISOString() })
+      .eq("id", lead.id);
+    if (saveErr) {
+      setBusy(null);
+      toast.error("WhatsApp draft save nahi hua.");
+      return;
+    }
+    const { error } = await supabase.functions.invoke("schedule-outreach", {
+      body: { lead_ids: [lead.id], channels: ["whatsapp"] },
+    });
+    setBusy(null);
+    if (error) {
+      toast.error("WhatsApp queue nahi hua.");
+      return;
+    }
+    toast.success("WhatsApp message queue me add ho gaya.");
     onSaved();
     onClose();
   };
@@ -133,6 +186,15 @@ export const LeadMailDialog = ({ lead, onClose, onSaved }: Props) => {
           </div>
         )}
 
+        {score !== null && (
+          <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3">
+            <Badge variant={score >= 70 ? "default" : score >= 45 ? "secondary" : "outline"}>
+              AI score {score}/100
+            </Badge>
+            {reason && <p className="text-xs text-muted-foreground">{reason}</p>}
+          </div>
+        )}
+
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="mail-subject">Subject</Label>
@@ -141,6 +203,16 @@ export const LeadMailDialog = ({ lead, onClose, onSaved }: Props) => {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Abhi koi draft nahi — Generate dabao"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="whatsapp-body">WhatsApp message</Label>
+            <Textarea
+              id="whatsapp-body"
+              value={whatsapp}
+              onChange={(e) => setWhatsapp(e.target.value)}
+              rows={5}
+              placeholder="Generate dabao — personalised WhatsApp message yahan aayega"
             />
           </div>
           <div className="space-y-1.5">
@@ -177,6 +249,10 @@ export const LeadMailDialog = ({ lead, onClose, onSaved }: Props) => {
                 <Send className="mr-2 h-4 w-4" />
               )}
               Queue mail
+            </Button>
+            <Button variant="secondary" onClick={queueWhatsapp} disabled={busy !== null || !whatsapp || !(lead.whatsapp ?? lead.phone)}>
+              {busy === "whatsapp" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
+              Queue WhatsApp
             </Button>
           </div>
         </DialogFooter>

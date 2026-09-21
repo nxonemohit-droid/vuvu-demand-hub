@@ -85,6 +85,7 @@ ${SIGNATURE}`,
 }
 
 function whatsappFor(lead: Record<string, string | null>) {
+  if (lead.draft_whatsapp) return lead.draft_whatsapp;
   const first = (lead.contact_name ?? "").trim().split(/\s+/)[0];
   const hello = first ? `Hello ${first}` : "Hello";
   const company = lead.company ?? "your company";
@@ -102,9 +103,18 @@ Deno.serve(async (req) => {
     const leadIds: string[] | null = Array.isArray(body.lead_ids) && body.lead_ids.length
       ? body.lead_ids
       : null;
+    const allowedChannels = new Set(["email", "whatsapp"]);
     const channels: string[] = Array.isArray(body.channels) && body.channels.length
-      ? body.channels
+      ? body.channels.filter((channel: unknown): channel is string =>
+          typeof channel === "string" && allowedChannels.has(channel)
+        )
       : ["email", "whatsapp"];
+    if (!channels.length) {
+      return new Response(JSON.stringify({ error: "Choose email or WhatsApp" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const dailyCap = Math.min(Number(body.daily_cap) || 50, 200);
     const dryRun = body.dry_run === true;
 
