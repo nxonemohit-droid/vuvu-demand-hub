@@ -123,12 +123,24 @@ export function buildQueries(
 
 /** Plain-language queries for Google Maps Places text search. */
 export function buildMapsQueries(
-  kind: "employer" | "education",
+  kind: LeadKind,
   countries: string[],
   sectors: string[],
 ): string[] {
   const out: string[] = [];
   for (const country of countries) {
+    if (kind === "supply") {
+      const places = SUPPLY_CITIES[country] ?? [country];
+      for (const place of places) {
+        out.push(
+          `manpower recruitment agency in ${place}`,
+          `overseas employment agency in ${place}`,
+          `study abroad consultant in ${place}`,
+          `visa consultant in ${place}`,
+        );
+      }
+      continue;
+    }
     if (kind === "education") {
       out.push(
         `vocational college in ${country}`,
