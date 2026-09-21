@@ -176,6 +176,7 @@ export function isUsefulUrl(url: string): boolean {
 }
 
 export function scoreLead(lead: {
+  kind?: string | null;
   country?: string | null;
   sector?: string | null;
   email?: string | null;
@@ -187,7 +188,10 @@ export function scoreLead(lead: {
 }): number {
   let s = 0;
   const m = marketFor(lead.country);
-  if (m) s += m.speed === "fast" ? 30 : 18;
+  // Supply-side partners sit in source countries, so the Europe permit speed
+  // does not apply — give them a flat base instead.
+  if (lead.kind === "supply") s += 28;
+  else if (m) s += m.speed === "fast" ? 30 : 18;
   if (m && lead.sector && m.sectors.includes(lead.sector.toLowerCase())) s += 15;
   if (lead.email && lead.email.includes("@")) s += 25;
   if (lead.whatsapp || lead.phone) s += 12;
