@@ -139,8 +139,17 @@ Deno.serve(async (req) => {
 
     const supa = adminClient();
 
+    // Optional filter so a campaign can target only one audience
+    // (employer / education / supply partners).
+    const kinds: string[] = Array.isArray(body.kinds)
+      ? body.kinds.filter((k: unknown): k is string =>
+          k === "employer" || k === "education" || k === "supply"
+        )
+      : [];
+
     let q = supa.from("leads").select("*").neq("stage", "rejected");
     if (leadIds) q = q.in("id", leadIds);
+    if (kinds.length) q = q.in("kind", kinds);
     const { data: leads, error } = await q.limit(1000);
     if (error) throw error;
 
