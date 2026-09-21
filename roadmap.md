@@ -12,3 +12,5 @@
 - [x] Apify, Google CSE, Firecrawl and website fallbacks in lead discovery/enrichment
 - [x] Google Maps Places (New) as primary lead source
 - [x] Paid Gemini key for AI scoring + personalised email/WhatsApp drafting
+- [x] Supply-side leads (`supply` kind): manpower agencies, agents, study abroad / visa counsellors in India, Nepal, Bangladesh, Sri Lanka, Uzbekistan, Philippines
+- [x] Separate partnership outreach block (email + WhatsApp, `kinds: ["supply"]` filter in schedule-outreach)
