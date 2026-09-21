@@ -26,20 +26,19 @@ async function sendEmail(to: string, subject: string, body: string) {
 
 async function sendWhatsapp(to: string, body: string) {
   if (!LOVABLE_KEY || !WA_CONNECTOR_KEY) throw new Error("WhatsApp connector not configured");
+  if (!WA_TEMPLATE) throw new Error("Approved WhatsApp template not configured");
   const digits = to.replace(/[^\d]/g, "");
   if (digits.length < 8 || digits.length > 15) throw new Error("WhatsApp number is not valid E.164");
-  const payload = WA_TEMPLATE
-    ? {
-        messaging_product: "whatsapp",
-        to: digits,
-        type: "template",
-        template: {
-          name: WA_TEMPLATE,
-          language: { code: "en_US" },
-          components: [{ type: "body", parameters: [{ type: "text", text: body.slice(0, 900) }] }],
-        },
-      }
-    : { messaging_product: "whatsapp", to: digits, type: "text", text: { body: body.slice(0, 4000) } };
+  const payload = {
+    messaging_product: "whatsapp",
+    to: digits,
+    type: "template",
+    template: {
+      name: WA_TEMPLATE,
+      language: { code: "en_US" },
+      components: [{ type: "body", parameters: [{ type: "text", text: body.slice(0, 900) }] }],
+    },
+  };
 
   const res = await fetch("https://connector-gateway.lovable.dev/whatsapp/messages", {
     method: "POST",
@@ -108,7 +107,7 @@ Deno.serve(async (req) => {
         sent++;
       } catch (e) {
         const msg = String(e);
-        const retryable = msg.includes("429") || msg.includes("5 0") || /\s5\d\d:/.test(msg);
+        const retryable = msg.includes("429") || /\s5\d\d:/.test(msg);
         const attempts = row.attempts + 1;
         await supa
           .from("outreach_sends")
