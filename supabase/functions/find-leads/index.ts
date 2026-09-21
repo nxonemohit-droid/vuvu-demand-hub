@@ -1,6 +1,13 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient, sha256Hex, extractDomain } from "../_shared/supabase.ts";
-import { buildQueries, buildMapsQueries, isUsefulUrl, marketFor, scoreLead } from "../_shared/markets.ts";
+import {
+  buildQueries,
+  buildMapsQueries,
+  isUsefulUrl,
+  marketFor,
+  scoreLead,
+  type LeadKind,
+} from "../_shared/markets.ts";
 
 const CSE_KEY = Deno.env.get("GOOGLE_CSE_API_KEY");
 const CSE_ID = Deno.env.get("GOOGLE_CSE_ID");

@@ -30,7 +30,14 @@ type Lead = Record<string, string | number | null>;
 function leadFacts(lead: Lead): string {
   const m = marketFor(String(lead.country ?? ""));
   const rows: Array<[string, unknown]> = [
-    ["Type", lead.kind === "education" ? "College / vocational institute" : "Employer / recruiter"],
+    [
+      "Type",
+      lead.kind === "education"
+        ? "College / vocational institute"
+        : lead.kind === "supply"
+        ? "Manpower agency / recruitment agent / study-abroad counsellor (supply partner)"
+        : "Employer / recruiter",
+    ],
     ["Name", lead.company],
     ["Country", lead.country],
     ["City", lead.city],
