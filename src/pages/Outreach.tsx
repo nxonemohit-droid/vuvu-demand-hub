@@ -131,6 +131,25 @@ const Outreach = () => {
     );
   };
 
+  /** Supply-side campaign: only manpower agencies, agents and counsellors. */
+  const supplyCampaign = async () => {
+    setBusy("supply-auto");
+    const { data: sched, error } = await supabase.functions.invoke("schedule-outreach", {
+      body: { channels: ["email"], kinds: ["supply"] },
+    });
+    if (error) {
+      setBusy(null);
+      toast.error("Partner campaign shuru nahi hui, dobara try karo.");
+      return;
+    }
+    const { data: sent } = await supabase.functions.invoke("process-outreach", { body: {} });
+    setBusy(null);
+    qc.invalidateQueries();
+    toast.success(
+      `${sched?.email ?? 0} partner emails queue me, ${sent?.sent ?? 0} abhi bhej diye.`,
+    );
+  };
+
   const flush = async () => {
     const data = await run("process-outreach", {}, "flush");
     if (!data) return;
