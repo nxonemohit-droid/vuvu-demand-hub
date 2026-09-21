@@ -225,6 +225,10 @@ const Recruiters = () => {
           </div>
         )}
       </div>
+
+      <RecruiterDuplicates />
+
+      <RecruiterPipeline countries={ALL_COUNTRIES} />
     </div>
   );
 };
