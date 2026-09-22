@@ -21,4 +21,4 @@
 - [x] Recruiter pipeline stages: New, Qualified, Contacted, Replied, Meeting booked, Partner onboarded
 - [x] Duplicate detection + merge for recruiter leads (email, phone, website, agency name) via `recruiter-tools`
 - [x] 0–100 partner priority score (country, partner type, contact quality, supply capacity)
-- [ ] WhatsApp outreach start: template create + approve, WHATSAPP_TEMPLATE_NAME secret, queue WhatsApp for recruiters, resume engine (in progress; number +91 98705 88554 connected, quality GREEN)
+- [ ] WhatsApp outreach start: BLOCKED on Meta template approval ("voynova_partner_outreach", PENDING, id 1404794471810490) — connection +91 98705 88554 linked (GREEN), WHATSAPP_TEMPLATE_NAME secret set. After approval: test send + queue WhatsApp for recruiters + resume engine
