@@ -1,4 +1,4 @@
-# Recruiter Auto-Mail Engine (India / Nepal / Bangladesh / Sri Lanka partners)
+# ARecruiter Auto-Mail Engine (India / Nepal / Bangladesh / Sri Lanka partners)
 
 Sirf **recruiter (supply) leads** ke liye automatic mail chalu hoga. Employer aur college leads is automation se bahar rahenge.
 
@@ -89,4 +89,4 @@ WhatsApp message bhi isi tone me, 60 word ke andar, service charge line ke saath
 1. Upar wala mail draft theek hai? Kuch add/hataana ho to batao.
 2. 60 second gap thik hai ya 30 second hi chahiye?
 
-Aap "ok" bologe tabhi implement karunga aur mail chalu honge.
+Aap "ok" bologe tabhi implement karunga aur mail chalu honge.bhai make it more detailed and focus about the features and add its free for and also add aboit suppliier dashboard full details from voynovaglobal.com
