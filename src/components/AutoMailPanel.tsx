@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Pause, Play, Sparkles, Radio } from "lucide-react";
+import { Loader2, Pause, Play, Sparkles, Radio, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,24 @@ const fmtTime = (iso: string | null | undefined) =>
 export const AutoMailPanel = () => {
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
+  const [showSample, setShowSample] = useState(false);
+
+  const { data: sample } = useQuery({
+    queryKey: ["recruiter-sample-draft"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("id, company, country, draft_subject, draft_body")
+        .eq("kind", "supply")
+        .is("merged_into", null)
+        .not("draft_body", "is", null)
+        .order("drafted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: settings } = useQuery({
     queryKey: ["outreach-settings"],
