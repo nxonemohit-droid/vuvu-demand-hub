@@ -152,6 +152,41 @@ async function firecrawlSearch(q: string): Promise<Hit[]> {
   }
 }
 
+/**
+ * Perplexity Search (connector gateway, managed connection — /search only).
+ * Returns rich snippets that often carry contact emails and phone numbers.
+ */
+async function perplexitySearch(q: string): Promise<Hit[]> {
+  if (!PERPLEXITY_KEY || !LOVABLE_KEY) return [];
+  try {
+    const res = await fetch(`${PPLX_GATEWAY}/search`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_KEY}`,
+        "X-Connection-Api-Key": PERPLEXITY_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query: q, max_results: 8 }),
+    });
+    if (!res.ok) {
+      const body = (await res.text()).slice(0, 300);
+      console.error(`Perplexity search ${res.status}: ${body}`);
+      if (res.status !== 402 && res.status !== 403) return []; // 402/403 surfaced via noteError
+      noteError("Perplexity", res.status, body);
+      return [];
+    }
+    const data = await res.json();
+    return (data.results ?? []).map((r: Record<string, string>) => ({
+      url: r.url,
+      title: r.title ?? "",
+      snippet: r.snippet ?? "",
+    }));
+  } catch (e) {
+    console.error("Perplexity search error", e);
+    return [];
+  }
+}
+
 function stripTags(v: string): string {
   return v.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&#x27;/g, "'")
     .replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
