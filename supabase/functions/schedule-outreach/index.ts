@@ -227,7 +227,9 @@ Deno.serve(async (req) => {
     }
 
     if (!dryRun && rows.length) {
-      const { error: insErr } = await supa.from("outreach_sends").insert(rows);
+      const { error: insErr } = await supa
+        .from("outreach_sends")
+        .upsert(rows, { onConflict: "lead_id,channel", ignoreDuplicates: true });
       if (insErr) throw insErr;
     }
 
