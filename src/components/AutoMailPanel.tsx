@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Pause, Play, Sparkles, Radio } from "lucide-react";
+import { Loader2, Pause, Play, Sparkles, Radio, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,24 @@ const fmtTime = (iso: string | null | undefined) =>
 export const AutoMailPanel = () => {
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
+  const [showSample, setShowSample] = useState(false);
+
+  const { data: sample } = useQuery({
+    queryKey: ["recruiter-sample-draft"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("id, company, country, draft_subject, draft_body")
+        .eq("kind", "supply")
+        .is("merged_into", null)
+        .not("draft_body", "is", null)
+        .order("drafted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: settings } = useQuery({
     queryKey: ["outreach-settings"],
@@ -233,6 +251,29 @@ export const AutoMailPanel = () => {
           Agla mail: <span className="font-medium text-foreground">{fmtTime(stats?.nextAt)}</span>
           {settings?.last_sent_at ? ` · Pichla mail: ${fmtTime(settings.last_sent_at)}` : ""}
         </p>
+
+        <div className="space-y-2">
+          <Button variant="outline" size="sm" onClick={() => setShowSample((s) => !s)}>
+            <Eye className="mr-2 h-3 w-3" />
+            {showSample ? "Sample draft chhupao" : "Sample draft dekho — jo mail sabko jayega"}
+          </Button>
+          {showSample &&
+            (sample ? (
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <p className="text-xs text-muted-foreground">
+                  Example: {sample.company} ({sample.country})
+                </p>
+                <p className="mt-1 text-sm font-semibold">Subject: {sample.draft_subject}</p>
+                <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-background p-3 text-xs leading-relaxed">
+                  {sample.draft_body}
+                </pre>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Abhi koi partner draft ready nahi hai — "Auto-mail chalu karo" dabate hi Gemini drafts bana dega.
+              </p>
+            ))}
+        </div>
 
         <div className="flex flex-wrap gap-3">
           <Button onClick={start} disabled={busy !== null} size="lg">
