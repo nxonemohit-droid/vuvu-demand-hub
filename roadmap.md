@@ -6,6 +6,7 @@
 - [x] Edge functions: find-leads, enrich-lead, draft-email, schedule-outreach, process-outreach
 - [x] UI: Find Leads / Outreach / Pipeline (3 screens) + export
 - [x] Cron for process-outreach
+- [ ] Outreach page: Gemini drafts block — personalised drafts list + preview + edit + queue (in progress; background drafting of ~496 email leads running)
 - [ ] BLOCKED: WhatsApp Business connector — Meta Embedded Signup must be completed in desktop Chrome for +91 9650645553
 - [ ] Drop legacy tables (needs user to run DROP in SQL editor — migration tool blocks drops)
 - [x] Light, friendly UI theme across all screens
