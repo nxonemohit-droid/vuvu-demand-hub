@@ -6,7 +6,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient } from "../_shared/supabase.ts";
 import { marketFor } from "../_shared/markets.ts";
 import { aiJson, aiProvider } from "../_shared/ai.ts";
-import { pitchFor } from "../_shared/recruiters.ts";
+import { pitchFor, recruiterMasterEmail } from "../_shared/recruiters.ts";
 
 const SIGNATURE = `Mohit Gururani
 Founder & CEO | Voynova Global Solutions Pvt. Ltd.
