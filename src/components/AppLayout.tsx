@@ -13,35 +13,29 @@ import {
 import { cn } from "@/lib/utils";
 
 const VArrowLogo = ({ className }: { className?: string }) => {
-  const gid = useId().replace(/:/g, "");
+  useId();
   return (
     <svg viewBox="0 0 32 32" fill="none" className={className}>
       <path
         d="M4 24 L16 8 L28 24"
-        stroke={`url(#${gid})`}
+        stroke="currentColor"
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
         d="M16 8 L16 3"
-        stroke={`url(#${gid})`}
+        stroke="currentColor"
         strokeWidth="3"
         strokeLinecap="round"
       />
       <path
         d="M12.5 6 L16 2 L19.5 6"
-        stroke={`url(#${gid})`}
+        stroke="currentColor"
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="32" y2="0">
-          <stop offset="0%" stopColor="#C9A84C" />
-          <stop offset="100%" stopColor="#8B6914" />
-        </linearGradient>
-      </defs>
     </svg>
   );
 };
@@ -74,20 +68,22 @@ export const AppLayout = () => {
   const primaryRole = roles[0] ?? "bd";
 
   return (
-    <div className="min-h-screen flex bg-muted/20">
-      <aside className="w-64 shrink-0 border-r bg-background flex flex-col">
-        <div className="px-5 py-5 border-b flex items-center gap-2.5">
-          <VArrowLogo className="h-9 w-9 shrink-0" />
-          <div className="leading-tight">
-            <div className="font-extrabold text-[15px] bg-gradient-to-r from-[#C9A84C] to-[#8B6914] bg-clip-text text-transparent tracking-wide">
+    <div className="min-h-screen flex bg-background">
+      <aside className="sticky top-0 h-screen w-20 md:w-64 shrink-0 border-r border-sidebar-border bg-sidebar flex flex-col">
+        <div className="h-20 px-4 md:px-6 border-b border-sidebar-border flex items-center justify-center md:justify-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <VArrowLogo className="h-7 w-7" />
+          </div>
+          <div className="hidden md:block leading-tight">
+            <div className="font-extrabold text-[15px] text-foreground tracking-wide">
               VOYNOVA
             </div>
-            <div className="font-bold text-[10px] bg-gradient-to-r from-[#C9A84C] to-[#8B6914] bg-clip-text text-transparent tracking-[0.15em] uppercase">
+            <div className="font-semibold text-[10px] text-primary tracking-[0.15em] uppercase">
               Global Solutions
             </div>
           </div>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 md:p-4 space-y-1.5">
           {navItems
             .map((item) => (
               <NavLink
@@ -95,20 +91,20 @@ export const AppLayout = () => {
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                    "flex h-10 items-center justify-center md:justify-start gap-3 px-3 rounded-lg text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-foreground/70 hover:bg-muted hover:text-foreground"
+                      ? "bg-sidebar-accent text-primary"
+                      : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
                   )
                 }
               >
-                <item.icon className="h-4 w-4" />
-                {item.label}
+                <item.icon className="h-4 w-4 shrink-0" />
+                <span className="hidden md:inline">{item.label}</span>
               </NavLink>
             ))}
         </nav>
-        <div className="p-3 border-t space-y-2">
-          <div className="px-2 text-xs">
+        <div className="p-3 md:p-4 border-t border-sidebar-border space-y-2">
+          <div className="hidden md:block rounded-lg bg-sidebar-accent/60 px-3 py-2.5 text-xs">
             <div className="font-medium truncate">{user.email}</div>
             <Badge variant="secondary" className="mt-1 capitalize">
               {primaryRole}
@@ -117,17 +113,17 @@ export const AppLayout = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start gap-2"
+            className="w-full justify-center md:justify-start gap-2 text-muted-foreground"
             onClick={async () => {
               await signOut();
               navigate("/auth", { replace: true });
             }}
           >
-            <LogOut className="h-4 w-4" /> Sign out
+            <LogOut className="h-4 w-4" /> <span className="hidden md:inline">Sign out</span>
           </Button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">
+      <main className="min-w-0 flex-1 overflow-auto">
         <Outlet />
       </main>
       <ShortcutHelpButton />

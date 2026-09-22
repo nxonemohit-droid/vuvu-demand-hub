@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Pause, Play, Sparkles, Radio, Eye } from "lucide-react";
+import { Loader2, Pause, Play, Sparkles, Radio, Eye, Users, FileText, ListChecks, Send, CircleAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -215,23 +215,28 @@ export const AutoMailPanel = () => {
   const running = settings?.status === "running";
 
   return (
-    <Card className="border-primary/30">
-      <CardHeader>
+    <Card className="overflow-hidden border-primary/20">
+      <CardHeader className="border-b border-primary/10 bg-primary/5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Radio className="h-4 w-4 text-primary" />
-              Recruiter auto-mail engine
-            </CardTitle>
-            <CardDescription>
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+              <Radio className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle>Recruiter auto-mail engine</CardTitle>
+              <CardDescription className="mt-1 max-w-3xl leading-5">
               Sirf recruiter partners (India, Nepal, Bangladesh, Sri Lanka) ko mail — har 60 second me ek,
               Mon–Fri 9:00–18:00 IST, roz max {settings?.daily_cap ?? 150}.
-            </CardDescription>
+              </CardDescription>
+            </div>
           </div>
-          <Badge variant={running ? "default" : "outline"}>{running ? "Chal raha hai" : "Band hai"}</Badge>
+          <Badge variant={running ? "default" : "outline"} className="h-7 px-3">
+            <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${running ? "bg-primary-foreground" : "bg-muted-foreground"}`} />
+            {running ? "Chal raha hai" : "Band hai"}
+          </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5 pt-5 md:pt-6">
         {settings?.pause_reason && !running && (
           <Alert>
             <AlertTitle>Engine rukka hua hai</AlertTitle>
@@ -239,12 +244,12 @@ export const AutoMailPanel = () => {
           </Alert>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-5">
-          <Stat label="Partners (email)" value={stats?.partners} />
-          <Stat label="Drafts ready" value={stats?.drafted} />
-          <Stat label="Queue me" value={stats?.pending} />
-          <Stat label="Aaj gaye" value={stats?.sentToday} />
-          <Stat label="Fail" value={stats?.failed} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <Stat icon={Users} label="Partners (email)" value={stats?.partners} />
+          <Stat icon={FileText} label="Drafts ready" value={stats?.drafted} />
+          <Stat icon={ListChecks} label="Queue me" value={stats?.pending} />
+          <Stat icon={Send} label="Aaj gaye" value={stats?.sentToday} tone="success" />
+          <Stat icon={CircleAlert} label="Fail" value={stats?.failed} tone="warning" />
         </div>
 
         <p className="text-xs text-muted-foreground">
@@ -253,18 +258,18 @@ export const AutoMailPanel = () => {
         </p>
 
         <div className="space-y-2">
-          <Button variant="outline" size="sm" onClick={() => setShowSample((s) => !s)}>
+          <Button variant="outline" size="sm" onClick={() => setShowSample((s) => !s)} aria-expanded={showSample}>
             <Eye className="mr-2 h-3 w-3" />
             {showSample ? "Sample draft chhupao" : "Sample draft dekho — jo mail sabko jayega"}
           </Button>
           {showSample &&
             (sample ? (
-              <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
                 <p className="text-xs text-muted-foreground">
                   Example: {sample.company} ({sample.country})
                 </p>
                 <p className="mt-1 text-sm font-semibold">Subject: {sample.draft_subject}</p>
-                <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-background p-3 text-xs leading-relaxed">
+                <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border bg-card p-4 text-xs leading-relaxed">
                   {sample.draft_body}
                 </pre>
               </div>
@@ -275,7 +280,7 @@ export const AutoMailPanel = () => {
             ))}
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 border-t border-primary/10 pt-5">
           <Button onClick={start} disabled={busy !== null} size="lg">
             {busy === "start" ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -306,9 +311,24 @@ export const AutoMailPanel = () => {
   );
 };
 
-const Stat = ({ label, value }: { label: string; value?: number }) => (
-  <div className="rounded-lg border bg-muted/40 p-3">
-    <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="text-xl font-semibold">{value ?? "—"}</p>
+const Stat = ({
+  icon: Icon,
+  label,
+  value,
+  tone = "primary",
+}: {
+  icon: typeof Users;
+  label: string;
+  value?: number;
+  tone?: "primary" | "success" | "warning";
+}) => (
+  <div className="rounded-lg border border-primary/10 bg-card p-3.5 shadow-sm">
+    <div className="mb-3 flex items-center justify-between">
+      <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tone === "success" ? "bg-success/10 text-success" : tone === "warning" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"}`}>
+        <Icon className="h-4 w-4" />
+      </div>
+    </div>
+    <p className="text-xs font-medium text-muted-foreground">{label}</p>
+    <p className="mt-0.5 text-2xl font-bold text-foreground">{value ?? "—"}</p>
   </div>
 );
