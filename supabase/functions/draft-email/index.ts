@@ -6,7 +6,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient } from "../_shared/supabase.ts";
 import { marketFor } from "../_shared/markets.ts";
 import { aiJson, aiProvider } from "../_shared/ai.ts";
-import { pitchFor } from "../_shared/recruiters.ts";
+import { pitchFor, recruiterMasterEmail } from "../_shared/recruiters.ts";
 
 const SIGNATURE = `Mohit Gururani
 Founder & CEO | Voynova Global Solutions Pvt. Ltd.
@@ -81,13 +81,22 @@ function instructionFor(lead: Lead): string {
   ];
   if (lead.kind === "supply") {
     const pitch = pitchFor(String(lead.country ?? ""));
-    shared.push(
-      "Angle: this is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. Offer a simple partnership: Voynova shares live Europe job orders and Learn & Earn college seats, the partner sources and pre-screens candidates, Voynova handles employer contracts, permit and visa paperwork and arrival support.",
-      `Use this country-specific pitch, written for partners in ${lead.country ?? "South Asia"}: ${pitch.corridor} ${pitch.ask} ${pitch.proof}`,
-      "Mention both revenue lines clearly: (1) Europe blue-collar job orders, (2) Learn & Earn college seats for students who study and work alongside.",
-      "For a supply partner, score on: do they actually mobilise blue-collar workers or students abroad, are they licensed or registered with the local regulator, do they cover our source countries, and is a decision maker reachable.",
-    );
-  } else if (lead.kind === "education") {
+    return [
+      shared[0],
+      shared[1],
+      shared[2],
+      shared[4],
+      "This is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. The rest of the email (who we are, features, supplier dashboard, commercials) is a fixed block added after your text, so DO NOT repeat it.",
+      `Country context for ${lead.country ?? "South Asia"}: ${pitch.corridor} ${pitch.ask} ${pitch.proof}`,
+      "Return json with these fields:",
+      "subject: email subject line, max 78 characters, no emoji. Name the agency and the offer, for example 'Europe job orders for <Agency> — Serbia, Latvia, Estonia'.",
+      "body: ONLY the opening of the email — the greeting line plus 2 to 4 sentences, 60-90 words. Say who Mohit is, and personalise with the agency name, its city, what kind of partner it is and why it fits our Europe job orders and Learn & Earn seats. Use only the facts given, never invent. Do not list features, do not mention charges, do not add a signature, do not add links, do not write a closing line.",
+      "whatsapp: a separate WhatsApp first message, max 60 words, friendly, one short intro line plus one question. Mention Europe job orders and that the supplier dashboard is free, and that service charges apply on placements. End with https://voynovaglobal.com",
+      "score: integer 0-100 for how good this supply partner is. Judge on: do they actually mobilise blue-collar workers or students abroad, are they licensed or registered with the local regulator, do they cover our source countries, and is a decision maker reachable.",
+      "reason: one short sentence, max 20 words, explaining the score.",
+    ].join(" ");
+  }
+  if (lead.kind === "education") {
     shared.push(
       "Angle: Voynova can send this institute screened, document-ready applicants from India and Nepal for their short skill / vocational programmes, handling document preparation, English readiness and visa paperwork so admissions receive complete files.",
     );
@@ -112,20 +121,15 @@ function fallback(lead: Lead): Draft {
 
   if (lead.kind === "supply") {
     const pitch = pitchFor(String(country));
+    const opening = `${greeting}
+
+I am Mohit Gururani, Founder of Voynova Global Solutions Pvt. Ltd. I am writing to ${company}${lead.city ? ` in ${lead.city}` : ""} because your team works on overseas deployment, and we have live Europe job orders that match that profile. ${pitch.corridor}`;
     return {
-      subject: `${country} partnership: Europe job orders & Learn and Earn seats`,
-      body: `${greeting}
-
-I am Mohit Gururani from Voynova Global Solutions. ${pitch.corridor}
-
-${pitch.ask}${lead.city ? ` We are currently expanding around ${lead.city}.` : ""}
-
-Two things we can share with ${company} from week one: our live Europe job orders for blue-collar trades, and Learn & Earn college seats where students study and work alongside. ${pitch.proof}
-
-Would a 15-minute call this week work to share our current requirements?
+      subject: `Europe job orders for ${company} — Serbia, Latvia, Estonia`,
+      body: `${recruiterMasterEmail({ opening, company: String(company), country: String(country) })}
 
 Best regards,`,
-      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We have live Europe job orders (Latvia, Serbia, Cyprus, Estonia) and Learn & Earn college seats, and we are adding sourcing partners in ${country}. Can we talk for 15 minutes this week about working with ${company}? More: https://voynovaglobal.com`,
+      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We have live Europe job orders (Latvia, Serbia, Cyprus, Estonia) plus Learn & Earn college seats. Your supplier dashboard on our platform is free; service charges apply only on placements. Can we talk 15 minutes this week about ${company}? https://voynovaglobal.com`,
       score: null,
       reason: null,
     };
@@ -173,9 +177,20 @@ async function draft(lead: Lead): Promise<Draft> {
   if (!out?.subject || !out?.body) return fallback(lead);
   const fb = fallback(lead);
   const rawScore = Number(out.score);
+  // Supply partners: the AI writes only the personalised opening, the detailed
+  // master block (features, supplier dashboard, commercials) is fixed.
+  const body = lead.kind === "supply"
+    ? `${recruiterMasterEmail({
+      opening: String(out.body),
+      company: String(lead.company ?? "your agency"),
+      country: String(lead.country ?? ""),
+    })}
+
+Best regards,`
+    : String(out.body);
   return {
     subject: String(out.subject),
-    body: String(out.body),
+    body,
     whatsapp: out.whatsapp ? String(out.whatsapp) : fb.whatsapp,
     score: Number.isFinite(rawScore) ? Math.max(0, Math.min(100, Math.round(rawScore))) : null,
     reason: out.reason ? String(out.reason).slice(0, 200) : null,
@@ -194,8 +209,16 @@ Deno.serve(async (req) => {
     const redraft = body.redraft === true;
     const preview = body.preview === true;
 
+    // Optional audience filter so a run can draft only recruiter partners.
+    const kinds: string[] = Array.isArray(body.kinds)
+      ? body.kinds.filter((k: unknown): k is string =>
+        k === "employer" || k === "education" || k === "supply"
+      )
+      : [];
+
     const supa = adminClient();
-    let q = supa.from("leads").select("*").neq("stage", "rejected");
+    let q = supa.from("leads").select("*").neq("stage", "rejected").is("merged_into", null);
+    if (kinds.length) q = q.in("kind", kinds);
     if (leadIds) q = q.in("id", leadIds);
     else {
       q = q.not("email", "is", null).order("visa_fit_score", { ascending: false }).limit(limit);

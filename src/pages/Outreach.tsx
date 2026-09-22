@@ -18,6 +18,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageHeader } from "@/components/PageHeader";
 import { LeadMailDialog, type MailLead } from "@/components/LeadMailDialog";
+import { AutoMailPanel } from "@/components/AutoMailPanel";
 
 
 const fmt = (iso: string | null) =>
@@ -225,6 +226,9 @@ const Outreach = () => {
         title="Outreach"
         description="Email aur WhatsApp — 50 per din, har message ke beech gap, Mon–Fri 9:00–18:00 IST."
       />
+
+      <AutoMailPanel />
+
 
 
       <div className="grid gap-4 sm:grid-cols-4">

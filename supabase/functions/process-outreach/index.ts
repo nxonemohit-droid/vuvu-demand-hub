@@ -59,6 +59,20 @@ Deno.serve(async (req) => {
 
   try {
     const supa = adminClient();
+
+    // Engine switch: a paused engine never calls the mail provider.
+    const { data: settings } = await supa
+      .from("outreach_settings")
+      .select("*")
+      .eq("id", 1)
+      .maybeSingle();
+    if (settings?.status === "paused") {
+      return new Response(
+        JSON.stringify({ sent: 0, failed: 0, paused: true, reason: settings.pause_reason ?? "Engine paused" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const { data: due, error } = await supa
       .from("outreach_sends")
       .select("*")
@@ -123,6 +137,22 @@ Deno.serve(async (req) => {
         failed++;
       }
       await new Promise((r) => setTimeout(r, 700));
+    }
+
+    // Circuit breaker: a run of failures pauses the engine with a visible reason.
+    if (sent || failed) {
+      const streak = sent ? 0 : (settings?.consecutive_failures ?? 0) + failed;
+      await supa
+        .from("outreach_settings")
+        .update({
+          consecutive_failures: streak,
+          ...(sent ? { last_sent_at: new Date().toISOString() } : {}),
+          ...(streak >= 5
+            ? { status: "paused", pause_reason: "5 mails in a row failed — check the mail provider and start again." }
+            : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", 1);
     }
 
     return new Response(JSON.stringify({ sent, failed, paused, due: due?.length ?? 0 }), {

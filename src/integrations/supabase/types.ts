@@ -1884,6 +1884,42 @@ export type Database = {
           },
         ]
       }
+      outreach_settings: {
+        Row: {
+          consecutive_failures: number
+          daily_cap: number
+          gap_seconds: number
+          id: number
+          last_sent_at: string | null
+          pause_reason: string | null
+          recruiter_auto_enabled: boolean
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          consecutive_failures?: number
+          daily_cap?: number
+          gap_seconds?: number
+          id?: number
+          last_sent_at?: string | null
+          pause_reason?: string | null
+          recruiter_auto_enabled?: boolean
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          consecutive_failures?: number
+          daily_cap?: number
+          gap_seconds?: number
+          id?: number
+          last_sent_at?: string | null
+          pause_reason?: string | null
+          recruiter_auto_enabled?: boolean
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
