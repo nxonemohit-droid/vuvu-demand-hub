@@ -227,6 +227,9 @@ const Outreach = () => {
         description="Email aur WhatsApp — 50 per din, har message ke beech gap, Mon–Fri 9:00–18:00 IST."
       />
 
+      <AutoMailPanel />
+
+
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Waiting" value={stats?.pending} />
