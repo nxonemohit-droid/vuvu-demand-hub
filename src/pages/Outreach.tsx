@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Mail, MessageCircle, Play, CalendarClock, Handshake, Sparkles, Eye } from "lucide-react";
+import { Loader2, Mail, MessageCircle, Play, CalendarClock, Handshake, Sparkles, Eye, Clock3, SendHorizontal, CheckCircle2, CircleAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -220,7 +220,7 @@ const Outreach = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
       <PageHeader
         step={2}
         title="Outreach"
@@ -231,21 +231,21 @@ const Outreach = () => {
 
 
 
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Stat label="Waiting" value={stats?.pending} />
-        <Stat label="Sent today" value={stats?.sentToday} />
-        <Stat label="Sent total" value={stats?.sent} />
-        <Stat label="Failed" value={stats?.failed} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat icon={Clock3} label="Waiting" value={stats?.pending} />
+        <Stat icon={SendHorizontal} label="Sent today" value={stats?.sentToday} />
+        <Stat icon={CheckCircle2} label="Sent total" value={stats?.sent} tone="success" />
+        <Stat icon={CircleAlert} label="Failed" value={stats?.failed} tone="warning" />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Start outreach</CardTitle>
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b border-primary/10 bg-primary/5">
+          <CardTitle className="flex items-center gap-2"><SendHorizontal className="h-5 w-5 text-primary" />Start outreach</CardTitle>
           <CardDescription>
             Har lead ka message uske company, country aur sector ke hisaab se apne aap bharta hai.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
+        <CardContent className="flex flex-wrap gap-3 pt-5 md:pt-6">
           <Button onClick={autoCampaign} disabled={busy !== null} size="lg">
             {busy === "auto" ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -269,8 +269,8 @@ const Outreach = () => {
         </CardContent>
       </Card>
 
-      <Card className="border-primary/30">
-        <CardHeader>
+      <Card className="overflow-hidden border-primary/20">
+        <CardHeader className="border-b border-primary/10 bg-primary/5">
           <CardTitle className="flex items-center gap-2">
             <Handshake className="h-5 w-5 text-primary" />
             Supply partners outreach
@@ -280,7 +280,7 @@ const Outreach = () => {
             partnership mail jata hai — hamare Europe job orders aur college seats ke saath.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
+        <CardContent className="flex flex-wrap gap-3 pt-5 md:pt-6">
           <Button onClick={supplyCampaign} disabled={busy !== null} size="lg">
             {busy === "supply-auto" ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -316,8 +316,8 @@ const Outreach = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b border-primary/10 bg-primary/5">
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             Gemini mail drafts
@@ -327,7 +327,7 @@ const Outreach = () => {
             chaho to edit karo, phir seedha queue kar do.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-5 md:pt-6">
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={draftBatch} disabled={busy !== null} size="sm">
               {busy === "draft-batch" ? (
@@ -362,9 +362,9 @@ const Outreach = () => {
               Abhi koi draft nahi — upar "Gemini se naye drafts banao" dabao.
             </p>
           ) : (
-            <div className="rounded-lg border overflow-hidden">
+            <div className="overflow-hidden rounded-lg border border-primary/10">
               <Table>
-                <TableHeader className="sticky top-0 bg-muted">
+                <TableHeader className="sticky top-0 bg-muted/70">
                   <TableRow>
                     <TableHead>Lead</TableHead>
                     <TableHead>Score</TableHead>
@@ -374,7 +374,7 @@ const Outreach = () => {
                 </TableHeader>
                 <TableBody>
                   {drafts.map((row, i) => (
-                    <TableRow key={row.id} className={i % 2 ? "bg-muted/40" : undefined}>
+                    <TableRow key={row.id} className={i % 2 ? "bg-muted/30 hover:bg-primary/5" : "hover:bg-primary/5"}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {row.company}
@@ -433,7 +433,7 @@ const Outreach = () => {
         </CardContent>
       </Card>
 
-      <Alert>
+      <Alert className="border-primary/15 bg-primary/5">
         <CalendarClock className="h-4 w-4" />
         <AlertTitle>WhatsApp automatic sending</AlertTitle>
         <AlertDescription>
@@ -442,19 +442,19 @@ const Outreach = () => {
         </AlertDescription>
       </Alert>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Queue</CardTitle>
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b border-primary/10 bg-primary/5">
+          <CardTitle className="flex items-center gap-2"><Clock3 className="h-5 w-5 text-primary" />Queue</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-5 md:pt-6">
           {isLoading ? (
             <Skeleton className="h-40 w-full" />
           ) : !queue?.length ? (
             <p className="text-sm text-muted-foreground">Queue khali hai.</p>
           ) : (
-            <div className="rounded-lg border overflow-hidden">
+            <div className="overflow-hidden rounded-lg border border-primary/10">
               <Table>
-                <TableHeader className="sticky top-0 bg-muted">
+                <TableHeader className="sticky top-0 bg-muted/70">
                   <TableRow>
                     <TableHead>Company</TableHead>
                     <TableHead>Channel</TableHead>
@@ -465,7 +465,7 @@ const Outreach = () => {
                 </TableHeader>
                 <TableBody>
                   {queue.map((row, i) => (
-                    <TableRow key={row.id} className={i % 2 ? "bg-muted/40" : undefined}>
+                    <TableRow key={row.id} className={i % 2 ? "bg-muted/30 hover:bg-primary/5" : "hover:bg-primary/5"}>
                       <TableCell className="font-medium">
                         {row.leads?.company ?? "—"}
                         <div className="text-xs text-muted-foreground">{row.leads?.country}</div>
@@ -506,11 +506,26 @@ const Outreach = () => {
   );
 };
 
-const Stat = ({ label, value }: { label: string; value?: number }) => (
-  <Card>
-    <CardContent className="pt-6">
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-3xl font-bold">{value ?? "—"}</div>
+const Stat = ({
+  icon: Icon,
+  label,
+  value,
+  tone = "primary",
+}: {
+  icon: typeof Clock3;
+  label: string;
+  value?: number;
+  tone?: "primary" | "success" | "warning";
+}) => (
+  <Card className="transition-all duration-200 hover:border-primary/25 hover:shadow-md">
+    <CardContent className="flex items-center gap-4 pt-6">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tone === "success" ? "bg-success/10 text-success" : tone === "warning" ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <div className="text-xs font-semibold uppercase text-muted-foreground">{label}</div>
+        <div className="mt-0.5 text-2xl font-bold text-foreground">{value ?? "—"}</div>
+      </div>
     </CardContent>
   </Card>
 );
