@@ -209,8 +209,16 @@ Deno.serve(async (req) => {
     const redraft = body.redraft === true;
     const preview = body.preview === true;
 
+    // Optional audience filter so a run can draft only recruiter partners.
+    const kinds: string[] = Array.isArray(body.kinds)
+      ? body.kinds.filter((k: unknown): k is string =>
+        k === "employer" || k === "education" || k === "supply"
+      )
+      : [];
+
     const supa = adminClient();
-    let q = supa.from("leads").select("*").neq("stage", "rejected");
+    let q = supa.from("leads").select("*").neq("stage", "rejected").is("merged_into", null);
+    if (kinds.length) q = q.in("kind", kinds);
     if (leadIds) q = q.in("id", leadIds);
     else {
       q = q.not("email", "is", null).order("visa_fit_score", { ascending: false }).limit(limit);
