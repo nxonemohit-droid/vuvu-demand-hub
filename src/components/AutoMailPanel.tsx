@@ -252,6 +252,29 @@ export const AutoMailPanel = () => {
           {settings?.last_sent_at ? ` · Pichla mail: ${fmtTime(settings.last_sent_at)}` : ""}
         </p>
 
+        <div className="space-y-2">
+          <Button variant="outline" size="sm" onClick={() => setShowSample((s) => !s)}>
+            <Eye className="mr-2 h-3 w-3" />
+            {showSample ? "Sample draft chhupao" : "Sample draft dekho — jo mail sabko jayega"}
+          </Button>
+          {showSample &&
+            (sample ? (
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <p className="text-xs text-muted-foreground">
+                  Example: {sample.company} ({sample.country})
+                </p>
+                <p className="mt-1 text-sm font-semibold">Subject: {sample.draft_subject}</p>
+                <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-background p-3 text-xs leading-relaxed">
+                  {sample.draft_body}
+                </pre>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Abhi koi partner draft ready nahi hai — "Auto-mail chalu karo" dabate hi Gemini drafts bana dega.
+              </p>
+            ))}
+        </div>
+
         <div className="flex flex-wrap gap-3">
           <Button onClick={start} disabled={busy !== null} size="lg">
             {busy === "start" ? (
