@@ -14,6 +14,8 @@ const CSE_ID = Deno.env.get("GOOGLE_CSE_ID");
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 const APIFY_TOKEN = Deno.env.get("APIFY_API_TOKEN");
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
+const PERPLEXITY_KEY = Deno.env.get("PERPLEXITY_API_KEY");
+const PPLX_GATEWAY = "https://connector-gateway.lovable.dev/perplexity";
 // The working user-owned Maps connection is the second linked connection.
 const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY_1") ?? Deno.env.get("GOOGLE_MAPS_API_KEY");
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
@@ -31,6 +33,7 @@ type Hit = {
   ratingCount?: number | null;
   placeId?: string | null;
   contactName?: string | null;
+  source?: string;
 };
 
 /** Google Maps Places (New) text search — reliable employer discovery with phone numbers. */
@@ -146,6 +149,41 @@ async function firecrawlSearch(q: string): Promise<Hit[]> {
     }));
   } catch (e) {
     console.error("Firecrawl search error", e);
+    return [];
+  }
+}
+
+/**
+ * Perplexity Search (connector gateway, managed connection — /search only).
+ * Returns rich snippets that often carry contact emails and phone numbers.
+ */
+async function perplexitySearch(q: string): Promise<Hit[]> {
+  if (!PERPLEXITY_KEY || !LOVABLE_KEY) return [];
+  try {
+    const res = await fetch(`${PPLX_GATEWAY}/search`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_KEY}`,
+        "X-Connection-Api-Key": PERPLEXITY_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query: q, max_results: 8 }),
+    });
+    if (!res.ok) {
+      const body = (await res.text()).slice(0, 300);
+      console.error(`Perplexity search ${res.status}: ${body}`);
+      if (res.status !== 402 && res.status !== 403) return []; // 402/403 surfaced via noteError
+      noteError("Perplexity", res.status, body);
+      return [];
+    }
+    const data = await res.json();
+    return (data.results ?? []).map((r: Record<string, string>) => ({
+      url: r.url,
+      title: r.title ?? "",
+      snippet: r.snippet ?? "",
+    }));
+  } catch (e) {
+    console.error("Perplexity search error", e);
     return [];
   }
 }
@@ -351,7 +389,14 @@ Deno.serve(async (req) => {
         if (maps) {
           hits = await mapsSearch(q);
         } else {
-          hits = [...(await googleSearch(q)), ...(await firecrawlSearch(q))];
+          // Run all connected providers in parallel, dedupe by URL afterwards.
+          const [g, f, p] = await Promise.all([
+            googleSearch(q),
+            firecrawlSearch(q),
+            perplexitySearch(q),
+          ]);
+          const tag = (hs: Hit[], src: string) => hs.map((h) => ({ ...h, source: src }));
+          hits = [...tag(g, "gcse"), ...tag(f, "firecrawl"), ...tag(p, "perplexity")];
           if (!hits.length) hits = await apifySearch(q);
           if (!hits.length) hits = await ddgSearch(q);
           if (!hits.length) hits = await mojeekSearch(q);
@@ -383,7 +428,7 @@ Deno.serve(async (req) => {
             place_id: hit.placeId ?? null,
             hiring_signal: hit.snippet?.slice(0, 400) ?? null,
             visa_speed: marketFor(country)?.speed ?? null,
-            source: maps ? "google_maps" : "gcse",
+            source: maps ? "google_maps" : (hit.source ?? "gcse"),
             source_url: hit.url,
             dedup_hash: hash,
           };
