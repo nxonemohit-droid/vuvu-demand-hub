@@ -18,6 +18,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageHeader } from "@/components/PageHeader";
 import { LeadMailDialog, type MailLead } from "@/components/LeadMailDialog";
+import { AutoMailPanel } from "@/components/AutoMailPanel";
 
 
 const fmt = (iso: string | null) =>
