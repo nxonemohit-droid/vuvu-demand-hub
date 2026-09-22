@@ -14,6 +14,8 @@ const CSE_ID = Deno.env.get("GOOGLE_CSE_ID");
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 const APIFY_TOKEN = Deno.env.get("APIFY_API_TOKEN");
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
+const PERPLEXITY_KEY = Deno.env.get("PERPLEXITY_API_KEY");
+const PPLX_GATEWAY = "https://connector-gateway.lovable.dev/perplexity";
 // The working user-owned Maps connection is the second linked connection.
 const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY_1") ?? Deno.env.get("GOOGLE_MAPS_API_KEY");
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
