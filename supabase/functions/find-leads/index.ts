@@ -33,6 +33,7 @@ type Hit = {
   ratingCount?: number | null;
   placeId?: string | null;
   contactName?: string | null;
+  source?: string;
 };
 
 /** Google Maps Places (New) text search — reliable employer discovery with phone numbers. */
@@ -427,7 +428,7 @@ Deno.serve(async (req) => {
             place_id: hit.placeId ?? null,
             hiring_signal: hit.snippet?.slice(0, 400) ?? null,
             visa_speed: marketFor(country)?.speed ?? null,
-            source: maps ? "google_maps" : "gcse",
+            source: maps ? "google_maps" : (hit.source ?? "gcse"),
             source_url: hit.url,
             dedup_hash: hash,
           };
