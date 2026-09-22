@@ -168,7 +168,8 @@ Deno.serve(async (req) => {
     const rows: Record<string, unknown>[] = [];
 
     for (const channel of channels) {
-      const gap = channel === "email" ? 90 : 120;
+      const override = Math.min(Math.max(Number(body.gap_seconds) || 0, 0), 600);
+      const gap = override || (channel === "email" ? 90 : 120);
       // continue after the last thing already queued on this channel
       const { data: last } = await supa
         .from("outreach_sends")
