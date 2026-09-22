@@ -161,8 +161,18 @@ Deno.serve(async (req) => {
     const { data: suppressed } = await supa.from("email_suppressions").select("email");
     const blocked = new Set((suppressed ?? []).map((s: { email: string }) => s.email.toLowerCase()));
 
-    const { data: existing } = await supa.from("outreach_sends").select("lead_id, channel");
-    const already = new Set((existing ?? []).map((r: { lead_id: string; channel: string }) => `${r.lead_id}:${r.channel}`));
+    // Already queued/sent (paged — default select caps at 1000 rows)
+    const already = new Set<string>();
+    for (let from = 0; ; from += 1000) {
+      const { data: page } = await supa
+        .from("outreach_sends")
+        .select("lead_id, channel")
+        .range(from, from + 999);
+      for (const r of (page ?? []) as { lead_id: string; channel: string }[]) {
+        already.add(`${r.lead_id}:${r.channel}`);
+      }
+      if (!page || page.length < 1000) break;
+    }
 
     const result: Record<string, number> = { email: 0, whatsapp: 0, skipped: 0 };
     const rows: Record<string, unknown>[] = [];
