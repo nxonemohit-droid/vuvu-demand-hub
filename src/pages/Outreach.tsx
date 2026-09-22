@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Mail, MessageCircle, Play, CalendarClock, Handshake } from "lucide-react";
+import { Loader2, Mail, MessageCircle, Play, CalendarClock, Handshake, Sparkles, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageHeader } from "@/components/PageHeader";
+import { LeadMailDialog, type MailLead } from "@/components/LeadMailDialog";
 
 
 const fmt = (iso: string | null) =>
@@ -25,6 +26,8 @@ const fmt = (iso: string | null) =>
 const Outreach = () => {
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
+  const [mailLead, setMailLead] = useState<MailLead | null>(null);
+  const [kindFilter, setKindFilter] = useState<"all" | "employer" | "education" | "supply">("all");
 
   const { data: stats } = useQuery({
     queryKey: ["outreach-stats"],
@@ -86,6 +89,40 @@ const Outreach = () => {
       return { email, whatsapp, supplyEmail, supplyWa };
     },
     refetchInterval: 8000,
+  });
+
+  const { data: draftCount } = useQuery({
+    queryKey: ["outreach-draft-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .not("draft_body", "is", null)
+        .is("merged_into", null)
+        .neq("stage", "rejected");
+      return count ?? 0;
+    },
+    refetchInterval: 10000,
+  });
+
+  const { data: drafts, isLoading: draftsLoading } = useQuery({
+    queryKey: ["outreach-drafts", kindFilter],
+    queryFn: async () => {
+      let q = supabase
+        .from("leads")
+        .select(
+          "id, company, kind, country, city, email, contact_name, contact_role, profile_summary, programs, trades, draft_subject, draft_body, draft_whatsapp, ai_score, ai_reason, phone, whatsapp",
+        )
+        .not("draft_body", "is", null)
+        .is("merged_into", null)
+        .neq("stage", "rejected")
+        .order("drafted_at", { ascending: false, nullsFirst: false })
+        .limit(60);
+      if (kindFilter !== "all") q = q.eq("kind", kindFilter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data as unknown as MailLead[];
+    },
   });
 
   const run = async (name: string, body: Record<string, unknown>, label: string) => {
@@ -157,6 +194,28 @@ const Outreach = () => {
     const data = await run("process-outreach", {}, "flush");
     if (!data) return;
     toast.success(`${data.sent} bheje, ${data.failed} fail, ${data.paused} rukay hue.`);
+  };
+
+  /** Gemini drafting: up to 5 batches of 10 = 50 personalised drafts per click. */
+  const draftBatch = async () => {
+    setBusy("draft-batch");
+    let made = 0;
+    let remaining = -1;
+    for (let i = 0; i < 5; i++) {
+      const { data, error } = await supabase.functions.invoke("draft-email", { body: { limit: 10 } });
+      if (error) break;
+      made += data?.drafted ?? 0;
+      remaining = data?.remaining ?? remaining;
+      if (!data?.drafted) break;
+    }
+    setBusy(null);
+    qc.invalidateQueries({ queryKey: ["outreach-drafts"] });
+    qc.invalidateQueries({ queryKey: ["outreach-draft-count"] });
+    toast.success(
+      remaining === 0
+        ? `Gemini ne ${made} naye drafts banaye — email wali sab leads covered.`
+        : `Gemini ne ${made} naye drafts banaye. ${remaining > 0 ? `${remaining} baaki hain` : "Aur drafts bane hain"} — dobara dabao.`,
+    );
   };
 
   return (
@@ -253,6 +312,123 @@ const Outreach = () => {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Gemini mail drafts
+          </CardTitle>
+          <CardDescription>
+            Har lead ka personalised email + WhatsApp message, AI score ke saath. Preview karo,
+            chaho to edit karo, phir seedha queue kar do.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={draftBatch} disabled={busy !== null} size="sm">
+              {busy === "draft-batch" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Gemini se naye drafts banao
+            </Button>
+            {(["all", "employer", "education", "supply"] as const).map((k) => (
+              <Button
+                key={k}
+                size="sm"
+                variant={kindFilter === k ? "default" : "outline"}
+                onClick={() => setKindFilter(k)}
+              >
+                {k === "all"
+                  ? "Sab"
+                  : k === "employer"
+                    ? "Employers"
+                    : k === "education"
+                      ? "Colleges"
+                      : "Partners"}
+              </Button>
+            ))}
+            <span className="text-sm text-muted-foreground">{draftCount ?? 0} drafts ready</span>
+          </div>
+          {draftsLoading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : !drafts?.length ? (
+            <p className="text-sm text-muted-foreground">
+              Abhi koi draft nahi — upar "Gemini se naye drafts banao" dabao.
+            </p>
+          ) : (
+            <div className="rounded-lg border overflow-hidden">
+              <Table>
+                <TableHeader className="sticky top-0 bg-muted">
+                  <TableRow>
+                    <TableHead>Lead</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead className="text-right">Draft</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {drafts.map((row, i) => (
+                    <TableRow key={row.id} className={i % 2 ? "bg-muted/40" : undefined}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {row.company}
+                          <Badge
+                            variant={
+                              row.kind === "education"
+                                ? "secondary"
+                                : row.kind === "supply"
+                                  ? "outline"
+                                  : "default"
+                            }
+                          >
+                            {row.kind === "education"
+                              ? "College"
+                              : row.kind === "supply"
+                                ? "Partner"
+                                : "Company"}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {[row.country, row.email].filter(Boolean).join(" · ")}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {row.ai_score !== null ? (
+                          <Badge
+                            variant={
+                              row.ai_score >= 70
+                                ? "default"
+                                : row.ai_score >= 45
+                                  ? "secondary"
+                                  : "outline"
+                            }
+                          >
+                            {row.ai_score}/100
+                          </Badge>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs max-w-72 truncate">
+                        {row.draft_subject ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" onClick={() => setMailLead(row)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Preview
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Alert>
         <CalendarClock className="h-4 w-4" />
         <AlertTitle>WhatsApp automatic sending</AlertTitle>
@@ -313,6 +489,15 @@ const Outreach = () => {
           )}
         </CardContent>
       </Card>
+
+      <LeadMailDialog
+        lead={mailLead}
+        onClose={() => setMailLead(null)}
+        onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["outreach-drafts"] });
+          qc.invalidateQueries({ queryKey: ["outreach-draft-count"] });
+        }}
+      />
     </div>
   );
 };
