@@ -7,7 +7,7 @@
 - [x] UI: Find Leads / Outreach / Pipeline (3 screens) + export
 - [x] Cron for process-outreach
 - [ ] Outreach page: Gemini drafts block — personalised drafts list + preview + edit + queue (in progress; background drafting of ~496 email leads running)
-- [ ] BLOCKED: WhatsApp Business connector — Meta Embedded Signup must be completed in desktop Chrome for +91 9650645553
+- [x] WhatsApp Business connector — connected +91 98705 88554 (old +91 9650645553 released via new number)
 - [ ] Drop legacy tables (needs user to run DROP in SQL editor — migration tool blocks drops)
 - [x] Light, friendly UI theme across all screens
 - [x] Apify, Google CSE, Firecrawl and website fallbacks in lead discovery/enrichment
@@ -21,3 +21,4 @@
 - [x] Recruiter pipeline stages: New, Qualified, Contacted, Replied, Meeting booked, Partner onboarded
 - [x] Duplicate detection + merge for recruiter leads (email, phone, website, agency name) via `recruiter-tools`
 - [x] 0–100 partner priority score (country, partner type, contact quality, supply capacity)
+- [ ] WhatsApp outreach start: template create + approve, WHATSAPP_TEMPLATE_NAME secret, queue WhatsApp for recruiters, resume engine (in progress; number +91 98705 88554 connected, quality GREEN)
