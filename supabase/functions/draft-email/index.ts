@@ -81,13 +81,21 @@ function instructionFor(lead: Lead): string {
   ];
   if (lead.kind === "supply") {
     const pitch = pitchFor(String(lead.country ?? ""));
-    shared.push(
-      "Angle: this is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. Offer a simple partnership: Voynova shares live Europe job orders and Learn & Earn college seats, the partner sources and pre-screens candidates, Voynova handles employer contracts, permit and visa paperwork and arrival support.",
-      `Use this country-specific pitch, written for partners in ${lead.country ?? "South Asia"}: ${pitch.corridor} ${pitch.ask} ${pitch.proof}`,
-      "Mention both revenue lines clearly: (1) Europe blue-collar job orders, (2) Learn & Earn college seats for students who study and work alongside.",
-      "For a supply partner, score on: do they actually mobilise blue-collar workers or students abroad, are they licensed or registered with the local regulator, do they cover our source countries, and is a decision maker reachable.",
-    );
-  } else if (lead.kind === "education") {
+    return [
+      shared[0],
+      shared[1],
+      shared[2],
+      "This is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. The rest of the email (who we are, features, supplier dashboard, commercials) is a fixed block added after your text, so DO NOT repeat it.",
+      `Country context for ${lead.country ?? "South Asia"}: ${pitch.corridor} ${pitch.ask} ${pitch.proof}`,
+      "Return json with these fields:",
+      "subject: email subject line, max 78 characters, no emoji. Name the agency and the offer, for example 'Europe job orders for <Agency> — Serbia, Latvia, Estonia'.",
+      "body: ONLY the opening of the email — the greeting line plus 2 to 4 sentences, 60-90 words. Say who Mohit is, and personalise with the agency name, its city, what kind of partner it is and why it fits our Europe job orders and Learn & Earn seats. Use only the facts given, never invent. Do not list features, do not mention charges, do not add a signature, do not add links, do not write a closing line.",
+      "whatsapp: a separate WhatsApp first message, max 60 words, friendly, one short intro line plus one question. Mention Europe job orders and that the supplier dashboard is free, and that service charges apply on placements. End with https://voynovaglobal.com",
+      "score: integer 0-100 for how good this supply partner is. Judge on: do they actually mobilise blue-collar workers or students abroad, are they licensed or registered with the local regulator, do they cover our source countries, and is a decision maker reachable.",
+      "reason: one short sentence, max 20 words, explaining the score.",
+    ].join(" ");
+  }
+  if (lead.kind === "education") {
     shared.push(
       "Angle: Voynova can send this institute screened, document-ready applicants from India and Nepal for their short skill / vocational programmes, handling document preparation, English readiness and visa paperwork so admissions receive complete files.",
     );
