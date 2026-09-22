@@ -85,6 +85,61 @@ export function recruiterWhatsApp(opts: {
   return `${opts.hello}, this is Mohit from Voynova Global Solutions. ${hook}. We have live Europe job orders (Latvia, Serbia, Cyprus, Estonia) for blue-collar trades plus Learn & Earn college seats. Can we talk 15 minutes this week about a partnership with ${opts.company}? More: https://voynovaglobal.com`;
 }
 
+/** ---------------- Master recruiter email ---------------- */
+
+const REGULATOR: Record<string, string> = {
+  India: "eMigrate",
+  Nepal: "DoFE",
+  Bangladesh: "BAIRA",
+  "Sri Lanka": "SLBFE",
+};
+
+/**
+ * Detailed master body for recruiter (supply partner) outreach.
+ * `opening` is the AI-personalised 2-3 sentence intro; everything else is fixed
+ * so every partner gets the same, complete explanation of the partnership.
+ */
+export function recruiterMasterEmail(opts: {
+  opening: string;
+  company: string;
+  country: string;
+}): string {
+  const reg = REGULATOR[opts.country];
+  return `${opts.opening.trim()}
+
+WHO WE ARE
+Voynova Global Solutions Pvt. Ltd. is an India-based international recruitment and workforce company. We hold direct demand from employers in Serbia, Latvia, Estonia, Cyprus, North Macedonia and Montenegro for construction, welding, hospitality, warehouse, driving, food processing and factory roles. Alongside that we run a Learn & Earn college route in Europe, where students study and work part-time during the course.
+
+WHY WE ARE DIFFERENT
+1. Direct employer demand. No sub-agent chain sitting between your candidate and the employer.
+2. Fast corridors only. We work with countries where the work permit is normally completed in under two months, so your candidate is not left waiting a year.
+3. Complete documentation support. Demand letter, employer contract, permit file, visa paperwork, appointment letter and arrival support are handled from our side.
+4. Ethical recruitment. No fee is charged to the worker, and the file stays compliant with ${reg ? `${reg} rules` : "your local regulator"}.
+5. Two revenue lines from one database: Europe blue-collar job orders and Learn & Earn college seats.
+6. Weekly updated requirement list with trade, salary band, accommodation, working hours and permit timeline written out.
+
+YOUR SUPPLIER DASHBOARD ON VOYNOVAGLOBAL.COM
+Every partner agency gets its own supplier login on https://voynovaglobal.com. Inside the dashboard you can:
+- See all live job orders with trade, country, salary band, accommodation, number of seats and closing date.
+- Submit candidates directly against an order and upload passport, resume, trade certificates and medical documents in one place.
+- Track every candidate stage by stage: submitted, shortlisted, employer selected, documents, permit applied, permit approved, visa, flight, joined.
+- Get document checklists per country so a file is never rejected for a missing paper.
+- Receive interview and trade-test schedules, employer feedback and rejection reasons.
+- See your commercial statement: what is payable on each placement, what is approved and what is paid.
+- Message our operations team on the same candidate file, so nothing is lost in WhatsApp groups.
+
+USING THE PLATFORM IS FREE FOR YOU
+The supplier dashboard, the job order list, candidate submission and the tracking tools are free for partner agencies. There is no subscription, no joining fee and no charge for access.
+
+COMMERCIALS — PLEASE NOTE
+The placement side is a paid, service-charge based partnership. Service charges are included in every vacancy we release; we do not offer free vacancies and we do not work on a no-charge basis. The exact charge, the split between us and the payment terms are shared in writing before any candidate file is opened, so there is no confusion later.
+
+HOW WE START
+You send us your current strength: trades you can supply, monthly capacity and the source states or districts you cover. We open your supplier login, share the live requirement list and run one small trial order together. If it works, we scale it.
+
+Can we have a 15-minute call this week to share the current requirement list and the commercial terms with ${opts.company}?`;
+}
+
 /** ---------------- Partner type ---------------- */
 
 export type PartnerTypeId = "manpower" | "agents" | "study" | "visa" | "other";
