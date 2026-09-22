@@ -121,17 +121,13 @@ function fallback(lead: Lead): Draft {
 
   if (lead.kind === "supply") {
     const pitch = pitchFor(String(country));
+    const opening = `${greeting}
+
+I am Mohit Gururani, Founder of Voynova Global Solutions Pvt. Ltd. I am writing to ${company}${lead.city ? ` in ${lead.city}` : ""} because your team works on overseas deployment, and we have live Europe job orders that match that profile. ${pitch.corridor}`;
     return {
-      subject: `${country} partnership: Europe job orders & Learn and Earn seats`,
-      body: `${greeting}
+      subject: `Europe job orders for ${company} — Serbia, Latvia, Estonia`,
+      body: recruiterMasterEmail({ opening, company: String(company), country: String(country) }) + `
 
-I am Mohit Gururani from Voynova Global Solutions. ${pitch.corridor}
-
-${pitch.ask}${lead.city ? ` We are currently expanding around ${lead.city}.` : ""}
-
-Two things we can share with ${company} from week one: our live Europe job orders for blue-collar trades, and Learn & Earn college seats where students study and work alongside. ${pitch.proof}
-
-Would a 15-minute call this week work to share our current requirements?
 
 Best regards,`,
       whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We have live Europe job orders (Latvia, Serbia, Cyprus, Estonia) and Learn & Earn college seats, and we are adding sourcing partners in ${country}. Can we talk for 15 minutes this week about working with ${company}? More: https://voynovaglobal.com`,
