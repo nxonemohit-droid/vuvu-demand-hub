@@ -85,6 +85,7 @@ function instructionFor(lead: Lead): string {
       shared[0],
       shared[1],
       shared[2],
+      shared[4],
       "This is a B2B supply partner — a manpower agency, recruitment agent, study-abroad consultant or visa counsellor in a source country. The rest of the email (who we are, features, supplier dashboard, commercials) is a fixed block added after your text, so DO NOT repeat it.",
       `Country context for ${lead.country ?? "South Asia"}: ${pitch.corridor} ${pitch.ask} ${pitch.proof}`,
       "Return json with these fields:",
