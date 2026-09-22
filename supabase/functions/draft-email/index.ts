@@ -126,11 +126,10 @@ function fallback(lead: Lead): Draft {
 I am Mohit Gururani, Founder of Voynova Global Solutions Pvt. Ltd. I am writing to ${company}${lead.city ? ` in ${lead.city}` : ""} because your team works on overseas deployment, and we have live Europe job orders that match that profile. ${pitch.corridor}`;
     return {
       subject: `Europe job orders for ${company} — Serbia, Latvia, Estonia`,
-      body: recruiterMasterEmail({ opening, company: String(company), country: String(country) }) + `
-
+      body: `${recruiterMasterEmail({ opening, company: String(company), country: String(country) })}
 
 Best regards,`,
-      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We have live Europe job orders (Latvia, Serbia, Cyprus, Estonia) and Learn & Earn college seats, and we are adding sourcing partners in ${country}. Can we talk for 15 minutes this week about working with ${company}? More: https://voynovaglobal.com`,
+      whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We have live Europe job orders (Latvia, Serbia, Cyprus, Estonia) plus Learn & Earn college seats. Your supplier dashboard on our platform is free; service charges apply only on placements. Can we talk 15 minutes this week about ${company}? https://voynovaglobal.com`,
       score: null,
       reason: null,
     };
