@@ -177,9 +177,20 @@ async function draft(lead: Lead): Promise<Draft> {
   if (!out?.subject || !out?.body) return fallback(lead);
   const fb = fallback(lead);
   const rawScore = Number(out.score);
+  // Supply partners: the AI writes only the personalised opening, the detailed
+  // master block (features, supplier dashboard, commercials) is fixed.
+  const body = lead.kind === "supply"
+    ? `${recruiterMasterEmail({
+      opening: String(out.body),
+      company: String(lead.company ?? "your agency"),
+      country: String(lead.country ?? ""),
+    })}
+
+Best regards,`
+    : String(out.body);
   return {
     subject: String(out.subject),
-    body: String(out.body),
+    body,
     whatsapp: out.whatsapp ? String(out.whatsapp) : fb.whatsapp,
     score: Number.isFinite(rawScore) ? Math.max(0, Math.min(100, Math.round(rawScore))) : null,
     reason: out.reason ? String(out.reason).slice(0, 200) : null,
