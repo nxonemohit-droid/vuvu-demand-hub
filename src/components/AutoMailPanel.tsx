@@ -8,7 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-const COUNTRIES = ["India", "Nepal", "Bangladesh", "Sri Lanka"] as const;
+type LeadKind = "employer" | "education" | "supply";
+
+type AutoMailPanelProps = {
+  /** Which audience this panel mails. Defaults to recruiter partners. */
+  kinds?: LeadKind[];
+  title?: string;
+  description?: string;
+  /** Quick "queue this country" buttons. */
+  countries?: string[];
+  /** Word used in toasts and labels, e.g. "partner" or "employer". */
+  noun?: string;
+};
 
 const fmtTime = (iso: string | null | undefined) =>
   iso
@@ -21,21 +32,28 @@ const fmtTime = (iso: string | null | undefined) =>
     : "—";
 
 /**
- * Auto-mail engine for recruiter (supply) partners only.
+ * Auto-mail engine for one audience (recruiter partners, or employers & colleges).
  * One mail per minute, Mon–Fri 09:00–18:00 IST, with a visible start/pause switch.
  */
-export const AutoMailPanel = () => {
+export const AutoMailPanel = ({
+  kinds = ["supply"],
+  title = "Recruiter auto-mail engine",
+  description = "Sirf recruiter partners (India, Nepal, Bangladesh, Sri Lanka) ko mail — har 60 second me ek, Mon–Fri 9:00–18:00 IST.",
+  countries = ["India", "Nepal", "Bangladesh", "Sri Lanka"],
+  noun = "partner",
+}: AutoMailPanelProps) => {
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
   const [showSample, setShowSample] = useState(false);
+  const audience = kinds.join("+");
 
   const { data: sample } = useQuery({
-    queryKey: ["recruiter-sample-draft"],
+    queryKey: ["auto-mail-sample", audience],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("leads")
         .select("id, company, country, draft_subject, draft_body")
-        .eq("kind", "supply")
+        .in("kind", kinds)
         .is("merged_into", null)
         .not("draft_body", "is", null)
         .order("drafted_at", { ascending: false })
@@ -61,31 +79,32 @@ export const AutoMailPanel = () => {
   });
 
   const { data: stats } = useQuery({
-    queryKey: ["recruiter-mail-stats"],
+    queryKey: ["auto-mail-stats", audience],
     queryFn: async () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const { data: partnerIds } = await supabase
+      const { data: leadIds } = await supabase
         .from("leads")
         .select("id")
-        .eq("kind", "supply")
+        .in("kind", kinds)
         .is("merged_into", null)
         .not("email", "is", null)
         .limit(5000);
-      const ids = (partnerIds ?? []).map((r) => r.id);
+      const ids = (leadIds ?? []).map((r) => r.id);
 
-      const countFor = async (build: (q: ReturnType<typeof base>) => ReturnType<typeof base>) => {
-        if (!ids.length) return 0;
-        const { count } = await build(base());
-        return count ?? 0;
-      };
       const base = () =>
         supabase
           .from("outreach_sends")
           .select("id", { count: "exact", head: true })
           .eq("channel", "email")
           .in("lead_id", ids.slice(0, 1000));
+
+      const countFor = async (build: (q: ReturnType<typeof base>) => ReturnType<typeof base>) => {
+        if (!ids.length) return 0;
+        const { count } = await build(base());
+        return count ?? 0;
+      };
 
       const [pending, sentToday, failed] = await Promise.all([
         countFor((q) => q.eq("status", "pending")),
@@ -104,7 +123,7 @@ export const AutoMailPanel = () => {
       const { count: drafted } = await supabase
         .from("leads")
         .select("id", { count: "exact", head: true })
-        .eq("kind", "supply")
+        .in("kind", kinds)
         .is("merged_into", null)
         .not("email", "is", null)
         .not("draft_body", "is", null);
@@ -130,14 +149,14 @@ export const AutoMailPanel = () => {
     qc.invalidateQueries({ queryKey: ["outreach-settings"] });
   };
 
-  /** Draft missing partner mails, queue them 60s apart, start the engine. */
+  /** Draft missing mails for this audience, queue them 60s apart, start the engine. */
   const start = async () => {
     setBusy("start");
     try {
       let drafted = 0;
       for (let i = 0; i < 3; i++) {
         const { data, error } = await supabase.functions.invoke("draft-email", {
-          body: { limit: 10, kinds: ["supply"] },
+          body: { limit: 10, kinds },
         });
         if (error) break;
         drafted += data?.drafted ?? 0;
@@ -145,7 +164,7 @@ export const AutoMailPanel = () => {
       }
 
       const { data: sched, error: schedErr } = await supabase.functions.invoke("schedule-outreach", {
-        body: { channels: ["email"], kinds: ["supply"], gap_seconds: 60, daily_cap: 150 },
+        body: { channels: ["email"], kinds, gap_seconds: 60, daily_cap: 150 },
       });
       if (schedErr) throw schedErr;
 
@@ -160,7 +179,7 @@ export const AutoMailPanel = () => {
 
       qc.invalidateQueries();
       toast.success(
-        `Auto-mail chalu. ${drafted} naye drafts bane, ${sched?.email ?? 0} partner mail queue me — har 60 second me ek jayega.`,
+        `Auto-mail chalu. ${drafted} naye drafts bane, ${sched?.email ?? 0} ${noun} mail queue me — har 60 second me ek jayega.`,
       );
     } catch (e) {
       toast.error("Auto-mail shuru nahi hui, dobara try karo.");
@@ -189,7 +208,7 @@ export const AutoMailPanel = () => {
     const { data: leads } = await supabase
       .from("leads")
       .select("id")
-      .eq("kind", "supply")
+      .in("kind", kinds)
       .eq("country", country)
       .is("merged_into", null)
       .not("email", "is", null)
@@ -197,11 +216,11 @@ export const AutoMailPanel = () => {
     const ids = (leads ?? []).map((l) => l.id);
     if (!ids.length) {
       setBusy(null);
-      toast.error(`${country} me email wale partner nahi mile.`);
+      toast.error(`${country} me email wale ${noun} nahi mile.`);
       return;
     }
     const { data, error } = await supabase.functions.invoke("schedule-outreach", {
-      body: { channels: ["email"], kinds: ["supply"], lead_ids: ids, gap_seconds: 60, daily_cap: 150 },
+      body: { channels: ["email"], kinds, lead_ids: ids, gap_seconds: 60, daily_cap: 150 },
     });
     setBusy(null);
     if (error) {
@@ -209,7 +228,7 @@ export const AutoMailPanel = () => {
       return;
     }
     qc.invalidateQueries();
-    toast.success(`${country}: ${data?.email ?? 0} partner mail queue me.`);
+    toast.success(`${country}: ${data?.email ?? 0} ${noun} mail queue me.`);
   };
 
   const running = settings?.status === "running";
@@ -223,10 +242,9 @@ export const AutoMailPanel = () => {
               <Radio className="h-5 w-5" />
             </div>
             <div>
-              <CardTitle>Recruiter auto-mail engine</CardTitle>
+              <CardTitle>{title}</CardTitle>
               <CardDescription className="mt-1 max-w-3xl leading-5">
-              Sirf recruiter partners (India, Nepal, Bangladesh, Sri Lanka) ko mail — har 60 second me ek,
-              Mon–Fri 9:00–18:00 IST, roz max {settings?.daily_cap ?? 150}.
+                {description} Roz max {settings?.daily_cap ?? 150} mail.
               </CardDescription>
             </div>
           </div>
@@ -245,7 +263,7 @@ export const AutoMailPanel = () => {
         )}
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <Stat icon={Users} label="Partners (email)" value={stats?.partners} />
+          <Stat icon={Users} label="Leads (email)" value={stats?.partners} />
           <Stat icon={FileText} label="Drafts ready" value={stats?.drafted} />
           <Stat icon={ListChecks} label="Queue me" value={stats?.pending} />
           <Stat icon={Send} label="Aaj gaye" value={stats?.sentToday} tone="success" />
@@ -275,7 +293,7 @@ export const AutoMailPanel = () => {
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Abhi koi partner draft ready nahi hai — "Auto-mail chalu karo" dabate hi Gemini drafts bana dega.
+                Abhi koi draft ready nahi hai — "Auto-mail chalu karo" dabate hi Gemini drafts bana dega.
               </p>
             ))}
         </div>
@@ -287,7 +305,7 @@ export const AutoMailPanel = () => {
             ) : (
               <Play className="mr-2 h-4 w-4" />
             )}
-            {running ? "Aur partners queue karo" : "Auto-mail chalu karo"}
+            {running ? `Aur ${noun} queue karo` : "Auto-mail chalu karo"}
           </Button>
           <Button onClick={pause} disabled={busy !== null || !running} variant="secondary">
             {busy === "pause" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pause className="mr-2 h-4 w-4" />}
@@ -295,17 +313,19 @@ export const AutoMailPanel = () => {
           </Button>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Country ke hisaab se queue karo</p>
-          <div className="flex flex-wrap gap-2">
-            {COUNTRIES.map((c) => (
-              <Button key={c} size="sm" variant="outline" onClick={() => queueCountry(c)} disabled={busy !== null}>
-                {busy === c ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Sparkles className="mr-2 h-3 w-3" />}
-                {c}
-              </Button>
-            ))}
+        {countries.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Country ke hisaab se queue karo</p>
+            <div className="flex flex-wrap gap-2">
+              {countries.map((c) => (
+                <Button key={c} size="sm" variant="outline" onClick={() => queueCountry(c)} disabled={busy !== null}>
+                  {busy === c ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Sparkles className="mr-2 h-3 w-3" />}
+                  {c}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

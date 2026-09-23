@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient } from "../_shared/supabase.ts";
+import { EMPLOYER_PDF_NAME, EMPLOYER_PDF_URL } from "../_shared/employers.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM = Deno.env.get("RESEND_FROM_EMAIL") ?? "Voynova <onboarding@resend.dev>";
@@ -7,7 +8,7 @@ const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 const WA_CONNECTOR_KEY = Deno.env.get("WHATSAPP_API_KEY");
 const WA_TEMPLATE = Deno.env.get("WHATSAPP_TEMPLATE_NAME");
 
-async function sendEmail(to: string, subject: string, body: string) {
+async function sendEmail(to: string, subject: string, body: string, attachProfile = false) {
   // Resend is a gateway-backed connection: RESEND_API_KEY is the connection key, not a provider key.
   const res = await fetch("https://connector-gateway.lovable.dev/resend/emails", {
     method: "POST",
@@ -22,6 +23,10 @@ async function sendEmail(to: string, subject: string, body: string) {
       subject,
       text: body,
       html: body.replace(/\n/g, "<br/>"),
+      // Employer mails carry the branded company profile + proposal PDF.
+      ...(attachProfile
+        ? { attachments: [{ path: EMPLOYER_PDF_URL, filename: EMPLOYER_PDF_NAME }] }
+        : {}),
     }),
   });
   const text = await res.text();
@@ -87,6 +92,16 @@ Deno.serve(async (req) => {
       .limit(5);
     if (error) throw error;
 
+    // Which of the due leads are employers? Those mails get the PDF attached.
+    const leadIds = [...new Set((due ?? []).map((r) => r.lead_id).filter(Boolean))];
+    const employerLeads = new Set<string>();
+    if (leadIds.length) {
+      const { data: leadRows } = await supa.from("leads").select("id, kind").in("id", leadIds);
+      for (const l of leadRows ?? []) {
+        if (l.kind !== "education" && l.kind !== "supply") employerLeads.add(l.id);
+      }
+    }
+
     let sent = 0;
     let failed = 0;
     let paused = 0;
@@ -103,7 +118,12 @@ Deno.serve(async (req) => {
       try {
         const id =
           row.channel === "email"
-            ? await sendEmail(row.to_address, row.subject ?? "Voynova Global Solutions", row.body)
+            ? await sendEmail(
+              row.to_address,
+              row.subject ?? "Voynova Global Solutions",
+              row.body,
+              employerLeads.has(row.lead_id),
+            )
             : await sendWhatsapp(row.to_address, row.body);
 
         await supa

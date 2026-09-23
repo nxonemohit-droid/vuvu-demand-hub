@@ -22,6 +22,8 @@
 - [x] Duplicate detection + merge for recruiter leads (email, phone, website, agency name) via `recruiter-tools`
 - [x] 0–100 partner priority score (country, partner type, contact quality, supply capacity)
 - [ ] WhatsApp outreach start: BLOCKED on Meta template approval ("voynova_partner_outreach", PENDING, id 1404794471810490) — connection +91 98705 88554 linked (GREEN), WHATSAPP_TEMPLATE_NAME secret set. After approval: test send + queue WhatsApp for recruiters + resume engine
+- [ ] Employer engine: detailed master proposal mail + premium branded PDF (company profile & proposal) attached to every employer mail, auto-mail engine for employers/colleges
+- [ ] PDF must follow voynovaglobal.com branding: deep navy + gold, premium/luxury layout
 - [ ] Demand Scout Pro Phase 1: Multi-language localized outreach (Serbian/BCMS, Greek, Latvian/Estonian, English) — language toggle in draft generator, country-adapted tone + compliance refs (Boravišna dozvola etc.)
 - [ ] Demand Scout Pro Phase 2: Deliverability shield — email validation status (syntax/MX), decision-maker vs generic (info@/office@) flags, daily send pacing + volume caps
 - [ ] Demand Scout Pro Phase 3: Hiring intent / vacancy signals — open-positions field on leads, templates dynamically reference active openings

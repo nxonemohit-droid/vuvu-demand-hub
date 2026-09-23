@@ -7,6 +7,11 @@ import { adminClient } from "../_shared/supabase.ts";
 import { marketFor } from "../_shared/markets.ts";
 import { aiJson, aiProvider } from "../_shared/ai.ts";
 import { pitchFor, recruiterMasterEmail } from "../_shared/recruiters.ts";
+import { employerMasterEmail } from "../_shared/employers.ts";
+
+/** Employer mails get the fixed master proposal; only the opening is AI-written. */
+const isEmployer = (lead: Record<string, unknown>) =>
+  lead.kind !== "education" && lead.kind !== "supply";
 
 const SIGNATURE = `Mohit Gururani
 Founder & CEO | Voynova Global Solutions Pvt. Ltd.
@@ -100,12 +105,22 @@ function instructionFor(lead: Lead): string {
     shared.push(
       "Angle: Voynova can send this institute screened, document-ready applicants from India and Nepal for their short skill / vocational programmes, handling document preparation, English readiness and visa paperwork so admissions receive complete files.",
     );
-  } else {
-    shared.push(
-      "Angle: Voynova can supply vetted, trade-tested blue-collar workers for the trades this employer actually uses, handling screening, documents, permit and visa paperwork, travel and arrival support. Workers pay no placement fee — the model is employer-funded and compliance-first. First shortlist in 7-10 days.",
-    );
+    return shared.join(" ");
   }
-  return shared.join(" ");
+  // Employer: AI writes only the opening; the master proposal block is fixed.
+  return [
+    shared[0],
+    shared[1],
+    shared[2],
+    shared[4],
+    "This is a European employer of blue-collar workers. The rest of the email (who we are, trades, process, timeline, compliance, commercials, attached PDF profile) is a fixed block added after your text, so DO NOT repeat it and do not write a closing line.",
+    "Return json with these fields:",
+    "subject: email subject line, max 78 characters, no emoji. Name the company and the offer, for example 'Trade-tested welders for <Company> — India & Nepal'.",
+    "body: ONLY the opening of the email — the greeting line plus 2 to 4 sentences, 60-90 words. Say who Mohit is and personalise with the company name, its city and the trades or sector it actually works in, and why Voynova fits. Use only the facts given, never invent. Do not list features, do not mention charges, no signature, no links.",
+    "whatsapp: a separate WhatsApp first message, max 60 words, friendly, one short intro line plus one question about their current trade requirement. End with https://voynovaglobal.com",
+    "score: integer 0-100 for how good this employer is for Voynova right now. Judge on: is it really an employer of blue-collar workers, does the country allow a work permit within about two months, is a decision maker reachable, and any hiring signal.",
+    "reason: one short sentence, max 20 words, explaining the score.",
+  ].join(" ");
 }
 
 type Draft = { subject: string; body: string; whatsapp: string; score: number | null; reason: string | null };
@@ -153,17 +168,18 @@ Best regards,`,
     };
   }
 
+  const employerOpening = `${greeting}
+
+I am Mohit Gururani, Founder of Voynova Global Solutions Pvt. Ltd. I am writing to ${company}${lead.city ? ` in ${lead.city}` : ""} because you employ ${lead.trades ?? lead.sector ?? "blue-collar"} teams, and we mobilise exactly that profile from India, Nepal and Bangladesh.${m ? ` ${country} works well for us because the route is the ${m.permit}, normally about ${m.days}.` : ""}`;
   return {
     subject: `Work-ready ${lead.trades ?? lead.sector ?? "blue-collar"} workers for ${company}`,
-    body: `${greeting}
-
-I am Mohit Gururani from Voynova Global Solutions. We supply vetted blue-collar workers from India and Nepal to employers in ${country}${lead.city ? ` and around ${lead.city}` : ""}.
-
-${lead.trades ? `For trades like ${lead.trades}, ` : ""}we handle screening and trade testing, documents, permit and visa paperwork, travel and arrival support. Workers pay no placement fee — our side is employer-funded and compliance-first.${m ? ` ${country} issues its permit in roughly ${m.days} (${m.permit}), subject to approval by the competent authority.` : ""}
-
-We can usually present a first shortlist within 7-10 days of your requirement.
-
-Would a 15-minute call this week work to share profiles and rates?
+    body: `${employerMasterEmail({
+      opening: employerOpening,
+      company: String(company),
+      country: String(country),
+      trades: lead.trades ? String(lead.trades) : null,
+      sector: lead.sector ? String(lead.sector) : null,
+    })}
 
 Best regards,`,
     whatsapp: `${hello}, this is Mohit from Voynova Global Solutions. We supply vetted ${lead.trades ?? lead.sector ?? "blue-collar"} workers from India and Nepal to employers in ${country}, with permits and visas handled end to end. Would you like a shortlist for ${company}? More: https://voynovaglobal.com`,
@@ -184,6 +200,16 @@ async function draft(lead: Lead): Promise<Draft> {
       opening: String(out.body),
       company: String(lead.company ?? "your agency"),
       country: String(lead.country ?? ""),
+    })}
+
+Best regards,`
+    : isEmployer(lead)
+    ? `${employerMasterEmail({
+      opening: String(out.body),
+      company: String(lead.company ?? "your team"),
+      country: String(lead.country ?? ""),
+      trades: lead.trades ? String(lead.trades) : null,
+      sector: lead.sector ? String(lead.sector) : null,
     })}
 
 Best regards,`
