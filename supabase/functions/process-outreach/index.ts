@@ -34,19 +34,28 @@ async function sendEmail(to: string, subject: string, body: string, attachProfil
   return JSON.parse(text).id as string;
 }
 
-async function sendWhatsapp(to: string, body: string) {
+// Approved Meta template "voynova": image header + "Hello {{1}}" body.
+const WA_TEMPLATE_NAME = "voynova";
+const WA_HEADER_IMAGE =
+  "https://tqzuluaukgwnqbeyvvkc.supabase.co/storage/v1/object/public/voynova-docs/wa-banner.jpg";
+void WA_TEMPLATE;
+
+async function sendWhatsapp(to: string, name: string) {
   if (!LOVABLE_KEY || !WA_CONNECTOR_KEY) throw new Error("WhatsApp connector not configured");
-  if (!WA_TEMPLATE) throw new Error("Approved WhatsApp template not configured");
   const digits = to.replace(/[^\d]/g, "");
   if (digits.length < 8 || digits.length > 15) throw new Error("WhatsApp number is not valid E.164");
+  const cleanName = (name || "there").replace(/[\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 60);
   const payload = {
     messaging_product: "whatsapp",
     to: digits,
     type: "template",
     template: {
-      name: WA_TEMPLATE,
-      language: { code: "en_US" },
-      components: [{ type: "body", parameters: [{ type: "text", text: body.slice(0, 900) }] }],
+      name: WA_TEMPLATE_NAME,
+      language: { code: "en" },
+      components: [
+        { type: "header", parameters: [{ type: "image", image: { link: WA_HEADER_IMAGE } }] },
+        { type: "body", parameters: [{ type: "text", text: cleanName }] },
+      ],
     },
   };
 
@@ -95,10 +104,12 @@ Deno.serve(async (req) => {
     // Which of the due leads are employers? Those mails get the PDF attached.
     const leadIds = [...new Set((due ?? []).map((r) => r.lead_id).filter(Boolean))];
     const employerLeads = new Set<string>();
+    const leadNames = new Map<string, string>();
     if (leadIds.length) {
-      const { data: leadRows } = await supa.from("leads").select("id, kind").in("id", leadIds);
+      const { data: leadRows } = await supa.from("leads").select("id, kind, company").in("id", leadIds);
       for (const l of leadRows ?? []) {
         if (l.kind !== "education" && l.kind !== "supply") employerLeads.add(l.id);
+        leadNames.set(l.id, l.company ?? "");
       }
     }
 
@@ -124,7 +135,7 @@ Deno.serve(async (req) => {
               row.body,
               employerLeads.has(row.lead_id),
             )
-            : await sendWhatsapp(row.to_address, row.body);
+            : await sendWhatsapp(row.to_address, leadNames.get(row.lead_id) ?? "");
 
         await supa
           .from("outreach_sends")
