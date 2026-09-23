@@ -8,9 +8,14 @@ const WA_CONNECTOR_KEY = Deno.env.get("WHATSAPP_API_KEY");
 const WA_TEMPLATE = Deno.env.get("WHATSAPP_TEMPLATE_NAME");
 
 async function sendEmail(to: string, subject: string, body: string) {
-  const res = await fetch("https://api.resend.com/emails", {
+  // Resend is a gateway-backed connection: RESEND_API_KEY is the connection key, not a provider key.
+  const res = await fetch("https://connector-gateway.lovable.dev/resend/emails", {
     method: "POST",
-    headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${LOVABLE_KEY}`,
+      "X-Connection-Api-Key": RESEND_KEY ?? "",
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       from: FROM,
       to: [to],
