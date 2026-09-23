@@ -3,7 +3,8 @@
 // Fallback: Lovable AI Gateway Responses API.
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
+// gemini-2.5-flash is retired for new access; 3.5-flash is the current fast model.
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.5-flash";
 
 type Schema = Record<string, unknown>;
 
@@ -90,6 +91,7 @@ async function viaLovable(instructions: string, input: string, schema: Schema) {
       } catch { /* partial frame */ }
     }
   }
+  if (!text.trim()) throw new Error("AI gateway returned an empty response");
   return JSON.parse(text);
 }
 

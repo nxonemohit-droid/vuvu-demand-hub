@@ -141,7 +141,15 @@ async function firecrawlSearch(q: string): Promise<Hit[]> {
       return [];
     }
     const data = await res.json();
-    const items = data.data ?? data.web ?? [];
+    // Firecrawl v2 returns either an array or { data: { web: [...] } }.
+    const raw = data.data ?? data;
+    const items: Record<string, string>[] = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.web)
+        ? raw.web
+        : Array.isArray(data.web)
+          ? data.web
+          : [];
     return items.map((i: Record<string, string>) => ({
       url: i.url,
       title: i.title ?? "",
