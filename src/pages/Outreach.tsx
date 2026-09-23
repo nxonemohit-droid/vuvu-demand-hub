@@ -229,6 +229,16 @@ const Outreach = () => {
 
       <AutoMailPanel />
 
+      <AutoMailPanel
+        kinds={["employer", "education"]}
+        noun="employer"
+        title="Europe employers & colleges auto-mail"
+        description="Europe ke employers aur colleges ko detailed proposal mail — sath me Voynova company profile PDF attach hoti hai. Har 60 second me ek mail, Mon–Fri 9:00–18:00 IST."
+        countries={["Latvia", "Estonia", "Serbia", "Cyprus"]}
+      />
+
+
+
 
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
