@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
               row.body,
               employerLeads.has(row.lead_id),
             )
-            : await sendWhatsapp(row.to_address, row.body);
+            : await sendWhatsapp(row.to_address, leadNames.get(row.lead_id) ?? "");
 
         await supa
           .from("outreach_sends")
