@@ -117,7 +117,24 @@ Deno.serve(async (req) => {
     let failed = 0;
     let paused = 0;
 
+    // Per-audience switches: recruiter (supply) vs employer/college email engines.
+    const supplyLeads = new Set<string>();
+    if (leadIds.length) {
+      const { data: kindRows } = await supa.from("leads").select("id, kind").in("id", leadIds);
+      for (const l of kindRows ?? []) if (l.kind === "supply") supplyLeads.add(l.id);
+    }
+    const s = settings as Record<string, unknown> | null;
+    const recruiterOn = s?.recruiter_auto_enabled !== false;
+    const employerOn = s?.employer_auto_enabled !== false;
+
     for (const row of due ?? []) {
+      if (row.channel === "email" && row.lead_id) {
+        const on = supplyLeads.has(row.lead_id) ? recruiterOn : employerOn;
+        if (!on) {
+          paused++;
+          continue;
+        }
+      }
       if (row.channel === "whatsapp" && (!LOVABLE_KEY || !WA_CONNECTOR_KEY)) {
         paused++;
         continue;
