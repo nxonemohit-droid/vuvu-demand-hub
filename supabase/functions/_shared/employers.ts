@@ -10,6 +10,35 @@ export const EMPLOYER_PDF_URL =
 
 export const EMPLOYER_PDF_NAME = "Voynova-Company-Profile-and-Employer-Proposal.pdf";
 
+const DOCS = "https://tqzuluaukgwnqbeyvvkc.supabase.co/storage/v1/object/public/voynova-docs";
+
+/**
+ * Picks the right profile PDF for a lead:
+ * employer → country employer proposal, supply (agency) → recruiter profile,
+ * education (college) → supplier profile. Returns null when nothing fits.
+ */
+export function attachmentFor(
+  kind: string | null | undefined,
+  country: string | null | undefined,
+): { path: string; filename: string } | null {
+  const c = (country ?? "").trim().toLowerCase();
+  if (kind === "education") {
+    return { path: `${DOCS}/voynova-supplier.pdf`, filename: "Voynova-Supplier-and-College-Partner-Profile.pdf" };
+  }
+  if (kind === "supply") {
+    if (["india", "nepal", "bangladesh"].includes(c)) {
+      const n = c[0].toUpperCase() + c.slice(1);
+      return { path: `${DOCS}/voynova-recruiter-${c}.pdf`, filename: `Voynova-Recruitment-Partner-Profile-${n}.pdf` };
+    }
+    return null;
+  }
+  if (["latvia", "estonia", "cyprus"].includes(c)) {
+    const n = c[0].toUpperCase() + c.slice(1);
+    return { path: `${DOCS}/voynova-employer-${c}.pdf`, filename: `Voynova-Employer-Proposal-${n}.pdf` };
+  }
+  return { path: EMPLOYER_PDF_URL, filename: EMPLOYER_PDF_NAME };
+}
+
 export function employerMasterEmail(opts: {
   opening: string;
   company: string;
