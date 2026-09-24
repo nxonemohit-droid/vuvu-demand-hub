@@ -57,6 +57,11 @@ export function employerMasterEmail(opts: {
 WHO WE ARE
 Voynova Global Solutions Pvt. Ltd. is an India-based international recruitment and workforce mobilisation company. We source skilled and semi-skilled workers from India, Nepal and Bangladesh for employers in Europe and the Balkans, and we work with the employer directly — there is no sub-agent chain between your vacancy and the worker.
 
+TRACK RECORD
+- 42 welders deployed to Serbia in 6 weeks, with zero visa rejections across that cohort
+- 800+ workers deployed across Serbia, Croatia and Balkan corridors (2024–25)
+- On-ground European team led by Ivana Radović, Director — European Corridor Operations
+
 TRADES WE MOBILISE${trades ? ` (relevant to ${opts.company}: ${trades})` : ""}
 - Construction: masons, shuttering and finish carpenters, steel fixers, helpers
 - Metal and fabrication: MIG / TIG / arc welders, fitters, fabricators, CNC operators
