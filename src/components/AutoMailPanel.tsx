@@ -31,6 +31,15 @@ const fmtTime = (iso: string | null | undefined) =>
       })
     : "—";
 
+/** Turns provider errors into a short, readable reason. */
+const friendlyError = (err: string) => {
+  if (/Invalid `to` field|non-ASCII/i.test(err)) return "Email address galat hai (format theek nahi).";
+  if (/401|403/.test(err)) return "Mail service ne mana kiya — connection check karo.";
+  if (/429/.test(err)) return "Bahut jaldi mail gaye — thodi der baad dobara try hoga.";
+  if (/\s5\d\d:/.test(err)) return "Mail service me temporary dikkat — dobara try hoga.";
+  return err.slice(0, 160);
+};
+
 /**
  * Auto-mail engine for one audience (recruiter partners, or employers & colleges).
  * One mail per minute, Mon–Fri 09:00–18:00 IST, with a visible start/pause switch.
@@ -322,7 +331,7 @@ export const AutoMailPanel = ({
                     </p>
                     <p className="truncate text-muted-foreground">{r.to_address}</p>
                     {r.status === "failed" && r.error && (
-                      <p className="mt-1 text-destructive">Reason: {r.error.slice(0, 160)}</p>
+                      <p className="mt-1 text-destructive">Reason: {friendlyError(r.error)}</p>
                     )}
                   </div>
                   <div className="text-right">
