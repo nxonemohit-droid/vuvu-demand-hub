@@ -142,6 +142,34 @@ export const AutoMailPanel = ({
     refetchInterval: 8000,
   });
 
+  /** Last sent/failed mails for this audience, with the fail reason. */
+  const { data: recent, isLoading: recentLoading } = useQuery({
+    queryKey: ["auto-mail-recent", audience],
+    queryFn: async () => {
+      const { data: leads, error: le } = await supabase
+        .from("leads")
+        .select("id, company, country")
+        .in("kind", kinds)
+        .is("merged_into", null)
+        .not("email", "is", null)
+        .limit(1000);
+      if (le) throw le;
+      const byId = new Map((leads ?? []).map((l) => [l.id, l]));
+      if (!byId.size) return [];
+      const { data, error } = await supabase
+        .from("outreach_sends")
+        .select("id, lead_id, to_address, status, sent_at, scheduled_for, error")
+        .eq("channel", "email")
+        .in("status", ["sent", "failed"])
+        .in("lead_id", [...byId.keys()])
+        .order("scheduled_for", { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      return (data ?? []).map((r) => ({ ...r, lead: byId.get(r.lead_id) }));
+    },
+    refetchInterval: 15000,
+  });
+
   const saveSettings = async (patch: Record<string, unknown>) => {
     const { error } = await supabase
       .from("outreach_settings")
@@ -276,6 +304,38 @@ export const AutoMailPanel = ({
           Agla mail: <span className="font-medium text-foreground">{fmtTime(stats?.nextAt)}</span>
           {settings?.last_sent_at ? ` · Pichla mail: ${fmtTime(settings.last_sent_at)}` : ""}
         </p>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Pichle mails ka status (har 15 second refresh)</p>
+          {recentLoading ? (
+            <div className="h-24 animate-pulse rounded-lg bg-muted" />
+          ) : !recent?.length ? (
+            <p className="text-xs text-muted-foreground">Abhi tak koi mail nahi gaya.</p>
+          ) : (
+            <ul className="divide-y rounded-lg border bg-card">
+              {recent.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-start justify-between gap-2 px-3 py-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground">
+                      {r.lead?.company ?? r.to_address}
+                      {r.lead?.country ? <span className="text-muted-foreground"> · {r.lead.country}</span> : null}
+                    </p>
+                    <p className="truncate text-muted-foreground">{r.to_address}</p>
+                    {r.status === "failed" && r.error && (
+                      <p className="mt-1 text-destructive">Reason: {r.error.slice(0, 160)}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <Badge variant={r.status === "sent" ? "default" : "destructive"}>
+                      {r.status === "sent" ? "Gaya" : "Fail"}
+                    </Badge>
+                    <p className="mt-1 text-muted-foreground">{fmtTime(r.sent_at ?? r.scheduled_for)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div className="space-y-2">
           <Button variant="outline" size="sm" onClick={() => setShowSample((s) => !s)} aria-expanded={showSample}>
