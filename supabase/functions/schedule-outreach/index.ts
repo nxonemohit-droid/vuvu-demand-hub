@@ -174,12 +174,16 @@ Deno.serve(async (req) => {
       if (!page || page.length < 1000) break;
     }
 
+    // Employers/colleges: no time window, send round the clock.
+    const noWindow = kinds.length > 0 && !kinds.includes("supply");
+    const slot = (d: Date) => (noWindow ? d : nextSlot(d));
+
     const result: Record<string, number> = { email: 0, whatsapp: 0, skipped: 0 };
     const rows: Record<string, unknown>[] = [];
 
     for (const channel of channels) {
       const override = Math.min(Math.max(Number(body.gap_seconds) || 0, 0), 600);
-      const gap = override || (channel === "email" ? 90 : 120);
+      const gap = override || (channel === "email" ? (noWindow ? 40 : 90) : 120);
       // continue after the last thing already queued on this channel
       const { data: last } = await supa
         .from("outreach_sends")
@@ -187,7 +191,7 @@ Deno.serve(async (req) => {
         .eq("channel", channel)
         .order("scheduled_for", { ascending: false })
         .limit(1);
-      let cursor = nextSlot(
+      let cursor = slot(
         new Date(Math.max(Date.now() + 60000, last?.[0] ? new Date(last[0].scheduled_for).getTime() + gap * 1000 : 0)),
       );
       let perDay = 0;
@@ -205,7 +209,7 @@ Deno.serve(async (req) => {
           const tomorrow = new Date(cursor.getTime());
           tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
           tomorrow.setUTCHours(3, 30, 0, 0); // 09:00 IST
-          cursor = nextSlot(tomorrow);
+          cursor = slot(tomorrow);
           dayKey = cursor.toISOString().slice(0, 10);
           perDay = 0;
         }
@@ -222,7 +226,7 @@ Deno.serve(async (req) => {
         });
         result[channel]++;
         perDay++;
-        cursor = nextSlot(new Date(cursor.getTime() + gap * 1000));
+        cursor = slot(new Date(cursor.getTime() + gap * 1000));
       }
     }
 
