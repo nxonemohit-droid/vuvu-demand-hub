@@ -1,0 +1,2 @@
+ALTER TABLE public.outreach_settings ADD COLUMN IF NOT EXISTS employer_auto_enabled boolean NOT NULL DEFAULT false;
+UPDATE public.outreach_settings SET employer_auto_enabled = (status = 'running') WHERE id = 1;

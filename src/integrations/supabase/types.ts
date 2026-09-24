@@ -1888,6 +1888,7 @@ export type Database = {
         Row: {
           consecutive_failures: number
           daily_cap: number
+          employer_auto_enabled: boolean
           gap_seconds: number
           id: number
           last_sent_at: string | null
@@ -1899,6 +1900,7 @@ export type Database = {
         Insert: {
           consecutive_failures?: number
           daily_cap?: number
+          employer_auto_enabled?: boolean
           gap_seconds?: number
           id?: number
           last_sent_at?: string | null
@@ -1910,6 +1912,7 @@ export type Database = {
         Update: {
           consecutive_failures?: number
           daily_cap?: number
+          employer_auto_enabled?: boolean
           gap_seconds?: number
           id?: number
           last_sent_at?: string | null

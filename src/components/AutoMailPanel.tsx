@@ -46,6 +46,8 @@ export const AutoMailPanel = ({
   const [busy, setBusy] = useState<string | null>(null);
   const [showSample, setShowSample] = useState(false);
   const audience = kinds.join("+");
+  /** Each audience has its own on/off switch so pausing one never stops the other. */
+  const flag = kinds.includes("supply") ? "recruiter_auto_enabled" : "employer_auto_enabled";
 
   const { data: sample } = useQuery({
     queryKey: ["auto-mail-sample", audience],
@@ -169,7 +171,7 @@ export const AutoMailPanel = ({
       if (schedErr) throw schedErr;
 
       await saveSettings({
-        recruiter_auto_enabled: true,
+        [flag]: true,
         status: "running",
         pause_reason: null,
         consecutive_failures: 0,
@@ -192,9 +194,7 @@ export const AutoMailPanel = ({
     setBusy("pause");
     try {
       await saveSettings({
-        recruiter_auto_enabled: false,
-        status: "paused",
-        pause_reason: "Aapne manually pause kiya.",
+        [flag]: false,
       });
       toast.success("Auto-mail pause ho gaya — koi mail nahi jayega.");
     } catch {
@@ -231,7 +231,9 @@ export const AutoMailPanel = ({
     toast.success(`${country}: ${data?.email ?? 0} ${noun} mail queue me.`);
   };
 
-  const running = settings?.status === "running";
+  const running =
+    settings?.status === "running" &&
+    Boolean((settings as Record<string, unknown> | null | undefined)?.[flag]);
 
   return (
     <Card className="overflow-hidden border-primary/20">
