@@ -1,6 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient } from "../_shared/supabase.ts";
-import { EMPLOYER_PDF_NAME, EMPLOYER_PDF_URL } from "../_shared/employers.ts";
+import { attachmentFor } from "../_shared/employers.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM = Deno.env.get("RESEND_FROM_EMAIL") ?? "Voynova <onboarding@resend.dev>";
@@ -8,7 +8,12 @@ const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 const WA_CONNECTOR_KEY = Deno.env.get("WHATSAPP_API_KEY");
 const WA_TEMPLATE = Deno.env.get("WHATSAPP_TEMPLATE_NAME");
 
-async function sendEmail(to: string, subject: string, body: string, attachProfile = false) {
+async function sendEmail(
+  to: string,
+  subject: string,
+  body: string,
+  attachment: { path: string; filename: string } | null = null,
+) {
   // Resend is a gateway-backed connection: RESEND_API_KEY is the connection key, not a provider key.
   const res = await fetch("https://connector-gateway.lovable.dev/resend/emails", {
     method: "POST",
@@ -23,10 +28,8 @@ async function sendEmail(to: string, subject: string, body: string, attachProfil
       subject,
       text: body,
       html: body.replace(/\n/g, "<br/>"),
-      // Employer mails carry the branded company profile + proposal PDF.
-      ...(attachProfile
-        ? { attachments: [{ path: EMPLOYER_PDF_URL, filename: EMPLOYER_PDF_NAME }] }
-        : {}),
+      // Each lead type gets its own profile PDF (employer / recruiter / supplier).
+      ...(attachment ? { attachments: [attachment] } : {}),
     }),
   });
   const text = await res.text();
@@ -103,12 +106,12 @@ Deno.serve(async (req) => {
 
     // Which of the due leads are employers? Those mails get the PDF attached.
     const leadIds = [...new Set((due ?? []).map((r) => r.lead_id).filter(Boolean))];
-    const employerLeads = new Set<string>();
+    const attachments = new Map<string, { path: string; filename: string } | null>();
     const leadNames = new Map<string, string>();
     if (leadIds.length) {
-      const { data: leadRows } = await supa.from("leads").select("id, kind, company").in("id", leadIds);
+      const { data: leadRows } = await supa.from("leads").select("id, kind, company, country").in("id", leadIds);
       for (const l of leadRows ?? []) {
-        if (l.kind !== "education" && l.kind !== "supply") employerLeads.add(l.id);
+        attachments.set(l.id, attachmentFor(l.kind, l.country));
         leadNames.set(l.id, l.company ?? "");
       }
     }
@@ -153,7 +156,7 @@ Deno.serve(async (req) => {
               row.to_address,
               row.subject ?? "Voynova Global Solutions",
               row.body,
-              employerLeads.has(row.lead_id),
+              attachments.get(row.lead_id) ?? null,
             )
             : await sendWhatsapp(row.to_address, leadNames.get(row.lead_id) ?? "");
 
