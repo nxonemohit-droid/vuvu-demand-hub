@@ -238,6 +238,9 @@ const Outreach = () => {
         countries={["Latvia", "Estonia", "Serbia", "Cyprus"]}
       />
 
+      <ManualWhatsappPanel />
+
+
 
 
 
