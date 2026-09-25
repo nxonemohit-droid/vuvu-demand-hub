@@ -133,7 +133,9 @@ Deno.serve(async (req) => {
     let attempted = 0;
     for (const row of due ?? []) {
       if (attempted >= 5) break;
-      if (row.channel === "email" && row.lead_id) {
+      // Per-audience pause applies to BOTH channels: pausing a panel stops its
+      // emails and its WhatsApp messages (supply → recruiter switch, else employer).
+      if ((row.channel === "email" || row.channel === "whatsapp") && row.lead_id) {
         const on = supplyLeads.has(row.lead_id) ? recruiterOn : employerOn;
         if (!on) {
           paused++;
