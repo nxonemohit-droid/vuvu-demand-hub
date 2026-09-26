@@ -29,4 +29,4 @@
 - [ ] Demand Scout Pro Phase 3: Hiring intent / vacancy signals — open-positions field on leads, templates dynamically reference active openings
 - [ ] Demand Scout Pro Phase 4: Case study & candidate video sample links — 1-click proof/one-pager link insertion into draft templates
 
-- [ ] All email outreach 24x7 (no Mon–Fri / hours limit), ~30–40s gap, all audiences, both engines on
+- [x] All email outreach 24x7 (no Mon–Fri / hours limit), ~30–40s gap, all audiences, both engines on
