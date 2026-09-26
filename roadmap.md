@@ -28,3 +28,5 @@
 - [ ] Demand Scout Pro Phase 2: Deliverability shield — email validation status (syntax/MX), decision-maker vs generic (info@/office@) flags, daily send pacing + volume caps
 - [ ] Demand Scout Pro Phase 3: Hiring intent / vacancy signals — open-positions field on leads, templates dynamically reference active openings
 - [ ] Demand Scout Pro Phase 4: Case study & candidate video sample links — 1-click proof/one-pager link insertion into draft templates
+
+- [x] All email outreach 24x7 (no Mon–Fri / hours limit), ~30–40s gap, all audiences, both engines on

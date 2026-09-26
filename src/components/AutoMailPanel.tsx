@@ -47,7 +47,7 @@ const friendlyError = (err: string) => {
 export const AutoMailPanel = ({
   kinds = ["supply"],
   title = "Recruiter auto-mail engine",
-  description = "Sirf recruiter partners (India, Nepal, Bangladesh, Sri Lanka) ko mail — har 60 second me ek, Mon–Fri 9:00–18:00 IST.",
+  description = "Sirf recruiter partners (India, Nepal, Bangladesh, Sri Lanka) ko mail — har 35 second me ek, 24x7.",
   countries = ["India", "Nepal", "Bangladesh", "Sri Lanka"],
   noun = "partner",
 }: AutoMailPanelProps) => {
@@ -203,7 +203,7 @@ export const AutoMailPanel = ({
       }
 
       const { data: sched, error: schedErr } = await supabase.functions.invoke("schedule-outreach", {
-        body: { channels: ["email"], kinds, gap_seconds: 60, daily_cap: 150 },
+        body: { channels: ["email"], kinds, gap_seconds: 35, daily_cap: 5000 },
       });
       if (schedErr) throw schedErr;
 
@@ -213,7 +213,7 @@ export const AutoMailPanel = ({
         pause_reason: null,
         consecutive_failures: 0,
         gap_seconds: 60,
-        daily_cap: 150,
+        daily_cap: 5000,
       });
 
       qc.invalidateQueries();
@@ -257,7 +257,7 @@ export const AutoMailPanel = ({
       return;
     }
     const { data, error } = await supabase.functions.invoke("schedule-outreach", {
-      body: { channels: ["email"], kinds, lead_ids: ids, gap_seconds: 60, daily_cap: 150 },
+      body: { channels: ["email"], kinds, lead_ids: ids, gap_seconds: 35, daily_cap: 5000 },
     });
     setBusy(null);
     if (error) {
@@ -283,7 +283,7 @@ export const AutoMailPanel = ({
             <div>
               <CardTitle>{title}</CardTitle>
               <CardDescription className="mt-1 max-w-3xl leading-5">
-                {description} Roz max {settings?.daily_cap ?? 150} mail.
+                {description}
               </CardDescription>
             </div>
           </div>

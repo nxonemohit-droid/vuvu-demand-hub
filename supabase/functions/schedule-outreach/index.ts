@@ -174,16 +174,17 @@ Deno.serve(async (req) => {
       if (!page || page.length < 1000) break;
     }
 
-    // Employers/colleges: no time window, send round the clock.
-    const noWindow = kinds.length > 0 && !kinds.includes("supply");
-    const slot = (d: Date) => (noWindow ? d : nextSlot(d));
+    // Email runs 24x7 for every audience (owner's choice); WhatsApp keeps the office window.
+    void nextSlot;
 
     const result: Record<string, number> = { email: 0, whatsapp: 0, skipped: 0 };
     const rows: Record<string, unknown>[] = [];
 
     for (const channel of channels) {
+      const noWindow = channel === "email";
+      const slot = (d: Date) => (noWindow ? d : nextSlot(d));
       const override = Math.min(Math.max(Number(body.gap_seconds) || 0, 0), 600);
-      const gap = override || (channel === "email" ? (noWindow ? 40 : 90) : 120);
+      const gap = override || (channel === "email" ? 35 : 120);
       // continue after the last thing already queued on this channel
       const { data: last } = await supa
         .from("outreach_sends")
@@ -205,7 +206,7 @@ Deno.serve(async (req) => {
 
         const key = cursor.toISOString().slice(0, 10);
         if (key !== dayKey) { dayKey = key; perDay = 0; }
-        if (perDay >= dailyCap) {
+        if (!noWindow && perDay >= dailyCap) {
           const tomorrow = new Date(cursor.getTime());
           tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
           tomorrow.setUTCHours(3, 30, 0, 0); // 09:00 IST
