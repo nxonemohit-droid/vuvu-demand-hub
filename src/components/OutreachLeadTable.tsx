@@ -20,6 +20,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { SendPreviewSheet } from "@/components/SendPreviewSheet";
+import { WhatsappBulkSheet } from "@/components/WhatsappBulkSheet";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   PAGE_SIZE,
   fmtDate,
@@ -80,6 +82,29 @@ export const OutreachLeadTable = ({ kind, initialStatus = "all", initialChannel 
   const { data, isLoading } = useOutreachLeads({ kind, status, channel, country, search, page });
   const { data: countries } = useAudienceCountries(kind);
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
+  const [selected, setSelected] = useState<Map<string, OutreachLead>>(new Map());
+  const [bulkOpen, setBulkOpen] = useState(false);
+
+  /** Only leads with a number whose WhatsApp has not gone yet can be bulk-sent. */
+  const canBulk = (l: OutreachLead) =>
+    !!(l.whatsapp || l.phone) &&
+    !l.outreach_sends.some((s) => s.channel === "whatsapp" && (s.status === "sent" || s.status === "skipped"));
+  const bulkable = (data?.rows ?? []).filter(canBulk);
+
+  const toggle = (l: OutreachLead) =>
+    setSelected((m) => {
+      const n = new Map(m);
+      if (n.has(l.id)) n.delete(l.id);
+      else n.set(l.id, l);
+      return n;
+    });
+
+  const selectAll = (on: boolean) =>
+    setSelected((m) => {
+      const n = new Map(m);
+      bulkable.forEach((l) => (on ? n.set(l.id, l) : n.delete(l.id)));
+      return n;
+    });
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["outreach-leads"] });
@@ -185,6 +210,13 @@ export const OutreachLeadTable = ({ kind, initialStatus = "all", initialChannel 
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-muted">
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={bulkable.length > 0 && bulkable.every((l) => selected.has(l.id))}
+                    onCheckedChange={(c) => selectAll(!!c)}
+                    aria-label="Sab select karo"
+                  />
+                </TableHead>
                 <TableHead>Lead</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>WhatsApp</TableHead>
@@ -200,6 +232,15 @@ export const OutreachLeadTable = ({ kind, initialStatus = "all", initialChannel 
                 const queued = [email, wa].find((s) => s?.status === "pending");
                 return (
                   <TableRow key={lead.id} className={i % 2 ? "bg-muted/30" : ""}>
+                    <TableCell className="w-10">
+                      {canBulk(lead) && (
+                        <Checkbox
+                          checked={selected.has(lead.id)}
+                          onCheckedChange={() => toggle(lead)}
+                          aria-label={`Select ${lead.company}`}
+                        />
+                      )}
+                    </TableCell>
                     <TableCell className="min-w-48">
                       <p className="font-medium">{lead.company}</p>
                       <p className="text-xs text-muted-foreground">
@@ -253,6 +294,24 @@ export const OutreachLeadTable = ({ kind, initialStatus = "all", initialChannel 
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
+
+      {selected.size > 0 && (
+        <div className="sticky bottom-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-card p-3 shadow-lg">
+          <span className="text-sm font-medium">{selected.size} select</span>
+          <Button size="sm" onClick={() => setBulkOpen(true)}>
+            <MessageCircle className="mr-1 h-4 w-4" />WhatsApp Bulk Send shuru karo
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Map())}>Clear</Button>
+        </div>
+      )}
+
+      <WhatsappBulkSheet
+        leads={[...selected.values()]}
+        open={bulkOpen}
+        onClose={() => { setBulkOpen(false); refresh(); }}
+        onDone={(id) => setSelected((m) => { const n = new Map(m); n.delete(id); return n; })}
+        textFor={waText}
+      />
 
       <SendPreviewSheet lead={preview?.lead ?? null} send={preview?.send ?? null} onClose={() => setPreview(null)} />
 
