@@ -93,16 +93,21 @@ export const ManualWhatsappPanel = () => {
   const mark = async (lead: WaLead, status: "sent" | "skipped") => {
     const number = digits(lead.whatsapp ?? lead.phone ?? "");
     const now = new Date().toISOString();
-    const { error } = await supabase.from("outreach_sends").insert({
-      lead_id: lead.id,
-      channel: "whatsapp",
-      to_address: number,
-      body: textFor(lead),
-      status,
-      scheduled_for: now,
-      sent_at: status === "sent" ? now : null,
-      error: status === "skipped" ? "Manually skipped" : null,
-    });
+    // One row per lead+channel (unique index), so upsert instead of insert —
+    // a lead that already has a queued WhatsApp row gets it marked sent/skipped.
+    const { error } = await supabase.from("outreach_sends").upsert(
+      {
+        lead_id: lead.id,
+        channel: "whatsapp",
+        to_address: number,
+        body: textFor(lead),
+        status,
+        scheduled_for: now,
+        sent_at: status === "sent" ? now : null,
+        error: status === "skipped" ? "Manually skipped" : null,
+      },
+      { onConflict: "lead_id,channel" },
+    );
     if (error) {
       toast.error("Record save nahi hua, dobara try karo.");
       return false;
