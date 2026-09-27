@@ -29,7 +29,7 @@ export const WhatsappBulkSheet = ({ leads, open, onClose, onDone, textFor }: Pro
   const [edited, setEdited] = useState<Record<string, string>>({});
   const [result, setResult] = useState({ sent: 0, skipped: 0 });
   const [busy, setBusy] = useState(false);
-  // Snapshot the selection when the sheet opens; parent removes sent queue from its list.
+  // Snapshot the selection when the sheet opens; parent removes sent leads from its list.
   const [queue, setQueue] = useState<OutreachLead[]>([]);
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export const WhatsappBulkSheet = ({ leads, open, onClose, onDone, textFor }: Pro
         { onConflict: "lead_id,channel" },
       );
       if (error) throw error;
-      await supabase.from("queue").update({ stage: "contacted" }).eq("id", lead.id).eq("stage", "new");
+      await supabase.from("leads").update({ stage: "contacted" }).eq("id", lead.id).eq("stage", "new");
       setResult((r) => ({ ...r, sent: r.sent + 1 }));
       onDone(lead.id);
       next();
