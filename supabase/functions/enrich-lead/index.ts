@@ -74,17 +74,21 @@ async function scrape(url: string): Promise<string | null> {
   }
 }
 
+let hunterBlocked = false;
+
 type HunterHit = { email: string; name: string | null; role: string | null };
 
 /** Prefer a real decision maker (HR / admissions / owner), else any generic inbox. */
 async function hunterEmail(domain: string): Promise<HunterHit | null> {
-  if (!HUNTER_KEY || !domain) return null;
+  if (!HUNTER_KEY || !domain || hunterBlocked) return null;
   try {
     const res = await fetch(
       `https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=10&api_key=${HUNTER_KEY}`,
       { signal: AbortSignal.timeout(15000) },
     );
     if (!res.ok) {
+      // Restricted / rate-limited account: stop calling Hunter for this run.
+      if (res.status === 429 || res.status === 401 || res.status === 403) hunterBlocked = true;
       console.error(`Hunter ${res.status}: ${(await res.text()).slice(0, 200)}`);
       return null;
     }

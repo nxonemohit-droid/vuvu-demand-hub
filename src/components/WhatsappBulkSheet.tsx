@@ -29,17 +29,20 @@ export const WhatsappBulkSheet = ({ leads, open, onClose, onDone, textFor }: Pro
   const [edited, setEdited] = useState<Record<string, string>>({});
   const [result, setResult] = useState({ sent: 0, skipped: 0 });
   const [busy, setBusy] = useState(false);
+  // Snapshot the selection when the sheet opens; parent removes sent queue from its list.
+  const [queue, setQueue] = useState<OutreachLead[]>([]);
 
   useEffect(() => {
     if (open) {
+      setQueue(leads);
       setIdx(0);
       setOpened(false);
       setResult({ sent: 0, skipped: 0 });
     }
   }, [open]);
 
-  const lead = leads[idx];
-  const finished = idx >= leads.length;
+  const lead = queue[idx];
+  const finished = idx >= queue.length;
   const text = lead ? edited[lead.id] ?? textFor(lead) : "";
 
   const next = () => {
@@ -77,7 +80,7 @@ export const WhatsappBulkSheet = ({ leads, open, onClose, onDone, textFor }: Pro
         { onConflict: "lead_id,channel" },
       );
       if (error) throw error;
-      await supabase.from("leads").update({ stage: "contacted" }).eq("id", lead.id).eq("stage", "new");
+      await supabase.from("queue").update({ stage: "contacted" }).eq("id", lead.id).eq("stage", "new");
       setResult((r) => ({ ...r, sent: r.sent + 1 }));
       onDone(lead.id);
       next();
@@ -118,10 +121,10 @@ export const WhatsappBulkSheet = ({ leads, open, onClose, onDone, textFor }: Pro
 
         <div className="mt-4 space-y-2">
           <div className="flex justify-between text-sm">
-            <span>{Math.min(idx, leads.length)} / {leads.length}</span>
+            <span>{Math.min(idx, queue.length)} / {queue.length}</span>
             <span className="text-muted-foreground">Bheje {result.sent} · Skip {result.skipped}</span>
           </div>
-          <Progress value={leads.length ? (idx / leads.length) * 100 : 0} />
+          <Progress value={queue.length ? (idx / queue.length) * 100 : 0} />
         </div>
 
         {finished ? (
