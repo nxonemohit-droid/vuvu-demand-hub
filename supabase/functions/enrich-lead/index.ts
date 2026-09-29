@@ -250,6 +250,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Fresh Hunter state per request: a 429/401/403 stops Hunter only for
+    // this run, and the next invocation starts unblocked.
+    const hunterState: HunterState = { blocked: false };
     let processed = 0;
     for (const lead of leads) {
       try {
@@ -262,7 +265,7 @@ Deno.serve(async (req) => {
         let contactRole = ai.contact_role ?? lead.contact_role ?? null;
         let emailSource = lead.email_source ?? (email ? "page" : null);
         if (!email && domain) {
-          const h = await hunterEmail(domain);
+          const h = await hunterEmail(domain, hunterState);
           if (h) {
             email = h.email;
             contactName = contactName ?? h.name;
