@@ -74,21 +74,26 @@ async function scrape(url: string): Promise<string | null> {
   }
 }
 
-let hunterBlocked = false;
+// Per-invocation state: a rate-limit/auth error should only stop Hunter for
+// the current request, not for the lifetime of the warm isolate.
+type HunterState = { blocked: boolean };
 
 type HunterHit = { email: string; name: string | null; role: string | null };
 
 /** Prefer a real decision maker (HR / admissions / owner), else any generic inbox. */
-async function hunterEmail(domain: string): Promise<HunterHit | null> {
-  if (!HUNTER_KEY || !domain || hunterBlocked) return null;
+async function hunterEmail(
+  domain: string,
+  state: HunterState = { blocked: false },
+): Promise<HunterHit | null> {
+  if (!HUNTER_KEY || !domain || state.blocked) return null;
   try {
     const res = await fetch(
       `https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=10&api_key=${HUNTER_KEY}`,
       { signal: AbortSignal.timeout(15000) },
     );
     if (!res.ok) {
-      // Restricted / rate-limited account: stop calling Hunter for this run.
-      if (res.status === 429 || res.status === 401 || res.status === 403) hunterBlocked = true;
+      // Restricted / rate-limited account: stop calling Hunter for this request.
+      if (res.status === 429 || res.status === 401 || res.status === 403) state.blocked = true;
       console.error(`Hunter ${res.status}: ${(await res.text()).slice(0, 200)}`);
       return null;
     }
