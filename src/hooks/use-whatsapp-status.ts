@@ -7,11 +7,19 @@ export const useWhatsAppStatus = () => useQuery({
   queryKey: ["whatsapp-template-status"],
   queryFn: async (): Promise<TemplateState> => {
     const { data, error } = await supabase.functions.invoke("whatsapp-status", { body: {} });
-    if (error) throw new Error(error instanceof FunctionsHttpError ? await error.context.text() : error.message);
+    if (error) {
+      const details = error instanceof FunctionsHttpError ? await error.context.text().catch(() => "") : error.message;
+      // Temporary hosting outage (503) — show plain text, the query retries automatically.
+      if (/SERVICE_DEGRADED|temporarily unavailable|503/i.test(details)) {
+        throw new Error("Status service is busy right now. Retrying automatically…");
+      }
+      throw new Error(details || "Could not load WhatsApp status.");
+    }
     return data as TemplateState;
   },
   refetchInterval: 30000,
-  retry: 1,
+  retry: 3,
+  retryDelay: (n) => Math.min(2000 * 2 ** n, 15000),
 });
 
 export const useWhatsAppFailures = () => useQuery({
