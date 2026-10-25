@@ -1,12 +1,13 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient } from "../_shared/supabase.ts";
 import { attachmentFor } from "../_shared/employers.ts";
+import { lookupWhatsAppTemplate, WHATSAPP_GATEWAY } from "../_shared/whatsapp-template.ts";
+import type { TemplateState } from "../_shared/whatsapp-template-policy.ts";
 
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM = Deno.env.get("RESEND_FROM_EMAIL") ?? "Voynova <onboarding@resend.dev>";
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 const WA_CONNECTOR_KEY = Deno.env.get("WHATSAPP_API_KEY");
-const WA_TEMPLATE = Deno.env.get("WHATSAPP_TEMPLATE_NAME");
 
 async function sendEmail(
   to: string,
@@ -37,10 +38,6 @@ async function sendEmail(
   return JSON.parse(text).id as string;
 }
 
-// The template name comes from the WHATSAPP_TEMPLATE_NAME secret. It is filled only
-// once Meta approves the template, so an empty value keeps every WhatsApp send on hold
-// instead of burning failed attempts against the queue.
-const WA_TEMPLATE_NAME = (WA_TEMPLATE ?? "").trim();
 const WA_LINK = "https://voynovaglobal.com";
 
 const clean = (s: string, max: number) =>
@@ -48,8 +45,8 @@ const clean = (s: string, max: number) =>
 
 type WaLead = { kind?: string | null; company?: string | null; country?: string | null };
 
-async function sendWhatsapp(to: string, lead: WaLead, draft: string) {
-  if (!LOVABLE_KEY || !WA_CONNECTOR_KEY || !WA_TEMPLATE_NAME) {
+async function sendWhatsapp(to: string, lead: WaLead, draft: string, state: TemplateState) {
+  if (!LOVABLE_KEY || !WA_CONNECTOR_KEY || !state.can_send || !state.language) {
     throw new Error("WhatsApp connector or approved template not configured");
   }
   const digits = to.replace(/[^\d]/g, "");
@@ -65,8 +62,8 @@ async function sendWhatsapp(to: string, lead: WaLead, draft: string) {
     to: digits,
     type: "template",
     template: {
-      name: WA_TEMPLATE_NAME,
-      language: { code: "en" },
+      name: state.name,
+      language: { code: state.language },
       components: [
         {
           type: "body",
@@ -80,7 +77,7 @@ async function sendWhatsapp(to: string, lead: WaLead, draft: string) {
     },
   };
 
-  const res = await fetch("https://connector-gateway.lovable.dev/whatsapp/messages", {
+  const res = await fetch(`${WHATSAPP_GATEWAY}/messages`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${LOVABLE_KEY}`,
@@ -90,8 +87,10 @@ async function sendWhatsapp(to: string, lead: WaLead, draft: string) {
     body: JSON.stringify(payload),
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(`WhatsApp ${res.status}: ${text.slice(0, 300)}`);
-  return JSON.parse(text).messages?.[0]?.id ?? null;
+  if (!res.ok) throw new Error(`WhatsApp ${res.status}: ${text}`);
+  const id = JSON.parse(text).messages?.[0]?.id;
+  if (!id) throw new Error(`WhatsApp did not accept the message: ${text}`);
+  return id as string;
 }
 
 Deno.serve(async (req) => {
@@ -113,24 +112,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: due, error } = await supa
+    // Check the actual connected account every run; never trust the secret as proof
+    // of approval. Exclude held WhatsApp rows so they cannot starve due emails.
+    const { state: whatsappTemplate } = await lookupWhatsAppTemplate();
+    let dueQuery = supa
       .from("outreach_sends")
       .select("*")
       .eq("status", "pending")
       .lte("scheduled_for", new Date().toISOString())
       .order("scheduled_for", { ascending: true })
       .limit(60);
+    if (!whatsappTemplate.can_send) dueQuery = dueQuery.eq("channel", "email");
+    const { data: due, error } = await dueQuery;
     if (error) throw error;
 
     // Which of the due leads are employers? Those mails get the PDF attached.
     const leadIds = [...new Set((due ?? []).map((r) => r.lead_id).filter(Boolean))];
     const attachments = new Map<string, { path: string; filename: string } | null>();
-    const leadNames = new Map<string, string>();
+    const waLeads = new Map<string, WaLead>();
     if (leadIds.length) {
       const { data: leadRows } = await supa.from("leads").select("id, kind, company, country").in("id", leadIds);
       for (const l of leadRows ?? []) {
         attachments.set(l.id, attachmentFor(l.kind, l.country));
-        leadNames.set(l.id, l.company ?? "");
+        waLeads.set(l.id, l);
       }
     }
 
@@ -160,7 +164,7 @@ Deno.serve(async (req) => {
           continue;
         }
       }
-      if (row.channel === "whatsapp" && (!LOVABLE_KEY || !WA_CONNECTOR_KEY || !WA_TEMPLATE_NAME)) {
+      if (row.channel === "whatsapp" && !whatsappTemplate.can_send) {
         paused++;
         continue;
       }
@@ -178,7 +182,7 @@ Deno.serve(async (req) => {
               row.body,
               attachments.get(row.lead_id) ?? null,
             )
-            : await sendWhatsapp(row.to_address, leadNames.get(row.lead_id) ?? "");
+            : await sendWhatsapp(row.to_address, waLeads.get(row.lead_id) ?? {}, row.body ?? "", whatsappTemplate);
 
         await supa
           .from("outreach_sends")
@@ -206,7 +210,7 @@ Deno.serve(async (req) => {
           .from("outreach_sends")
           .update({
             attempts,
-            error: msg.slice(0, 400),
+            error: msg,
             status: retryable && attempts < 3 ? "pending" : "failed",
             scheduled_for: retryable && attempts < 3
               ? new Date(Date.now() + 10 * 60000).toISOString()
@@ -234,7 +238,7 @@ Deno.serve(async (req) => {
         .eq("id", 1);
     }
 
-    return new Response(JSON.stringify({ sent, failed, paused, due: due?.length ?? 0 }), {
+    return new Response(JSON.stringify({ sent, failed, paused, due: due?.length ?? 0, whatsapp_template: whatsappTemplate }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
