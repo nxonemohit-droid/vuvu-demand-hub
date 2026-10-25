@@ -397,14 +397,14 @@ Deno.serve(async (req) => {
         if (maps) {
           hits = await mapsSearch(q);
         } else {
-          // Run all connected providers in parallel, dedupe by URL afterwards.
-          const [g, f, p] = await Promise.all([
-            googleSearch(q),
-            firecrawlSearch(q),
-            perplexitySearch(q),
-          ]);
+          // Free providers first; Firecrawl search only when they return < 3 hits.
+          const [g, p] = await Promise.all([googleSearch(q), perplexitySearch(q)]);
           const tag = (hs: Hit[], src: string) => hs.map((h) => ({ ...h, source: src }));
-          hits = [...tag(g, "gcse"), ...tag(f, "firecrawl"), ...tag(p, "perplexity")];
+          hits = [...tag(g, "gcse"), ...tag(p, "perplexity")];
+          if (hits.length < 3) {
+            firecrawlSearches++;
+            hits.push(...tag(await firecrawlSearch(q), "firecrawl"));
+          }
           if (!hits.length) hits = await apifySearch(q);
           if (!hits.length) hits = await ddgSearch(q);
           if (!hits.length) hits = await mojeekSearch(q);
