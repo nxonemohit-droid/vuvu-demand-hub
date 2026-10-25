@@ -94,7 +94,7 @@ ${SIGNATURE}`,
   }
 
   return {
-    subject: `Skilled ${lead.sector ?? "blue-collar"} workers for ${company} — from India, Nepal, Bangladesh & Sri Lanka`,
+    subject: `Skilled workers for ${company} — from India, Nepal, Bangladesh & Sri Lanka`,
     body: `${greeting}
 
 I am Mohit Gururani from Voynova Global Solutions, India. We supply screened skilled and semi-skilled workers from India, Nepal, Bangladesh and Sri Lanka to employers in ${country}${sector}.
