@@ -21,6 +21,7 @@ import { LeadMailDialog, type MailLead } from "@/components/LeadMailDialog";
 import { AutoMailPanel } from "@/components/AutoMailPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OutreachOverview } from "@/components/OutreachOverview";
+import { WhatsAppStatusPanel } from "@/components/WhatsAppStatusPanel";
 import { OutreachLeadTable } from "@/components/OutreachLeadTable";
 import { useOutreachStats, type Audience, type Channel, type StatusFilter } from "@/hooks/use-outreach";
 
@@ -303,6 +304,7 @@ const Outreach = () => {
         description="Employers, recruiters aur colleges — kisko mail gaya, kya queue me hai, kya fail hua, sab yahan."
       />
 
+      <WhatsAppStatusPanel />
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setListFilter({ status: "all", channel: "any" }); }}>
         <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -313,14 +315,6 @@ const Outreach = () => {
 
         <TabsContent value="overview" className="space-y-6">
           <OutreachOverview onOpen={openList} />
-          <Alert className="border-primary/15 bg-primary/5">
-            <CalendarClock className="h-4 w-4" />
-            <AlertTitle>Automatic WhatsApp abhi band hai</AlertTitle>
-            <AlertDescription>
-              WhatsApp bhejne ke liye kisi bhi tab me lead ke saamne "WhatsApp bhejo" dabao — aapka WhatsApp message ke saath
-              khulega. Send dabane ke baad "Haan, Contacted karo" dabao.
-            </AlertDescription>
-          </Alert>
         </TabsContent>
 
         <TabsContent value="employer" className="space-y-6">
