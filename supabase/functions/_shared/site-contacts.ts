@@ -69,8 +69,9 @@ async function getHtml(url: string): Promise<string | null> {
 export type ScanBudget = { firecrawlLeft: number; firecrawlUsed: number };
 
 async function firecrawlScrape(url: string): Promise<string | null> {
-  const fc = Deno.env.get("FIRECRAWL_API_KEY");
-  const lk = Deno.env.get("LOVABLE_API_KEY");
+  const env = (globalThis as unknown as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env;
+  const fc = env?.get("FIRECRAWL_API_KEY");
+  const lk = env?.get("LOVABLE_API_KEY");
   if (!fc || !lk) return null;
   try {
     const res = await fetch("https://connector-gateway.lovable.dev/firecrawl/v2/scrape", {
