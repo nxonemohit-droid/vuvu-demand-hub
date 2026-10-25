@@ -8,6 +8,7 @@ import {
   scoreLead,
   type LeadKind,
 } from "../_shared/markets.ts";
+import { scanSiteContacts, type SiteContacts } from "../_shared/site-contacts.ts";
 
 const CSE_KEY = Deno.env.get("GOOGLE_CSE_API_KEY");
 const CSE_ID = Deno.env.get("GOOGLE_CSE_ID");
