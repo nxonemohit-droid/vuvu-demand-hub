@@ -415,6 +415,24 @@ Deno.serve(async (req) => {
           if (!hits.length) hits = await mojeekSearch(q);
         }
         await new Promise((r) => setTimeout(r, maps ? 400 : 1200));
+
+        // Pre-scan new domains in parallel (5 at a time, 15s cap each).
+        const toScan = [...new Set(
+          hits.filter((h) => h?.url && !seen.has(h.url) && isUsefulUrl(h.url))
+            .map((h) => extractDomain(h.url))
+            .filter((d): d is string => !!d && !siteCache.has(d)),
+        )];
+        const empty: SiteContacts = { emails: [], phones: [], usedFirecrawl: false };
+        for (let i = 0; i < toScan.length; i += 5) {
+          await Promise.all(toScan.slice(i, i + 5).map(async (d) => {
+            const r = await Promise.race([
+              scanSiteContacts(d, budget),
+              new Promise<SiteContacts>((res) => setTimeout(() => res(empty), 15000)),
+            ]).catch(() => empty);
+            siteCache.set(d, r);
+          }));
+        }
+
         for (const hit of hits) {
           if (!hit?.url || seen.has(hit.url) || !isUsefulUrl(hit.url)) continue;
           seen.add(hit.url);
@@ -425,13 +443,7 @@ Deno.serve(async (req) => {
           const sector = sectors.find((s) => q.includes(s)) ?? null;
           const hash = await sha256Hex(`${domain}|${country}|${kind}`);
 
-          let site: SiteContacts | null = null;
-          if (domain) {
-            if (!siteCache.has(domain)) {
-              siteCache.set(domain, await scanSiteContacts(domain, budget));
-            }
-            site = siteCache.get(domain) ?? null;
-          }
+          const site: SiteContacts | null = domain ? siteCache.get(domain) ?? null : null;
           if (site?.emails.length) siteEmails++;
           const phone = hit.phone ?? site?.phones[0] ?? null;
           const baseSource = maps ? "google_maps" : (hit.source ?? "gcse");
