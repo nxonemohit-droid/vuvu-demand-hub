@@ -1,5 +1,7 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [x] Search all 10 listed European markets for employers and colleges: 347 employer and 227 education prospects saved; visible in authenticated Find Leads. Broad discovery is not hiring/admissions verification; some large jobs hit CPU limits, smaller batches reached every market. Public research separately verified 10 employers and 4 existing colleges; exact duplicate-skip total is not recorded.
+
 - [x] WhatsApp panel: live template approval status, approval-gated automatic sends, and failure reasons
 - [x] Lead search: ran current Firecrawl/Hunter-enabled pipeline; Latvia search created 18 leads and enrichment processed 3 (individual provider success not separately confirmed)
 
