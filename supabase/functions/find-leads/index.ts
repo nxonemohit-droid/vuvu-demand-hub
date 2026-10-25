@@ -391,6 +391,10 @@ Deno.serve(async (req) => {
       const seen = new Set<string>();
       let created = 0;
       let found = 0;
+      let firecrawlSearches = 0;
+      let siteEmails = 0;
+      const siteCache = new Map<string, SiteContacts>();
+      const budget = { firecrawlLeft: 10, firecrawlUsed: 0 };
 
       for (const { q, maps } of queries) {
         let hits: Hit[] = [];
