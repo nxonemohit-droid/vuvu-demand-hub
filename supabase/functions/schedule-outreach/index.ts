@@ -34,15 +34,16 @@ Bridging Indian & Nepali talent with global opportunities
 https://voynovaglobal.com | https://voy-nova-profiles.live/company-profile`;
 
 function emailFor(lead: Record<string, string | null>) {
-  // A personalised AI draft (from draft-email) always wins over the template.
-  if (lead.draft_body) {
+  // Supply partners keep their personalised AI draft; employers and colleges
+  // get the dedicated audience templates below (owner's choice).
+  if (lead.kind === "supply" && lead.draft_body) {
     return {
       subject: lead.draft_subject ?? `Voynova Global Solutions — ${lead.company ?? "partnership"}`,
       body: lead.draft_body,
     };
   }
   const first = (lead.contact_name ?? "").trim().split(/\s+/)[0];
-  const greeting = first ? `Hi ${first},` : "Hello,";
+  const greeting = first ? `Dear ${first},` : "Dear Hiring Team,";
   const company = lead.company ?? "your team";
   const country = lead.country ?? "Europe";
   const market = marketFor(country);
@@ -68,17 +69,24 @@ ${SIGNATURE}`,
   }
 
   if (lead.kind === "education") {
+    const admissions = first ? `Dear ${first},` : "Dear Admissions Team,";
     return {
-      subject: `Student pipeline from India & Nepal for ${company}`,
-      body: `${greeting}
+      subject: `International students from India, Nepal, Bangladesh & Sri Lanka for ${company}`,
+      body: `${admissions}
 
-I am reaching out from Voynova Global Solutions. We prepare and place students from India and Nepal into short skill and vocational programmes in Europe, where they can study and work alongside.
+I am Mohit Gururani from Voynova Global Solutions, India. We work as a student recruitment partner for colleges and training institutes in ${country}.
 
-We would like to send ${company} a first batch of screened applicants${lead.program_type ? ` for your ${lead.program_type}` : ""}. We handle document preparation, language readiness and visa paperwork, so your admissions team only receives complete files.
+We would like to send ${company} international students from India, Nepal, Bangladesh and Sri Lanka${lead.program_type ? ` for your ${lead.program_type} programmes` : ""}.
 
-${country} works well for our students because the study route there is quick and transparent.
+How we support your admissions team:
+- Pre-screened applicants: academic records, English level and genuine study intent checked
+- Complete files: application forms, documents and translations ready before submission
+- Visa paperwork support and pre-departure briefing for every student
+- Arrival and settling-in coordination, so students start on time
 
-Would a short call this week make sense to agree intake numbers and requirements?
+We can start with a small pilot batch for your next intake and grow from there.
+
+Could you share your intake dates, entry requirements and student recruitment terms? A 15-minute call this week would also work well.
 
 Best regards,
 ${SIGNATURE}`,
@@ -86,18 +94,23 @@ ${SIGNATURE}`,
   }
 
   return {
-    subject: `Work-ready ${lead.sector ?? "blue-collar"} workers for ${company} — ${country}`,
+    subject: `Skilled ${lead.sector ?? "blue-collar"} workers for ${company} — from India, Nepal, Bangladesh & Sri Lanka`,
     body: `${greeting}
 
-I am reaching out from Voynova Global Solutions. We supply vetted blue-collar workers from India and Nepal to employers in ${country}${sector}.
+I am Mohit Gururani from Voynova Global Solutions, India. We supply screened skilled and semi-skilled workers from India, Nepal, Bangladesh and Sri Lanka to employers in ${country}${sector}.
 
-${lead.hiring_signal ? `I saw that ${company} is currently recruiting, so the timing may suit.` : `If ${company} is planning to recruit this season, the timing may suit.`} ${market ? `${country} issues its work permit in roughly ${market.days} (${market.permit}), so a candidate can realistically start within two months.` : ""}
+${lead.hiring_signal ? `I noticed ${company} is currently hiring, so this may be good timing.` : `If ${company} is planning to hire this season, we would be glad to help.`}
 
-What we handle: screening and trade testing, documents, permit and visa paperwork, travel and arrival support. Workers pay no placement fee — our side is employer-funded and compliance-first.
+What we provide:
+- Candidates for construction, welding, factory, warehouse, hospitality, cleaning, agriculture and driving roles
+- Screening, trade tests and video interviews before you select anyone
+- Full documentation, work permit and visa paperwork support${market ? ` (${market.permit} in ${country})` : ""}
+- Travel, arrival and onboarding support
+- Ethical hiring: workers pay no recruitment fee
 
-We can usually present a first shortlist within 7–10 days of your requirement.
+We can share a first shortlist of CVs within 7–10 days after we receive your requirement. Small batches and large volumes are both fine.
 
-Would a 15-minute call this week work to share profiles and rates?
+Could you send me the roles and number of workers you need? I will share matching profiles. Our company profile is attached.
 
 Best regards,
 ${SIGNATURE}`,
