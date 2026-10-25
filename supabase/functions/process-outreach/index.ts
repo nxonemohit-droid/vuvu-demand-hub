@@ -37,24 +37,21 @@ async function sendEmail(
   return JSON.parse(text).id as string;
 }
 
-// Approved Meta template "voynova_ad_v1": body {{1}} headline, {{2}} detail, {{3}} link.
-const WA_TEMPLATE_NAME = "voynova_ad_v1";
+// The template name comes from the WHATSAPP_TEMPLATE_NAME secret. It is filled only
+// once Meta approves the template, so an empty value keeps every WhatsApp send on hold
+// instead of burning failed attempts against the queue.
+const WA_TEMPLATE_NAME = (WA_TEMPLATE ?? "").trim();
 const WA_LINK = "https://voynovaglobal.com";
-void WA_TEMPLATE;
 
 const clean = (s: string, max: number) =>
   s.replace(/[\n\t\r]+/g, " ").replace(/\s{4,}/g, "   ").replace(/\s{2,}/g, " ").trim().slice(0, max);
 
 type WaLead = { kind?: string | null; company?: string | null; country?: string | null };
 
-function headlineFor(l: WaLead): string {
-  if (l.kind === "supply") return "Partnership for Europe job orders";
-  if (l.kind === "education") return "Student partnership with Voynova";
-  return `Skilled workers ready for your company${l.country ? ` in ${l.country}` : ""}`;
-}
-
 async function sendWhatsapp(to: string, lead: WaLead, draft: string) {
-  if (!LOVABLE_KEY || !WA_CONNECTOR_KEY) throw new Error("WhatsApp connector not configured");
+  if (!LOVABLE_KEY || !WA_CONNECTOR_KEY || !WA_TEMPLATE_NAME) {
+    throw new Error("WhatsApp connector or approved template not configured");
+  }
   const digits = to.replace(/[^\d]/g, "");
   if (digits.length < 8 || digits.length > 15) throw new Error("WhatsApp number is not valid E.164");
   const name = clean(lead.company || "", 60);
@@ -74,7 +71,7 @@ async function sendWhatsapp(to: string, lead: WaLead, draft: string) {
         {
           type: "body",
           parameters: [
-            { type: "text", text: clean(headlineFor(lead), 80) },
+            { type: "text", text: clean(lead.company || "there", 60) },
             { type: "text", text: detail },
             { type: "text", text: WA_LINK },
           ],
@@ -163,7 +160,7 @@ Deno.serve(async (req) => {
           continue;
         }
       }
-      if (row.channel === "whatsapp" && (!LOVABLE_KEY || !WA_CONNECTOR_KEY)) {
+      if (row.channel === "whatsapp" && (!LOVABLE_KEY || !WA_CONNECTOR_KEY || !WA_TEMPLATE_NAME)) {
         paused++;
         continue;
       }
