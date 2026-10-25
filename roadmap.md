@@ -1,5 +1,7 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [ ] Find new employers across all listed European markets and worker sectors, plus colleges across all listed markets; verify saved results and duplicates.
+
 - [x] WhatsApp panel: live template approval status, approval-gated automatic sends, and failure reasons
 - [x] Lead search: ran current Firecrawl/Hunter-enabled pipeline; Latvia search created 18 leads and enrichment processed 3 (individual provider success not separately confirmed)
 
