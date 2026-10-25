@@ -37,17 +37,32 @@ async function sendEmail(
   return JSON.parse(text).id as string;
 }
 
-// Approved Meta template "voynova": image header + "Hello {{1}}" body.
-const WA_TEMPLATE_NAME = "voynova";
-const WA_HEADER_IMAGE =
-  "https://tqzuluaukgwnqbeyvvkc.supabase.co/storage/v1/object/public/voynova-docs/wa-banner.jpg";
+// Approved Meta template "voynova_ad_v1": body {{1}} headline, {{2}} detail, {{3}} link.
+const WA_TEMPLATE_NAME = "voynova_ad_v1";
+const WA_LINK = "https://voynovaglobal.com";
 void WA_TEMPLATE;
 
-async function sendWhatsapp(to: string, name: string) {
+const clean = (s: string, max: number) =>
+  s.replace(/[\n\t\r]+/g, " ").replace(/\s{4,}/g, "   ").replace(/\s{2,}/g, " ").trim().slice(0, max);
+
+type WaLead = { kind?: string | null; company?: string | null; country?: string | null };
+
+function headlineFor(l: WaLead): string {
+  if (l.kind === "supply") return "Partnership for Europe job orders";
+  if (l.kind === "education") return "Student partnership with Voynova";
+  return `Skilled workers ready for your company${l.country ? ` in ${l.country}` : ""}`;
+}
+
+async function sendWhatsapp(to: string, lead: WaLead, draft: string) {
   if (!LOVABLE_KEY || !WA_CONNECTOR_KEY) throw new Error("WhatsApp connector not configured");
   const digits = to.replace(/[^\d]/g, "");
   if (digits.length < 8 || digits.length > 15) throw new Error("WhatsApp number is not valid E.164");
-  const cleanName = (name || "there").replace(/[\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, 60);
+  const name = clean(lead.company || "", 60);
+  const detail = clean(
+    draft ||
+      `${name ? `Dear ${name}, ` : ""}Voynova Global Solutions supplies trained blue-collar workers from India, Nepal and Bangladesh to European employers, with full compliance support.`,
+    400,
+  );
   const payload = {
     messaging_product: "whatsapp",
     to: digits,
@@ -56,8 +71,14 @@ async function sendWhatsapp(to: string, name: string) {
       name: WA_TEMPLATE_NAME,
       language: { code: "en" },
       components: [
-        { type: "header", parameters: [{ type: "image", image: { link: WA_HEADER_IMAGE } }] },
-        { type: "body", parameters: [{ type: "text", text: cleanName }] },
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: clean(headlineFor(lead), 80) },
+            { type: "text", text: detail },
+            { type: "text", text: WA_LINK },
+          ],
+        },
       ],
     },
   };
