@@ -470,6 +470,9 @@ Deno.serve(async (req) => {
           .eq("id", job.id);
       }
 
+      console.log(
+        `find-leads done: found=${found} created=${created} siteEmails=${siteEmails} firecrawlSearch=${firecrawlSearches} firecrawlScrape=${budget.firecrawlUsed}`,
+      );
       await supa
         .from("find_jobs")
         .update({
