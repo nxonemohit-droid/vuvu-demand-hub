@@ -1,5 +1,7 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [ ] WhatsApp panel: live template approval status, approval-gated automatic sends, and failure reasons
+
 - [x] Delete legacy pages, components, edge functions (five retained deployed functions need separate live cleanup)
 - [x] Migration: new `leads`, `outreach_sends`, `find_jobs` tables (+ RLS + grants)
 - [x] Country/visa config incl. Cyprus; education (Learn & Earn) lead mode
