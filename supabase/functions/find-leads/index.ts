@@ -420,14 +420,26 @@ Deno.serve(async (req) => {
           const sector = sectors.find((s) => q.includes(s)) ?? null;
           const hash = await sha256Hex(`${domain}|${country}|${kind}`);
 
+          let site: SiteContacts | null = null;
+          if (domain) {
+            if (!siteCache.has(domain)) {
+              siteCache.set(domain, await scanSiteContacts(domain, budget));
+            }
+            site = siteCache.get(domain) ?? null;
+          }
+          if (site?.emails.length) siteEmails++;
+          const phone = hit.phone ?? site?.phones[0] ?? null;
+          const baseSource = maps ? "google_maps" : (hit.source ?? "gcse");
+
           const lead = {
             kind,
             company: hit.company ?? companyFromHit(hit),
             website: domain ? `https://${domain}` : null,
+            email: site?.emails[0] ?? null,
             country,
             city: hit.city ?? null,
-            phone: hit.phone ?? null,
-            whatsapp: hit.phone ?? null,
+            phone,
+            whatsapp: phone,
             sector,
             address: hit.address ?? null,
             opening_hours: hit.openingHours ?? null,
@@ -436,7 +448,7 @@ Deno.serve(async (req) => {
             place_id: hit.placeId ?? null,
             hiring_signal: hit.snippet?.slice(0, 400) ?? null,
             visa_speed: marketFor(country)?.speed ?? null,
-            source: maps ? "google_maps" : (hit.source ?? "gcse"),
+            source: site?.emails.length ? `${baseSource}+site` : baseSource,
             source_url: hit.url,
             dedup_hash: hash,
           };
