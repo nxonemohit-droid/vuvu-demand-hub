@@ -167,6 +167,8 @@ Deno.serve(async (req) => {
     let q = supa.from("leads").select("*").neq("stage", "rejected").is("merged_into", null);
     if (leadIds) q = q.in("id", leadIds);
     if (kinds.length) q = q.in("kind", kinds);
+    // Email-only runs: skip leads without an email so the 1000-row page is not wasted.
+    if (channels.length === 1 && channels[0] === "email") q = q.not("email", "is", null);
     const { data: leads, error } = await q.limit(1000);
     if (error) throw error;
 
