@@ -1,6 +1,7 @@
 # Voynova Lead Engine — rebuild roadmap
 
 - [ ] WhatsApp panel: live template approval status, approval-gated automatic sends, and failure reasons
+- [ ] Lead search: use the now-active Firecrawl + Hunter for current lead search
 
 - [x] Delete legacy pages, components, edge functions (five retained deployed functions need separate live cleanup)
 - [x] Migration: new `leads`, `outreach_sends`, `find_jobs` tables (+ RLS + grants)
