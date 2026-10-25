@@ -8,6 +8,7 @@ import {
   scoreLead,
   type LeadKind,
 } from "../_shared/markets.ts";
+import { scanSiteContacts, type SiteContacts } from "../_shared/site-contacts.ts";
 
 const CSE_KEY = Deno.env.get("GOOGLE_CSE_API_KEY");
 const CSE_ID = Deno.env.get("GOOGLE_CSE_ID");
@@ -391,25 +392,47 @@ Deno.serve(async (req) => {
       const seen = new Set<string>();
       let created = 0;
       let found = 0;
+      let firecrawlSearches = 0;
+      let siteEmails = 0;
+      const siteCache = new Map<string, SiteContacts>();
+      const budget = { firecrawlLeft: 10, firecrawlUsed: 0 };
 
       for (const { q, maps } of queries) {
         let hits: Hit[] = [];
         if (maps) {
           hits = await mapsSearch(q);
         } else {
-          // Run all connected providers in parallel, dedupe by URL afterwards.
-          const [g, f, p] = await Promise.all([
-            googleSearch(q),
-            firecrawlSearch(q),
-            perplexitySearch(q),
-          ]);
+          // Free providers first; Firecrawl search only when they return < 3 hits.
+          const [g, p] = await Promise.all([googleSearch(q), perplexitySearch(q)]);
           const tag = (hs: Hit[], src: string) => hs.map((h) => ({ ...h, source: src }));
-          hits = [...tag(g, "gcse"), ...tag(f, "firecrawl"), ...tag(p, "perplexity")];
+          hits = [...tag(g, "gcse"), ...tag(p, "perplexity")];
+          if (hits.length < 3) {
+            firecrawlSearches++;
+            hits.push(...tag(await firecrawlSearch(q), "firecrawl"));
+          }
           if (!hits.length) hits = await apifySearch(q);
           if (!hits.length) hits = await ddgSearch(q);
           if (!hits.length) hits = await mojeekSearch(q);
         }
         await new Promise((r) => setTimeout(r, maps ? 400 : 1200));
+
+        // Pre-scan new domains in parallel (5 at a time, 15s cap each).
+        const toScan = [...new Set(
+          hits.filter((h) => h?.url && !seen.has(h.url) && isUsefulUrl(h.url))
+            .map((h) => extractDomain(h.url))
+            .filter((d): d is string => !!d && !siteCache.has(d)),
+        )];
+        const empty: SiteContacts = { emails: [], phones: [], usedFirecrawl: false };
+        for (let i = 0; i < toScan.length; i += 5) {
+          await Promise.all(toScan.slice(i, i + 5).map(async (d) => {
+            const r = await Promise.race([
+              scanSiteContacts(d, budget),
+              new Promise<SiteContacts>((res) => setTimeout(() => res(empty), 15000)),
+            ]).catch(() => empty);
+            siteCache.set(d, r);
+          }));
+        }
+
         for (const hit of hits) {
           if (!hit?.url || seen.has(hit.url) || !isUsefulUrl(hit.url)) continue;
           seen.add(hit.url);
@@ -420,14 +443,20 @@ Deno.serve(async (req) => {
           const sector = sectors.find((s) => q.includes(s)) ?? null;
           const hash = await sha256Hex(`${domain}|${country}|${kind}`);
 
+          const site: SiteContacts | null = domain ? siteCache.get(domain) ?? null : null;
+          if (site?.emails.length) siteEmails++;
+          const phone = hit.phone ?? site?.phones[0] ?? null;
+          const baseSource = maps ? "google_maps" : (hit.source ?? "gcse");
+
           const lead = {
             kind,
             company: hit.company ?? companyFromHit(hit),
             website: domain ? `https://${domain}` : null,
+            email: site?.emails[0] ?? null,
             country,
             city: hit.city ?? null,
-            phone: hit.phone ?? null,
-            whatsapp: hit.phone ?? null,
+            phone,
+            whatsapp: phone,
             sector,
             address: hit.address ?? null,
             opening_hours: hit.openingHours ?? null,
@@ -436,7 +465,7 @@ Deno.serve(async (req) => {
             place_id: hit.placeId ?? null,
             hiring_signal: hit.snippet?.slice(0, 400) ?? null,
             visa_speed: marketFor(country)?.speed ?? null,
-            source: maps ? "google_maps" : (hit.source ?? "gcse"),
+            source: site?.emails.length ? `${baseSource}+site` : baseSource,
             source_url: hit.url,
             dedup_hash: hash,
           };
@@ -453,6 +482,9 @@ Deno.serve(async (req) => {
           .eq("id", job.id);
       }
 
+      console.log(
+        `find-leads done: found=${found} created=${created} siteEmails=${siteEmails} firecrawlSearch=${firecrawlSearches} firecrawlScrape=${budget.firecrawlUsed}`,
+      );
       await supa
         .from("find_jobs")
         .update({
