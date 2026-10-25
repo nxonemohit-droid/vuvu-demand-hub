@@ -1,7 +1,7 @@
 # Voynova Lead Engine — rebuild roadmap
 
-- [ ] WhatsApp panel: live template approval status, approval-gated automatic sends, and failure reasons
-- [ ] Lead search: use the now-active Firecrawl + Hunter for current lead search
+- [x] WhatsApp panel: live template approval status, approval-gated automatic sends, and failure reasons
+- [x] Lead search: ran current Firecrawl/Hunter-enabled pipeline; Latvia search created 18 leads and enrichment processed 3 (individual provider success not separately confirmed)
 
 - [x] Delete legacy pages, components, edge functions (five retained deployed functions need separate live cleanup)
 - [x] Migration: new `leads`, `outreach_sends`, `find_jobs` tables (+ RLS + grants)
@@ -24,7 +24,7 @@
 - [x] Recruiter pipeline stages: New, Qualified, Contacted, Replied, Meeting booked, Partner onboarded
 - [x] Duplicate detection + merge for recruiter leads (email, phone, website, agency name) via `recruiter-tools`
 - [x] 0–100 partner priority score (country, partner type, contact quality, supply capacity)
-- [ ] WhatsApp outreach start: BLOCKED on Meta template approval ("voynova_partner_outreach", PENDING, id 1404794471810490) — connection +91 98705 88554 linked (GREEN), WHATSAPP_TEMPLATE_NAME secret set. After approval: test send + queue WhatsApp for recruiters + resume engine
+- [ ] WhatsApp outreach delivery verification: waiting for Meta approval of `voynova_partner_v1` on the Estonia connection; 1,240 messages held. Runtime approval gate resumes eligible queued sends only when the audience engine is running.
 - [ ] Employer engine: detailed master proposal mail + premium branded PDF (company profile & proposal) attached to every employer mail, auto-mail engine for employers/colleges
 - [ ] PDF must follow voynovaglobal.com branding: deep navy + gold, premium/luxury layout
 - [ ] Demand Scout Pro Phase 1: Multi-language localized outreach (Serbian/BCMS, Greek, Latvian/Estonian, English) — language toggle in draft generator, country-adapted tone + compliance refs (Boravišna dozvola etc.)
