@@ -39,8 +39,8 @@ export const OutreachOverview = ({ onOpen }: Props) => {
                 <TableRow>
                   <TableHead>Audience</TableHead>
                   <TableHead>Channel</TableHead>
-                  <TableHead>Bheja</TableHead>
-                  <TableHead>Aaj bheje</TableHead>
+                  <TableHead>Sent / WA accepted-recorded</TableHead>
+                  <TableHead>Today</TableHead>
                   <TableHead>Queue me</TableHead>
                   <TableHead>Fail</TableHead>
                   <TableHead>Reply</TableHead>
@@ -56,7 +56,7 @@ export const OutreachOverview = ({ onOpen }: Props) => {
                         <TableCell>
                           <span className="flex items-center gap-1.5 text-sm">
                             {ch === "email" ? <Mail className="h-4 w-4 text-primary" /> : <MessageCircle className="h-4 w-4 text-primary" />}
-                            {ch === "email" ? "Email" : "WhatsApp"}
+                            {ch === "email" ? "Email" : "WhatsApp · delivery unknown"}
                           </span>
                         </TableCell>
                         <TableCell>{cell(kind, ch, "sent", s.sent, "text-primary")}</TableCell>

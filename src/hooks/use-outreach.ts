@@ -19,6 +19,7 @@ export type SendRow = {
   scheduled_for: string;
   error: string | null;
   attempts: number;
+  provider_message_id: string | null;
 };
 
 export type OutreachLead = {
@@ -28,6 +29,12 @@ export type OutreachLead = {
   city: string | null;
   kind: Audience;
   contact_name: string | null;
+  contact_role: string | null;
+  role: string | null;
+  hiring_signal: string | null;
+  source_url: string | null;
+  website: string | null;
+  email_source: string | null;
   email: string | null;
   phone: string | null;
   whatsapp: string | null;
@@ -119,8 +126,8 @@ export const useOutreachLeads = (p: LeadListParams) =>
       let q = supabase
         .from("leads")
         .select(
-          `id, company, country, city, kind, contact_name, email, phone, whatsapp, stage, draft_whatsapp,
-           outreach_sends(id, channel, status, to_address, subject, body, sent_at, scheduled_for, error, attempts)${filterJoin}`,
+          `id, company, country, city, kind, contact_name, contact_role, role, hiring_signal, source_url, website, email_source, email, phone, whatsapp, stage, draft_whatsapp,
+           outreach_sends(id, channel, status, to_address, subject, body, sent_at, scheduled_for, error, attempts, provider_message_id)${filterJoin}`,
           { count: "exact" },
         )
         .eq("kind", p.kind)

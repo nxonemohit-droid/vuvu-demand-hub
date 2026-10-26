@@ -1,5 +1,8 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [x] Check WhatsApp evidence and show Meta acceptance separately from actual delivery on Outreach. Two tests passed; signed-in panel shows ten accepted messages with delivery unknown. No callback storage exists; actual Delivered/Read tracking is blocked by Classic connector support and requires approved migration.
+- [x] Show contact roles, contact-source labels and hiring/admissions evidence with source links in employer/college tables. Verified four Latvia prospects: Europlast has undated blue-collar vacancies, LU international degree admissions supported; Pillar/LVPIC excluded. LU already emailed, so no duplicate institution outreach. One new Europlast enquiry sent; signed-in preview reads sent at 26/10/2026 22:01. Remaining leads are source-reported, not individually verified.
+
 - [x] Speed up lead search: bounded requests, one-query lookahead, parallel contact-page checks and per-request Firecrawl budget; 4 scanner tests passed; live Latvia education search completed with 36 URLs and 1 new lead.
 - [ ] Finish Hunter lookup for all leads: live batches saved contacts on 1,884 leads, with 2,200 total Hunter-sourced contacts now stored; blocked by Hunter's billing-period search allowance (429), not a transient rate limit. No further Hunter calls until allowance is restored.
 - [x] Confirm `voynova_partner_v1` approval and run a small WhatsApp batch: APPROVED, 3 accepted, 0 failed; live panel shows 919 queued, 527 accepted, 5 historical failures. Only the three test rows were moved from future scheduling; the remaining queue schedule was unchanged.
@@ -30,7 +33,7 @@
 - [x] Recruiter pipeline stages: New, Qualified, Contacted, Replied, Meeting booked, Partner onboarded
 - [x] Duplicate detection + merge for recruiter leads (email, phone, website, agency name) via `recruiter-tools`
 - [x] 0–100 partner priority score (country, partner type, contact quality, supply capacity)
-- [ ] WhatsApp recipient delivery verification: template APPROVED and 3-message run accepted by Meta; actual recipient delivery remains unverified without delivery callbacks.
+- [ ] WhatsApp recipient delivery verification: no stored delivery callbacks; current Classic connector cannot receive receipts. Requires modern-stack migration approval; do not infer delivery from acceptance.
 - [ ] Employer engine: detailed master proposal mail + premium branded PDF (company profile & proposal) attached to every employer mail, auto-mail engine for employers/colleges
 - [ ] PDF must follow voynovaglobal.com branding: deep navy + gold, premium/luxury layout
 - [ ] Demand Scout Pro Phase 1: Multi-language localized outreach (Serbian/BCMS, Greek, Latvian/Estonian, English) — language toggle in draft generator, country-adapted tone + compliance refs (Boravišna dozvola etc.)

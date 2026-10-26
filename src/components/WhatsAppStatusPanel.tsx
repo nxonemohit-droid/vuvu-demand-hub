@@ -1,5 +1,5 @@
 import { MessageCircle, RefreshCw, CircleAlert } from "lucide-react";
-import { useWhatsAppStatus, useWhatsAppFailures } from "@/hooks/use-whatsapp-status";
+import { useWhatsAppStatus, useWhatsAppFailures, useWhatsAppAccepted } from "@/hooks/use-whatsapp-status";
 import { useOutreachStats, fmtDate } from "@/hooks/use-outreach";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 export const WhatsAppStatusPanel = () => {
   const status = useWhatsAppStatus();
   const failures = useWhatsAppFailures();
+  const accepted = useWhatsAppAccepted();
   const stats = useOutreachStats();
   const state = status.data;
   const totals = stats.data ? Object.values(stats.data).reduce((a, s) => ({ pending: a.pending + s.whatsapp.pending, sent: a.sent + s.whatsapp.sent, failed: a.failed + s.whatsapp.failed }), { pending: 0, sent: 0, failed: 0 }) : null;
@@ -36,6 +37,13 @@ export const WhatsAppStatusPanel = () => {
         {[ ["Queued", totals?.pending], ["Accepted / recorded sent", totals?.sent], ["Failed", totals?.failed] ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 text-xl font-semibold">{value ?? "—"}</dd></div>)}
       </dl>
       <p className="text-xs text-muted-foreground">Provider acceptance is not delivery confirmation.</p>
+      <Alert><CircleAlert className="h-4 w-4" /><AlertTitle>Recipient delivery: not confirmed</AlertTitle><AlertDescription>No delivery or read receipts are available in this app. Accepted messages remain delivery unknown.</AlertDescription></Alert>
+      {accepted.isError ? <p className="text-sm text-destructive">Accepted message records could not be loaded.</p> : accepted.data?.length ? (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Recent Meta-accepted messages</h3>
+          {accepted.data.map((row) => <div key={row.id} className="border-b border-border py-2 text-sm"><p className="font-medium">{row.leads?.company ?? row.to_address}</p><p className="text-muted-foreground">{row.to_address} · {fmtDate(row.sent_at)}</p><Badge variant="secondary">Accepted · delivery unknown</Badge><details className="mt-1"><summary className="cursor-pointer text-xs text-muted-foreground">Message reference</summary><p className="break-all text-xs text-muted-foreground">{row.provider_message_id}</p></details></div>)}
+        </div>
+      ) : null}
       {failures.isError ? <Alert variant="destructive"><CircleAlert className="h-4 w-4" /><AlertTitle>Failure report unavailable</AlertTitle><AlertDescription>{failures.error.message}</AlertDescription></Alert> : failures.isLoading ? <Skeleton className="h-12 w-full" /> : failures.data?.length ? (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold">Recent failed messages</h3>
