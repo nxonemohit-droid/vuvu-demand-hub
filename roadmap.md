@@ -1,5 +1,8 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [ ] Check actual WhatsApp delivery evidence and show delivery separately from provider acceptance on Outreach; never infer delivery from a successful send.
+- [ ] Show source-backed employer/college contacts, roles and hiring/admissions evidence; verify a small unsent batch, send it and read back status.
+
 - [x] Speed up lead search: bounded requests, one-query lookahead, parallel contact-page checks and per-request Firecrawl budget; 4 scanner tests passed; live Latvia education search completed with 36 URLs and 1 new lead.
 - [ ] Finish Hunter lookup for all leads: live batches saved contacts on 1,884 leads, with 2,200 total Hunter-sourced contacts now stored; blocked by Hunter's billing-period search allowance (429), not a transient rate limit. No further Hunter calls until allowance is restored.
 - [x] Confirm `voynova_partner_v1` approval and run a small WhatsApp batch: APPROVED, 3 accepted, 0 failed; live panel shows 919 queued, 527 accepted, 5 historical failures. Only the three test rows were moved from future scheduling; the remaining queue schedule was unchanged.
