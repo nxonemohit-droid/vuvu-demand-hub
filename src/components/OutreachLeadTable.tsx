@@ -22,6 +22,7 @@ import {
 import { SendPreviewSheet } from "@/components/SendPreviewSheet";
 import { WhatsappBulkSheet } from "@/components/WhatsappBulkSheet";
 import { Checkbox } from "@/components/ui/checkbox";
+import { whatsappSendLabel } from "@/lib/whatsapp-delivery";
 import {
   PAGE_SIZE,
   fmtDate,
@@ -50,7 +51,7 @@ const waText = (lead: OutreachLead) => {
 
 const StatusCell = ({ send, onView }: { send?: SendRow; onView: () => void }) => {
   if (!send) return <span className="text-xs text-muted-foreground">Nahi bheja</span>;
-  const label = send.status === "sent" ? "Bheja" : send.status === "pending" ? "Queue me" : send.status === "failed" ? "Fail" : "Chhoda";
+  const label = send.channel === "whatsapp" ? whatsappSendLabel(send.status, send.provider_message_id) : send.status === "sent" ? "Bheja" : send.status === "pending" ? "Queue me" : send.status === "failed" ? "Fail" : "Chhoda";
   return (
     <button type="button" onClick={onView} className="text-left">
       <Badge variant={send.status === "sent" ? "default" : send.status === "failed" ? "destructive" : "secondary"}>{label}</Badge>
@@ -248,6 +249,9 @@ export const OutreachLeadTable = ({ kind, initialStatus = "all", initialChannel 
                         {lead.contact_name ? ` · ${lead.contact_name}` : ""}
                       </p>
                       <p className="text-[11px] text-muted-foreground">{lead.email ?? "no email"} · {lead.whatsapp ?? lead.phone ?? "no phone"}</p>
+                      <p className="text-xs text-muted-foreground">Contact role: {lead.contact_role ?? "Not verified"}</p>
+                      {lead.email_source && <p className="text-[11px] text-muted-foreground">Contact source: {lead.email_source === "hunter" ? "Hunter · provider-reported" : lead.email_source}</p>}
+                      <details className="mt-2 max-w-80 text-xs"><summary className="cursor-pointer text-primary">{lead.kind === "education" ? "Admissions evidence" : "Hiring evidence"} · review source</summary><p className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">Role: {lead.role ?? "Not verified"}</p><p className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">{lead.hiring_signal ?? "No evidence recorded."}</p><p className="mt-1 text-muted-foreground">Saved discovery text is not proof of a current vacancy or international intake.</p>{lead.source_url && /^https?:\/\//i.test(lead.source_url) && <a href={lead.source_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-primary underline">Open source</a>}</details>
                       {lead.stage !== "new" && <Badge variant="outline" className="mt-1 capitalize">{lead.stage}</Badge>}
                     </TableCell>
                     <TableCell><StatusCell send={email} onView={() => email && setPreview({ lead, send: email })} /></TableCell>

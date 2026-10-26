@@ -1,6 +1,7 @@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { fmtDate, friendlyError, pdfLabel, type OutreachLead, type SendRow } from "@/hooks/use-outreach";
+import { whatsappSendLabel } from "@/lib/whatsapp-delivery";
 
 type Props = { lead: OutreachLead | null; send: SendRow | null; onClose: () => void };
 
@@ -19,7 +20,7 @@ export const SendPreviewSheet = ({ lead, send, onClose }: Props) => (
           <div className="mt-4 space-y-4 text-sm">
             <div className="flex flex-wrap gap-2">
               <Badge variant={send.status === "sent" ? "default" : send.status === "failed" ? "destructive" : "secondary"}>
-                {send.status}
+                {send.channel === "whatsapp" ? whatsappSendLabel(send.status, send.provider_message_id) : send.status}
               </Badge>
               <span className="text-muted-foreground">
                 {send.sent_at ? `Bheja: ${fmtDate(send.sent_at)}` : `Scheduled: ${fmtDate(send.scheduled_for)}`}

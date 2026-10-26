@@ -34,3 +34,17 @@ export const useWhatsAppFailures = () => useQuery({
   },
   refetchInterval: 30000,
 });
+
+export const useWhatsAppAccepted = () => useQuery({
+  queryKey: ["whatsapp-recent-accepted"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("outreach_sends")
+      .select("id,to_address,sent_at,provider_message_id,leads(company)")
+      .eq("channel", "whatsapp").eq("status", "sent")
+      .not("provider_message_id", "is", null)
+      .order("sent_at", { ascending: false }).limit(10);
+    if (error) throw error;
+    return data ?? [];
+  },
+  refetchInterval: 30000,
+});
