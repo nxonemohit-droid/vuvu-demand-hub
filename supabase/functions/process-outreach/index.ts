@@ -98,6 +98,17 @@ Deno.serve(async (req) => {
 
   try {
     const supa = adminClient();
+    const body: unknown = await req.json().catch(() => ({}));
+    const options = body && typeof body === "object" ? body as Record<string, unknown> : {};
+    const whatsappOnly = options.channel === "whatsapp";
+    const runLimit = whatsappOnly ? Math.max(1, Math.min(5, Number(options.limit) || 3)) : 5;
+    if (whatsappOnly) {
+      const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+      const { data: auth } = await supa.auth.getUser(token ?? "");
+      if (!auth.user) return new Response(JSON.stringify({ error: "Sign in to run WhatsApp queue" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Engine switch: a paused engine never calls the mail provider.
     const { data: settings } = await supa
@@ -122,7 +133,11 @@ Deno.serve(async (req) => {
       .lte("scheduled_for", new Date().toISOString())
       .order("scheduled_for", { ascending: true })
       .limit(60);
-    if (!whatsappTemplate.can_send) dueQuery = dueQuery.eq("channel", "email");
+    if (whatsappOnly && !whatsappTemplate.can_send) return new Response(JSON.stringify({
+      sent: 0, failed: 0, paused: true, whatsapp_template: whatsappTemplate,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (whatsappOnly) dueQuery = dueQuery.eq("channel", "whatsapp");
+    else if (!whatsappTemplate.can_send) dueQuery = dueQuery.eq("channel", "email");
     const { data: due, error } = await dueQuery;
     if (error) throw error;
 
@@ -154,7 +169,7 @@ Deno.serve(async (req) => {
 
     let attempted = 0;
     for (const row of due ?? []) {
-      if (attempted >= 5) break;
+      if (attempted >= runLimit) break;
       // Per-audience pause applies to BOTH channels: pausing a panel stops its
       // emails and its WhatsApp messages (supply → recruiter switch, else employer).
       if ((row.channel === "email" || row.channel === "whatsapp") && row.lead_id) {
