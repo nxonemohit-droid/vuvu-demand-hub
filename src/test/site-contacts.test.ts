@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { extractEmails, findContactLinks, scanSiteContacts } from "../../supabase/functions/_shared/site-contacts";
 
