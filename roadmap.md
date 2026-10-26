@@ -1,5 +1,9 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [x] Speed up lead search: bounded requests, one-query lookahead, parallel contact-page checks and per-request Firecrawl budget; 4 scanner tests passed; live Latvia education search completed with 36 URLs and 1 new lead.
+- [ ] Finish Hunter lookup for all leads: live batches saved contacts on 1,884 leads, with 2,200 total Hunter-sourced contacts now stored; blocked by Hunter's billing-period search allowance (429), not a transient rate limit. No further Hunter calls until allowance is restored.
+- [x] Confirm `voynova_partner_v1` approval and run a small WhatsApp batch: APPROVED, 3 accepted, 0 failed; live panel shows 919 queued, 527 accepted, 5 historical failures. Only the three test rows were moved from future scheduling; the remaining queue schedule was unchanged.
+
 - [x] Search all 10 listed European markets for employers and colleges: 347 employer and 227 education prospects saved; visible in authenticated Find Leads. Broad discovery is not hiring/admissions verification; some large jobs hit CPU limits, smaller batches reached every market. Public research separately verified 10 employers and 4 existing colleges; exact duplicate-skip total is not recorded.
 
 - [x] WhatsApp panel: live template approval status, approval-gated automatic sends, and failure reasons
@@ -26,7 +30,7 @@
 - [x] Recruiter pipeline stages: New, Qualified, Contacted, Replied, Meeting booked, Partner onboarded
 - [x] Duplicate detection + merge for recruiter leads (email, phone, website, agency name) via `recruiter-tools`
 - [x] 0–100 partner priority score (country, partner type, contact quality, supply capacity)
-- [ ] WhatsApp outreach delivery verification: waiting for Meta approval of `voynova_partner_v1` on the Estonia connection; 1,240 messages held. Runtime approval gate resumes eligible queued sends only when the audience engine is running.
+- [ ] WhatsApp recipient delivery verification: template APPROVED and 3-message run accepted by Meta; actual recipient delivery remains unverified without delivery callbacks.
 - [ ] Employer engine: detailed master proposal mail + premium branded PDF (company profile & proposal) attached to every employer mail, auto-mail engine for employers/colleges
 - [ ] PDF must follow voynovaglobal.com branding: deep navy + gold, premium/luxury layout
 - [ ] Demand Scout Pro Phase 1: Multi-language localized outreach (Serbian/BCMS, Greek, Latvian/Estonian, English) — language toggle in draft generator, country-adapted tone + compliance refs (Boravišna dozvola etc.)
