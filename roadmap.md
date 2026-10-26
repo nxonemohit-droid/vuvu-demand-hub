@@ -2,6 +2,7 @@
 
 - [ ] Speed up lead search without increasing paid-provider calls: bounded requests, overlapping discovery, parallel contact-page checks, tests and live verification.
 - [ ] Find available contact details for existing leads using Hunter; verify provider access, run enrichment and report coverage or blockers.
+- [ ] Confirm `voynova_partner_v1` approval; only if APPROVED run a small WhatsApp batch and verify live panel state.
 
 - [x] Search all 10 listed European markets for employers and colleges: 347 employer and 227 education prospects saved; visible in authenticated Find Leads. Broad discovery is not hiring/admissions verification; some large jobs hit CPU limits, smaller batches reached every market. Public research separately verified 10 employers and 4 existing colleges; exact duplicate-skip total is not recorded.
 
