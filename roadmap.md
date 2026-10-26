@@ -1,6 +1,6 @@
 # Voynova Lead Engine — rebuild roadmap
 
-- [ ] Check actual WhatsApp delivery evidence and show delivery separately from provider acceptance on Outreach; never infer delivery from a successful send.
+- [x] Check WhatsApp evidence and show Meta acceptance separately from actual delivery on Outreach. Two tests passed; signed-in panel shows ten accepted messages with delivery unknown. No callback storage exists; actual Delivered/Read tracking is blocked by Classic connector support and requires approved migration.
 - [ ] Show source-backed employer/college contacts, roles and hiring/admissions evidence; verify a small unsent batch, send it and read back status.
 
 - [x] Speed up lead search: bounded requests, one-query lookahead, parallel contact-page checks and per-request Firecrawl budget; 4 scanner tests passed; live Latvia education search completed with 36 URLs and 1 new lead.
@@ -33,7 +33,7 @@
 - [x] Recruiter pipeline stages: New, Qualified, Contacted, Replied, Meeting booked, Partner onboarded
 - [x] Duplicate detection + merge for recruiter leads (email, phone, website, agency name) via `recruiter-tools`
 - [x] 0–100 partner priority score (country, partner type, contact quality, supply capacity)
-- [ ] WhatsApp recipient delivery verification: template APPROVED and 3-message run accepted by Meta; actual recipient delivery remains unverified without delivery callbacks.
+- [ ] WhatsApp recipient delivery verification: no stored delivery callbacks; current Classic connector cannot receive receipts. Requires modern-stack migration approval; do not infer delivery from acceptance.
 - [ ] Employer engine: detailed master proposal mail + premium branded PDF (company profile & proposal) attached to every employer mail, auto-mail engine for employers/colleges
 - [ ] PDF must follow voynovaglobal.com branding: deep navy + gold, premium/luxury layout
 - [ ] Demand Scout Pro Phase 1: Multi-language localized outreach (Serbian/BCMS, Greek, Latvian/Estonian, English) — language toggle in draft generator, country-adapted tone + compliance refs (Boravišna dozvola etc.)
