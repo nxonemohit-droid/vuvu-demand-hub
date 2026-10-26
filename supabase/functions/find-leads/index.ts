@@ -43,6 +43,7 @@ async function mapsSearch(q: string): Promise<Hit[]> {
   try {
     const res = await fetch(`${GATEWAY_URL}/places/v1/places:searchText`, {
       method: "POST",
+      signal: AbortSignal.timeout(12000),
       headers: {
         Authorization: `Bearer ${LOVABLE_KEY}`,
         "X-Connection-Api-Key": MAPS_KEY,
@@ -104,7 +105,7 @@ async function googleSearch(q: string): Promise<Hit[]> {
   u.searchParams.set("q", q);
   u.searchParams.set("num", "10");
   try {
-    const res = await fetch(u.toString());
+    const res = await fetch(u.toString(), { signal: AbortSignal.timeout(10000) });
     if (!res.ok) {
       const body = (await res.text()).slice(0, 300);
       console.error(`CSE ${res.status}: ${body}`);
@@ -128,6 +129,7 @@ async function firecrawlSearch(q: string): Promise<Hit[]> {
   try {
     const res = await fetch("https://connector-gateway.lovable.dev/firecrawl/v2/search", {
       method: "POST",
+      signal: AbortSignal.timeout(12000),
       headers: {
         Authorization: `Bearer ${LOVABLE_KEY}`,
         "X-Connection-Api-Key": FIRECRAWL_KEY,
@@ -171,6 +173,7 @@ async function perplexitySearch(q: string): Promise<Hit[]> {
   try {
     const res = await fetch(`${PPLX_GATEWAY}/search`, {
       method: "POST",
+      signal: AbortSignal.timeout(12000),
       headers: {
         Authorization: `Bearer ${LOVABLE_KEY}`,
         "X-Connection-Api-Key": PERPLEXITY_KEY,
@@ -211,6 +214,7 @@ async function ddgSearch(q: string): Promise<Hit[]> {
     () =>
       fetch("https://lite.duckduckgo.com/lite/", {
         method: "POST",
+        signal: AbortSignal.timeout(8000),
         headers: {
           "User-Agent": UA,
           "Content-Type": "application/x-www-form-urlencoded",
@@ -220,6 +224,7 @@ async function ddgSearch(q: string): Promise<Hit[]> {
       }),
     () =>
       fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, {
+        signal: AbortSignal.timeout(8000),
         headers: { "User-Agent": UA, "Accept-Language": "en-US,en;q=0.9" },
       }),
   ];
@@ -227,6 +232,7 @@ async function ddgSearch(q: string): Promise<Hit[]> {
   attempts.push(() => {
     const target = encodeURIComponent(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`);
     return fetch(`https://r.jina.ai/${target}`, {
+      signal: AbortSignal.timeout(8000),
       headers: { "User-Agent": UA, Accept: "text/plain" },
     });
   });
@@ -286,6 +292,7 @@ function parseDuckDuckGo(html: string): Hit[] {
 async function mojeekSearch(q: string): Promise<Hit[]> {
   try {
     const res = await fetch(`https://www.mojeek.com/search?q=${encodeURIComponent(q)}`, {
+      signal: AbortSignal.timeout(8000),
       headers: { "User-Agent": UA, "Accept-Language": "en-US,en;q=0.9" },
     });
     if (!res.ok) {
@@ -314,6 +321,7 @@ async function apifySearch(q: string): Promise<Hit[]> {
       `https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=120`,
       {
         method: "POST",
+        signal: AbortSignal.timeout(20000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           queries: q,
@@ -397,7 +405,7 @@ Deno.serve(async (req) => {
       const siteCache = new Map<string, SiteContacts>();
       const budget = { firecrawlLeft: 10, firecrawlUsed: 0 };
 
-      for (const { q, maps } of queries) {
+      const discover = async ({ q, maps }: { q: string; maps: boolean }): Promise<Hit[]> => {
         let hits: Hit[] = [];
         if (maps) {
           hits = await mapsSearch(q);
@@ -414,7 +422,17 @@ Deno.serve(async (req) => {
           if (!hits.length) hits = await ddgSearch(q);
           if (!hits.length) hits = await mojeekSearch(q);
         }
-        await new Promise((r) => setTimeout(r, maps ? 400 : 1200));
+        return hits;
+      };
+
+      // One query ahead only: discovery overlaps current website scans/saves,
+      // without launching the whole paid search workload at once.
+      let nextHits = queries[0] ? discover(queries[0]) : Promise.resolve<Hit[]>([]);
+      for (let queryIndex = 0; queryIndex < queries.length; queryIndex++) {
+        const { q, maps } = queries[queryIndex];
+        const hits = await nextHits;
+        const nextQuery = queries[queryIndex + 1];
+        nextHits = nextQuery ? discover(nextQuery) : Promise.resolve([]);
 
         // Pre-scan new domains in parallel (5 at a time, 15s cap each).
         const toScan = [...new Set(
@@ -425,10 +443,7 @@ Deno.serve(async (req) => {
         const empty: SiteContacts = { emails: [], phones: [], usedFirecrawl: false };
         for (let i = 0; i < toScan.length; i += 5) {
           await Promise.all(toScan.slice(i, i + 5).map(async (d) => {
-            const r = await Promise.race([
-              scanSiteContacts(d, budget),
-              new Promise<SiteContacts>((res) => setTimeout(() => res(empty), 15000)),
-            ]).catch(() => empty);
+            const r = await scanSiteContacts(d, budget).catch(() => empty);
             siteCache.set(d, r);
           }));
         }
@@ -500,7 +515,12 @@ Deno.serve(async (req) => {
     };
 
     // @ts-ignore EdgeRuntime is provided by the Supabase runtime
-    EdgeRuntime.waitUntil(work());
+    EdgeRuntime.waitUntil(work().catch(async (error: unknown) => {
+      console.error("find-leads background failed", error);
+      await supa.from("find_jobs").update({
+        status: "failed", error: String(error), finished_at: new Date().toISOString(),
+      }).eq("id", job.id);
+    }));
 
     return new Response(JSON.stringify({ job_id: job.id, queries: queries.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
