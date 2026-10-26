@@ -1,6 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { adminClient, extractDomain } from "../_shared/supabase.ts";
 import { scoreLead } from "../_shared/markets.ts";
+import { z } from "npm:zod@3";
 
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 const HUNTER_KEY = Deno.env.get("HUNTER_API_KEY");
@@ -76,7 +77,7 @@ async function scrape(url: string): Promise<string | null> {
 
 // Per-invocation state: a rate-limit/auth error should only stop Hunter for
 // the current request, not for the lifetime of the warm isolate.
-type HunterState = { blocked: boolean };
+type HunterState = { blocked: boolean; error?: string };
 
 type HunterHit = { email: string; name: string | null; role: string | null };
 
@@ -85,7 +86,8 @@ async function hunterEmail(
   domain: string,
   state: HunterState = { blocked: false },
 ): Promise<HunterHit | null> {
-  if (!HUNTER_KEY || !domain || state.blocked) return null;
+  if (!HUNTER_KEY) { state.error = "Hunter key is not configured"; return null; }
+  if (!domain || state.blocked) return null;
   try {
     const res = await fetch(
       `https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=10&api_key=${HUNTER_KEY}`,
@@ -94,7 +96,8 @@ async function hunterEmail(
     if (!res.ok) {
       // Restricted / rate-limited account: stop calling Hunter for this request.
       if (res.status === 429 || res.status === 401 || res.status === 403) state.blocked = true;
-      console.error(`Hunter ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      state.error = `Hunter ${res.status}: ${(await res.text()).slice(0, 200)}`;
+      console.error(state.error);
       return null;
     }
     const data = await res.json();
@@ -113,6 +116,7 @@ async function hunterEmail(
       role: pick.position ?? null,
     };
   } catch (e) {
+    state.error = "Hunter request timed out or failed";
     console.error("Hunter error", e);
     return null;
   }
@@ -192,7 +196,8 @@ async function extract(markdown: string, kind: string): Promise<Record<string, s
   }
 
   // Accumulate the SSE output_text deltas.
-  const reader = res.body!.getReader();
+  if (!res.body) return {};
+  const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
   let text = "";
@@ -227,6 +232,46 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const limit = Math.min(Number(body.limit) || 5, 10);
     const supa = adminClient();
+
+    // Explicit Hunter-only lookup also checks already-enriched leads and
+    // existing generic inboxes, without spending Firecrawl or AI credits.
+    if (body.hunterOnly === true) {
+      const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+      const { data: auth } = await supa.auth.getUser(token ?? "");
+      if (!auth.user) return new Response(JSON.stringify({ error: "Sign in to look up contacts" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+      const parsed = z.object({ leadIds: z.array(z.string().uuid()).min(1).max(10) }).safeParse(body);
+      if (!parsed.success) return new Response(JSON.stringify({ error: "Choose 1–10 valid leads" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+      const { data: targets, error: targetError } = await supa.from("leads")
+        .select("id, website, source_url, email, contact_name, contact_role")
+        .in("id", parsed.data.leadIds);
+      if (targetError) throw targetError;
+      const state: HunterState = { blocked: false };
+      let checked = 0;
+      let found = 0;
+      for (const lead of targets ?? []) {
+        if (state.blocked) break;
+        const domain = extractDomain(lead.website ?? lead.source_url);
+        if (!domain) continue;
+        const hit = await hunterEmail(domain, state);
+        checked++;
+        if (hit) {
+          const { error: saveError } = await supa.from("leads").update({
+            email: hit.email, email_source: "hunter",
+            contact_name: hit.name, contact_role: hit.role, last_error: null,
+          }).eq("id", lead.id);
+          if (saveError) throw saveError;
+          found++;
+        }
+        if (state.error) break;
+      }
+      return new Response(JSON.stringify({ checked, found, error: state.error ?? null }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const allowedKinds = ["employer", "education", "supply"] as const;
     const kinds = Array.isArray(body.kinds)

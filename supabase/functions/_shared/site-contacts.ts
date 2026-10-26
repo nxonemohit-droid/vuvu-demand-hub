@@ -49,12 +49,12 @@ export function findContactLinks(html: string, origin: string): string[] {
   return [...out].slice(0, 2);
 }
 
-async function getHtml(url: string): Promise<string | null> {
+async function getHtml(url: string, signal?: AbortSignal): Promise<string | null> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 6000);
   try {
     const res = await fetch(url, {
-      signal: ctrl.signal,
+      signal: signal ? AbortSignal.any([ctrl.signal, signal]) : ctrl.signal,
       redirect: "follow",
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124 Safari/537.36" },
     });
@@ -69,7 +69,7 @@ async function getHtml(url: string): Promise<string | null> {
 
 export type ScanBudget = { firecrawlLeft: number; firecrawlUsed: number };
 
-async function firecrawlScrape(url: string, budget: ScanBudget): Promise<string | null> {
+async function firecrawlScrape(url: string, budget: ScanBudget, signal: AbortSignal): Promise<string | null> {
   const env = (globalThis as unknown as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env;
   const fc = env?.get("FIRECRAWL_API_KEY");
   const lk = env?.get("LOVABLE_API_KEY");
@@ -80,7 +80,7 @@ async function firecrawlScrape(url: string, budget: ScanBudget): Promise<string 
   try {
     const res = await fetch("https://connector-gateway.lovable.dev/firecrawl/v2/scrape", {
       method: "POST",
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.any([AbortSignal.timeout(6000), signal]),
       headers: { Authorization: `Bearer ${lk}`, "X-Connection-Api-Key": fc, "Content-Type": "application/json" },
       body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: false }),
     });
@@ -100,18 +100,18 @@ export async function scanSiteContacts(domain: string, budget: ScanBudget): Prom
   const timer = setTimeout(() => deadline.abort(), 14000);
   try {
   const origin = `https://${domain}`;
-  const home = await getHtml(origin);
+  const home = await getHtml(origin, deadline.signal);
   let all = home ?? "";
   const pages = home ? findContactLinks(home, new URL(origin).origin) : [];
   if (!pages.length) pages.push(`${origin}/contact`, `${origin}/contact-us`);
   // Contact pages are independent: fetch both together instead of serially.
-  all += (await Promise.all(pages.slice(0, 2).map(getHtml))).map((html) => html ?? "").join("\n");
+  all += (await Promise.all(pages.slice(0, 2).map((page) => getHtml(page, deadline.signal)))).map((html) => html ?? "").join("\n");
   let emails = extractEmails(all, domain);
   let usedFirecrawl = false;
   if (!emails.length && !home && budget.firecrawlLeft > 0 && !deadline.signal.aborted) {
     const before = budget.firecrawlUsed;
-    const contact = await firecrawlScrape(`${origin}/contact`, budget);
-    const md = contact ?? (!deadline.signal.aborted ? await firecrawlScrape(origin, budget) : null);
+    const contact = await firecrawlScrape(`${origin}/contact`, budget, deadline.signal);
+    const md = contact ?? (!deadline.signal.aborted ? await firecrawlScrape(origin, budget, deadline.signal) : null);
     usedFirecrawl = budget.firecrawlUsed > before;
     if (md) { all += md; emails = extractEmails(all, domain); }
   }
