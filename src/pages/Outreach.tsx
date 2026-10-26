@@ -275,7 +275,7 @@ const Outreach = () => {
         <Stat icon={CheckCircle2} label="Email bheja" value={s?.email.sent} tone="success" />
         <Stat icon={Clock3} label="Email queue me" value={s?.email.pending} />
         <Stat icon={CircleAlert} label="Fail (email + WhatsApp)" value={s ? s.email.failed + s.whatsapp.failed : undefined} tone="warning" />
-        <Stat icon={MessageCircle} label="WhatsApp bheja" value={s?.whatsapp.sent} />
+        <Stat icon={MessageCircle} label="WA accepted / recorded" value={s?.whatsapp.sent} />
       </div>
     );
   };
