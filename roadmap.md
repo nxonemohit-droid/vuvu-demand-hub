@@ -1,7 +1,7 @@
 # Voynova Lead Engine — rebuild roadmap
 
 - [x] Check WhatsApp evidence and show Meta acceptance separately from actual delivery on Outreach. Two tests passed; signed-in panel shows ten accepted messages with delivery unknown. No callback storage exists; actual Delivered/Read tracking is blocked by Classic connector support and requires approved migration.
-- [x] Show contact roles, contact-source labels and hiring/admissions evidence with source links in employer/college tables. Verified four Latvia prospects: Europlast has undated blue-collar vacancies, LU international degree admissions supported; Pillar/LVPIC excluded. LU already emailed, so do not duplicate institution outreach. Europlast enquiry queued; read back send status before closing.
+- [x] Show contact roles, contact-source labels and hiring/admissions evidence with source links in employer/college tables. Verified four Latvia prospects: Europlast has undated blue-collar vacancies, LU international degree admissions supported; Pillar/LVPIC excluded. LU already emailed, so no duplicate institution outreach. One new Europlast enquiry sent; signed-in preview reads sent at 26/10/2026 22:01. Remaining leads are source-reported, not individually verified.
 
 - [x] Speed up lead search: bounded requests, one-query lookahead, parallel contact-page checks and per-request Firecrawl budget; 4 scanner tests passed; live Latvia education search completed with 36 URLs and 1 new lead.
 - [ ] Finish Hunter lookup for all leads: live batches saved contacts on 1,884 leads, with 2,200 total Hunter-sourced contacts now stored; blocked by Hunter's billing-period search allowance (429), not a transient rate limit. No further Hunter calls until allowance is restored.
