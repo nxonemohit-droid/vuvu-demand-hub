@@ -54,9 +54,9 @@ const FindLeads = () => {
           .from("leads")
           .select("id", { count: "exact", head: true })
           .in("kind", ["employer", "education"]);
-      const total = await base();
-      const withEmail = await base().not("email", "is", null);
-      const pending = await base().eq("enriched", false).lt("enrich_attempts", 3);
+      const [total, withEmail, pending] = await Promise.all([
+        base(), base().not("email", "is", null), base().eq("enriched", false).lt("enrich_attempts", 3),
+      ]);
       return {
         total: total.count ?? 0,
         withEmail: withEmail.count ?? 0,
@@ -270,6 +270,7 @@ const FindLeads = () => {
               <div className="text-sm text-muted-foreground">
                 {job.urls_found} pages checked · {job.leads_created} new leads saved
               </div>
+              {job.error && <p className="text-sm text-destructive">{job.error}</p>}
             </div>
           )}
         </CardContent>
