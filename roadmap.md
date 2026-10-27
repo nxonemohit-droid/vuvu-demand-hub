@@ -1,5 +1,7 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [ ] Send bounded 40-employer WhatsApp batch including previously Accepted recipients at user's request; preserve prior references and report acceptance separately from receipts.
+
 - [x] Run requested 20-message WhatsApp batch: 20 pending recruiter mobile numbers accepted by Meta, 0 send failures; other future queue schedules unchanged.
 - [ ] Reconcile user's four visible WhatsApp messages with recorded employer sends: employer pending queue is zero, not proof of delivery; 503 historical sent records include 63 without provider references. Current +372 connection is GREEN; new 20 recruiter sends have provider references and appear as Accepted · delivery unknown in the signed-in Outreach panel. Actual visible/delivered count remains blocked by absent receipts and requires identification of the user's phone view.
 
