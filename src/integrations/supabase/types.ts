@@ -2564,6 +2564,39 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_delivery_receipts: {
+        Row: {
+          created_at: string
+          delivery_id: string
+          errors: Json
+          id: string
+          occurred_at: string
+          provider_message_id: string
+          recipient: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_id: string
+          errors?: Json
+          id?: string
+          occurred_at: string
+          provider_message_id: string
+          recipient?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          delivery_id?: string
+          errors?: Json
+          id?: string
+          occurred_at?: string
+          provider_message_id?: string
+          recipient?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       whatsapp_outreach: {
         Row: {
           created_at: string
@@ -2630,6 +2663,30 @@ export type Database = {
           daily_cap?: number
           id?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      whatsapp_webhook_inbox: {
+        Row: {
+          delivery_id: string
+          event_type: string | null
+          id: string
+          payload: Json
+          received_at: string
+        }
+        Insert: {
+          delivery_id: string
+          event_type?: string | null
+          id?: string
+          payload?: Json
+          received_at?: string
+        }
+        Update: {
+          delivery_id?: string
+          event_type?: string | null
+          id?: string
+          payload?: Json
+          received_at?: string
         }
         Relationships: []
       }

@@ -73,7 +73,7 @@ export const RecruiterPipeline = ({ countries }: Props) => {
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
     for (const s of RECRUITER_STAGES) m[s] = 0;
-    for (const l of leads ?? []) if (l.stage in m) m[l.stage] += 1;
+    for (const l of leads ?? []) if (l.stage in m) m[l.stage] = (m[l.stage] ?? 0) + 1;
     return m;
   }, [leads]);
 

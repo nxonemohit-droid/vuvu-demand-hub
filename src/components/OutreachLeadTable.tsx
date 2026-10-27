@@ -49,7 +49,7 @@ const waText = (lead: OutreachLead) => {
   );
 };
 
-const StatusCell = ({ send, onView }: { send?: SendRow; onView: () => void }) => {
+const StatusCell = ({ send, onView }: { send?: SendRow | undefined; onView: () => void }) => {
   if (!send) return <span className="text-xs text-muted-foreground">Nahi bheja</span>;
   const label = send.channel === "whatsapp" ? whatsappSendLabel(send.status, send.provider_message_id) : send.status === "sent" ? "Bheja" : send.status === "pending" ? "Queue me" : send.status === "failed" ? "Fail" : "Chhoda";
   return (
@@ -117,21 +117,21 @@ export const OutreachLeadTable = ({ kind, initialStatus = "all", initialChannel 
       .from("outreach_sends")
       .update({ status: "pending", attempts: 0, error: null, scheduled_for: new Date().toISOString() })
       .eq("id", send.id);
-    if (error) return toast.error("Dobara queue nahi hua, phir try karo.");
+    if (error) { toast.error("Dobara queue nahi hua, phir try karo."); return; }
     toast.success("Dobara queue me daal diya.");
     refresh();
   };
 
   const remove = async (send: SendRow) => {
     const { error } = await supabase.from("outreach_sends").update({ status: "skipped", error: "Manually skipped" }).eq("id", send.id);
-    if (error) return toast.error("Queue se nahi hata, phir try karo.");
+    if (error) { toast.error("Queue se nahi hata, phir try karo."); return; }
     toast.success("Queue se hata diya.");
     refresh();
   };
 
   const openWhatsapp = (lead: OutreachLead) => {
     const number = digits(lead.whatsapp ?? lead.phone ?? "");
-    if (number.length < 8) return toast.error("Is lead ka number sahi nahi hai.");
+    if (number.length < 8) { toast.error("Is lead ka number sahi nahi hai."); return; }
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(waText(lead))}`, "_blank", "noopener");
     setConfirmLead(lead);
   };
@@ -154,7 +154,7 @@ export const OutreachLeadTable = ({ kind, initialStatus = "all", initialChannel 
       },
       { onConflict: "lead_id,channel" },
     );
-    if (error) return toast.error("Record save nahi hua, dobara try karo.");
+    if (error) { toast.error("Record save nahi hua, dobara try karo."); return; }
     await supabase.from("leads").update({ stage: "contacted" }).eq("id", lead.id).eq("stage", "new");
     toast.success(`${lead.company} — Contacted mark ho gaya.`);
     refresh();

@@ -1,0 +1,9 @@
+{"functions": [
+  {"name": "whatsapp-status", "classification": "internal-only", "signal": "called from src/hooks/use-whatsapp-status.ts", "outcome": "migrated"},
+  {"name": "process-outreach", "classification": "cron target", "signal": "per-minute pg_cron job created from SQL (not in repo migrations); also called from src/pages/Outreach.tsx", "outcome": "left"},
+  {"name": "find-leads", "classification": "Deno-only dependency", "signal": "uses EdgeRuntime.waitUntil background work", "outcome": "left"},
+  {"name": "draft-email", "classification": "internal-only", "signal": "called from 4 src/ files; not yet translated this turn", "outcome": "left"},
+  {"name": "enrich-lead", "classification": "internal-only", "signal": "called from 2 src/ files; long bounded provider batches; not yet translated this turn", "outcome": "left"},
+  {"name": "recruiter-tools", "classification": "internal-only", "signal": "called from 2 src/ files; not yet translated this turn", "outcome": "left"},
+  {"name": "schedule-outreach", "classification": "internal-only", "signal": "called from 3 src/ files; shares queue code with process-outreach; not yet translated this turn", "outcome": "left"}
+]}

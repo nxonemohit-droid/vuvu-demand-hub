@@ -64,6 +64,13 @@
       "when": 1790223013841,
       "tag": "0008_per_audience_auto_mail_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793078266408,
+      "tag": "0009_whatsapp_delivery_receipts",
+      "breakpoints": true
     }
   ]
 }
