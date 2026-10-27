@@ -1,6 +1,11 @@
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 
-if (typeof window !== "undefined") Object.defineProperty(window, "matchMedia", {
+Object.defineProperty(window, "scrollTo", {
+  writable: true,
+  value: () => {},
+});
+
+Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({
     matches: false,
