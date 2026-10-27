@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "@/lib/router-compat";
+import { Link, Outlet, useLocation, useNavigate } from "@/lib/router-compat";
 import { useEffect, useId } from "react";
 import { Radar, LogOut, HelpCircle, Send, BarChart3, Handshake } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
@@ -49,7 +49,8 @@ const navItems = [
 
 export const AppLayout = () => {
   const navigate = useNavigate();
-  const { user, roles, loading, isAdmin } = useRoles();
+  const { pathname } = useLocation();
+  const { user, roles, loading } = useRoles();
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth", { replace: true });
@@ -84,24 +85,25 @@ export const AppLayout = () => {
           </div>
         </div>
         <nav className="flex-1 p-3 md:p-4 space-y-1.5">
-          {navItems
-            .map((item) => (
-              <NavLink
+          {navItems.map((item) => {
+            const isActive = pathname === item.to || pathname.startsWith(`${item.to}/`);
+            return (
+              <Link
                 key={item.to}
                 to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    "flex h-10 items-center justify-center md:justify-start gap-3 px-3 rounded-lg text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-sidebar-accent text-primary"
-                      : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
-                  )
-                }
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "flex h-10 items-center justify-center md:justify-start gap-3 px-3 rounded-lg text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-sidebar-accent text-primary"
+                    : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+                )}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
                 <span className="hidden md:inline">{item.label}</span>
-              </NavLink>
-            ))}
+              </Link>
+            );
+          })}
         </nav>
         <div className="p-3 md:p-4 border-t border-sidebar-border space-y-2">
           <div className="hidden md:block rounded-lg bg-sidebar-accent/60 px-3 py-2.5 text-xs">
