@@ -6,3 +6,4 @@
 - Explicit Hunter-only contact refresh uses authenticated, bounded lead-ID batches and skips Firecrawl/AI so existing leads can gain provider contacts without unrelated enrichment spend.
 - Explicit WhatsApp-only queue tests require an authenticated user and a bounded batch size; preserve approval and audience pause gates and leave normal scheduled processing unchanged.
 - Keep WhatsApp recipient-delivery presentation in a shared utility; an outreach send response or manual send confirmation is not a delivery receipt.
+- Verify WhatsApp callbacks with the connection key, persist deliveries before transactional receipt processing, and retry unfinished events fairly on subsequent webhook traffic; durable receipts correlate by provider ID regardless of send-save arrival order.

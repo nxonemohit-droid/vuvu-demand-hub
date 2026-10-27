@@ -26,6 +26,7 @@ export const LiveOutreachDashboard = () => {
           <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border py-2 text-sm">
             <div><p className="font-medium">{r.leads?.company ?? r.to_address}</p><p className="text-xs text-muted-foreground">{r.to_address} · {fmtDate(r.sent_at)}</p></div>
             <Badge variant={r.receipt === "failed" ? "destructive" : r.receipt === "delivered" || r.receipt === "read" ? "default" : "secondary"}>{r.receipt ? LABEL[r.receipt] : "Accepted · delivery unknown"}</Badge>
+            <details className="w-full text-xs text-muted-foreground"><summary className="cursor-pointer">Delivery proof</summary><p className="break-all">Message ID: {r.provider_message_id}</p>{r.proof.length ? r.proof.map((p) => <p key={p.delivery_id + p.status} className="break-all">{p.status} · {fmtDate(p.occurred_at)} · Receipt: {p.delivery_id}{p.errors && JSON.stringify(p.errors) !== "[]" ? ` · ${JSON.stringify(p.errors)}` : ""}</p>) : <p>No Meta delivery receipt received.</p>}</details>
           </div>
         ))}
       </div>

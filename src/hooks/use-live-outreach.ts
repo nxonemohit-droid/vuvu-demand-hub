@@ -38,17 +38,17 @@ export const useLiveOutreach = () => {
       if (error) throw error;
       const ids = (sends ?? []).map((s) => s.provider_message_id as string);
       const { data: receipts, error: rErr } = ids.length
-        ? await supabase.from("whatsapp_delivery_receipts").select("provider_message_id,status,errors").in("provider_message_id", ids)
+        ? await supabase.from("whatsapp_delivery_receipts").select("provider_message_id,status,errors,occurred_at,delivery_id").in("provider_message_id", ids)
         : { data: [], error: null };
       if (rErr) throw rErr;
-      const { count: delivered } = await supabase.from("whatsapp_delivery_receipts").select("id", head).in("status", ["delivered", "read"]);
-      const { count: read } = await supabase.from("whatsapp_delivery_receipts").select("id", head).eq("status", "read");
+      const { data: totals, error: totalsError } = await supabase.from("whatsapp_receipt_counts").select("delivered,read,failed").single();
+      if (totalsError) throw totalsError;
       const rows = (sends ?? []).map((s) => {
         const mine = (receipts ?? []).filter((r) => r.provider_message_id === s.provider_message_id);
-        return { ...s, receipt: bestReceiptStatus(mine.map((r) => r.status)) };
+        return { ...s, receipt: bestReceiptStatus(mine.map((r) => r.status)), proof: mine };
       });
-      return { verified, withEmail, withPhone, waSent, waFailed, delivered: delivered ?? 0, read: read ?? 0, rows };
+      return { verified, withEmail, withPhone, waSent, waFailed, delivered: totals?.delivered ?? 0, read: totals?.read ?? 0, rows };
     },
-    refetchInterval: 60000,
+    refetchInterval: 5000,
   });
 };

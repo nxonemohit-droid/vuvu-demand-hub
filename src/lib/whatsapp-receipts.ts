@@ -22,11 +22,12 @@ export function extractReceipts(payload: unknown): WhatsAppReceipt[] {
     const o = node as Record<string, unknown>;
     if (typeof o["id"] === "string" && typeof o["status"] === "string" && STATUSES.has(o["status"])) {
       const ts = Number(o["timestamp"]);
+      if (!Number.isFinite(ts) || ts <= 0 || ts > 8640000000000) return;
       const receipt: WhatsAppReceipt = {
         providerMessageId: o["id"],
         status: o["status"] as WhatsAppReceipt["status"],
         recipient: typeof o["recipient_id"] === "string" ? o["recipient_id"] : null,
-        occurredAt: Number.isFinite(ts) && ts > 0 ? new Date(ts * 1000).toISOString() : new Date().toISOString(),
+        occurredAt: new Date(ts * 1000).toISOString(),
         errors: Array.isArray(o["errors"]) ? o["errors"] : [],
       };
       found.set(`${receipt.providerMessageId}:${receipt.status}`, receipt);
