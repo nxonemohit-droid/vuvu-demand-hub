@@ -71,6 +71,13 @@
       "when": 1793078266408,
       "tag": "0009_whatsapp_delivery_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793085192915,
+      "tag": "0010_realtime_outreach_dashboard",
+      "breakpoints": true
     }
   ]
 }

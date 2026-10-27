@@ -22,6 +22,7 @@ import { AutoMailPanel } from "@/components/AutoMailPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OutreachOverview } from "@/components/OutreachOverview";
 import { WhatsAppStatusPanel } from "@/components/WhatsAppStatusPanel";
+import { LiveOutreachDashboard } from "@/components/LiveOutreachDashboard";
 import { OutreachLeadTable } from "@/components/OutreachLeadTable";
 import { useOutreachStats, type Audience, type Channel, type StatusFilter } from "@/hooks/use-outreach";
 
@@ -304,6 +305,7 @@ const Outreach = () => {
         description="Employers, recruiters aur colleges — kisko mail gaya, kya queue me hai, kya fail hua, sab yahan."
       />
 
+      <LiveOutreachDashboard />
       <WhatsAppStatusPanel />
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setListFilter({ status: "all", channel: "any" }); }}>
         <TabsList className="h-auto flex-wrap">

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { verifyWebhookRequest } from "@lovable.dev/webhooks-js";
 import { extractReceipts } from "@/lib/whatsapp-receipts";
-import { supabaseAdmin } from "@/lib/supabase-admin.server";
+
 
 /**
  * Receives WhatsApp callbacks forwarded by the connector gateway.
@@ -26,6 +26,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
         const eventType = typeof payload === "object" && payload !== null && "type" in payload
           ? String((payload as { type: unknown }).type) : null;
         try {
+          const { supabaseAdmin } = await import("@/lib/supabase-admin.server");
           const db = supabaseAdmin();
           const { error: inboxError } = await db.from("whatsapp_webhook_inbox")
             .upsert({ delivery_id: deliveryId, event_type: eventType, payload: payload as never }, { onConflict: "delivery_id", ignoreDuplicates: true });
