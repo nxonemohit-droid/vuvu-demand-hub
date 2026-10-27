@@ -1,5 +1,7 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [ ] Publish corrected WhatsApp receiver and verify actual Meta callbacks: connection-key signature fix, transactional durable receipts, invoked fair recovery and 5-second Outreach refresh implemented; signed diagnostic persisted once across retries in preview. Published receiver still rejects the connection-key signature (401). Latest batch: 40 accepted, zero stored Delivered/Read receipts; publishing and a fresh real callback remain required.
+
 - [x] Send bounded 40-employer WhatsApp batch: 5 new attempts plus 35 previously Accepted recipients resent at user's request; all 40 accepted with provider IDs saved, prior references preserved in lead notes; no delivery receipts received.
 
 - [x] Run requested 20-message WhatsApp batch: 20 pending recruiter mobile numbers accepted by Meta, 0 send failures; other future queue schedules unchanged.

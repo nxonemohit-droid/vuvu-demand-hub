@@ -22,4 +22,11 @@ describe("WhatsApp delivery receipts", () => {
     expect(bestReceiptStatus(["sent", "delivered", "read"])).toBe("read");
     expect(bestReceiptStatus([])).toBeNull();
   });
+  it("never invents provider event time when a callback has no timestamp", () => {
+    expect(extractReceipts({ statuses: [{ id: "wamid.D", status: "delivered" }] })).toEqual([]);
+  });
+  it("preserves Meta timestamp and does not downgrade read to sent", () => {
+    expect(extractReceipts(metaPayload)[0]?.occurredAt).toBe(new Date(1793077755000).toISOString());
+    expect(bestReceiptStatus(["read", "sent"])).toBe("read");
+  });
 });
