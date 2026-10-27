@@ -2666,6 +2666,69 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_status_events: {
+        Row: {
+          delivery_id: string
+          errors: Json
+          id: string
+          occurred_at: string
+          provider_message_id: string
+          recipient: string | null
+          status: string
+        }
+        Insert: {
+          delivery_id: string
+          errors?: Json
+          id?: string
+          occurred_at: string
+          provider_message_id: string
+          recipient?: string | null
+          status: string
+        }
+        Update: {
+          delivery_id?: string
+          errors?: Json
+          id?: string
+          occurred_at?: string
+          provider_message_id?: string
+          recipient?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      whatsapp_webhook_events: {
+        Row: {
+          delivery_id: string
+          event: string
+          id: string
+          next_attempt_at: string
+          payload: Json
+          processed_at: string | null
+          processing_error: string | null
+          received_at: string
+        }
+        Insert: {
+          delivery_id: string
+          event: string
+          id?: string
+          next_attempt_at?: string
+          payload: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          received_at?: string
+        }
+        Update: {
+          delivery_id?: string
+          event?: string
+          id?: string
+          next_attempt_at?: string
+          payload?: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          received_at?: string
+        }
+        Relationships: []
+      }
       whatsapp_webhook_inbox: {
         Row: {
           delivery_id: string
@@ -2907,6 +2970,14 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_receipt_counts: {
+        Row: {
+          delivered: number | null
+          failed: number | null
+          read: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _lead_haystack: {
@@ -2933,6 +3004,10 @@ export type Database = {
           _require_no_contact?: boolean
         }
         Returns: number
+      }
+      complete_whatsapp_event: {
+        Args: { p_delivery_id: string; p_receipts: Json }
+        Returns: undefined
       }
       compute_demand_lead_quality_score: {
         Args: { _lead: Database["public"]["Tables"]["demand_leads"]["Row"] }
