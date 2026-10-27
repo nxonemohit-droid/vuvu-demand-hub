@@ -1,0 +1,13 @@
+{
+  "customizations": [
+    { "token": "--primary (Voynova Blue)", "source": "src/index.css", "reappliedIn": "src/styles.css" },
+    { "token": "--accent (Voynova Green)", "source": "src/index.css", "reappliedIn": "src/styles.css" },
+    { "token": "--success / bg-success", "source": "src/index.css + tailwind.config.ts", "reappliedIn": "src/styles.css" },
+    { "token": "--warning / bg-warning", "source": "src/index.css + tailwind.config.ts", "reappliedIn": "src/styles.css" },
+    { "token": "--sidebar-* palette / bg-sidebar", "source": "src/index.css + tailwind.config.ts", "reappliedIn": "src/styles.css" },
+    { "token": "--radius 0.75rem", "source": "src/index.css", "reappliedIn": "src/styles.css" },
+    { "token": "Inter body font", "source": "src/index.css", "reappliedIn": "src/styles.css" },
+    { "token": "container 2rem / 1400px", "source": "tailwind.config.ts", "reappliedIn": "src/styles.css" },
+    { "token": "accordion-down / accordion-up animations", "source": "tailwind.config.ts", "reappliedIn": "src/styles.css" }
+  ]
+}
