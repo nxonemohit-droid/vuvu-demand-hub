@@ -28,7 +28,7 @@ export function extractEmails(html: string, domain?: string | null): string[] {
 export function extractPhones(html: string): string[] {
   const set = new Set<string>();
   for (const m of html.matchAll(/href=["']tel:([^"']+)["']/gi)) {
-    const p = decodeURIComponent(m[1]).replace(/[^\d+]/g, "");
+    const p = decodeURIComponent(m[1] ?? "").replace(/[^\d+]/g, "");
     if (p.replace(/\D/g, "").length >= 7) set.add(p);
   }
   return [...set];
@@ -38,8 +38,8 @@ export function extractPhones(html: string): string[] {
 export function findContactLinks(html: string, origin: string): string[] {
   const out = new Set<string>();
   for (const m of html.matchAll(/<a[^>]+href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
-    const href = m[1];
-    const text = m[2].replace(/<[^>]+>/g, "");
+    const href = m[1] ?? "";
+    const text = (m[2] ?? "").replace(/<[^>]+>/g, "");
     if (!CONTACT_WORDS.test(href) && !CONTACT_WORDS.test(text)) continue;
     try {
       const u = new URL(href, origin);

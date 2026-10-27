@@ -372,7 +372,7 @@ const Stat = ({
 }: {
   icon: typeof Clock3;
   label: string;
-  value?: number;
+  value?: number | undefined;
   tone?: "primary" | "success" | "warning";
 }) => (
   <Card className="transition-all duration-200 hover:border-primary/25 hover:shadow-md">

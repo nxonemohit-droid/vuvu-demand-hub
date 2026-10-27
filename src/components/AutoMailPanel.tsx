@@ -410,7 +410,7 @@ const Stat = ({
 }: {
   icon: typeof Users;
   label: string;
-  value?: number;
+  value?: number | undefined;
   tone?: "primary" | "success" | "warning";
 }) => (
   <div className="rounded-lg border border-primary/10 bg-card p-3.5 shadow-sm">

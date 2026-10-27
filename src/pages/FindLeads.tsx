@@ -324,7 +324,7 @@ const FindLeads = () => {
   );
 };
 
-const StatCard = ({ label, value }: { label: string; value?: number }) => (
+const StatCard = ({ label, value }: { label: string; value?: number | undefined }) => (
   <Card>
     <CardContent className="pt-6">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>

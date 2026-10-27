@@ -26,7 +26,7 @@ const Auth = () => {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Signed in");
     navigate("/", { replace: true });
   };
@@ -43,7 +43,7 @@ const Auth = () => {
       },
     });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Account created");
     navigate("/", { replace: true });
   };

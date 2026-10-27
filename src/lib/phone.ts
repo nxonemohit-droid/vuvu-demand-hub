@@ -94,7 +94,7 @@ export type ParsedPhone = {
   /** Human-friendly international format */
   display: string;
   /** Detected country ISO-2 */
-  country?: CountryCode;
+  country?: CountryCode | undefined;
   /** Whether libphonenumber considers it a valid number */
   valid: boolean;
 };
