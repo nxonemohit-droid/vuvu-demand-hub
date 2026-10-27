@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "@/lib/router-compat";
 import { useEffect, useId } from "react";
 import { Radar, LogOut, HelpCircle, Send, BarChart3, Handshake } from "lucide-react";
 import { useRoles, signOut } from "@/lib/auth";
