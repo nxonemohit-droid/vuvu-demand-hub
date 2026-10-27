@@ -16,6 +16,7 @@ import { Route as AppFindRouteImport } from './routes/_app/find'
 import { Route as AppOutreachRouteImport } from './routes/_app/outreach'
 import { Route as AppPipelineRouteImport } from './routes/_app/pipeline'
 import { Route as AppRecruitersRouteImport } from './routes/_app/recruiters'
+import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -51,6 +52,12 @@ const AppRecruitersRoute = AppRecruitersRouteImport.update({
   path: '/recruiters',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicWhatsappWebhookRoute =
+  ApiPublicWhatsappWebhookRouteImport.update({
+    id: '/api/public/whatsapp/webhook',
+    path: '/api/public/whatsapp/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/outreach': typeof AppOutreachRoute
   '/pipeline': typeof AppPipelineRoute
   '/recruiters': typeof AppRecruitersRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -67,6 +75,7 @@ export interface FileRoutesByTo {
   '/pipeline': typeof AppPipelineRoute
   '/recruiters': typeof AppRecruitersRoute
   '/': typeof AppIndexRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,12 +86,27 @@ export interface FileRoutesById {
   '/_app/pipeline': typeof AppPipelineRoute
   '/_app/recruiters': typeof AppRecruitersRoute
   '/_app/': typeof AppIndexRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/find' | '/outreach' | '/pipeline' | '/recruiters'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/find'
+    | '/outreach'
+    | '/pipeline'
+    | '/recruiters'
+    | '/api/public/whatsapp/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/find' | '/outreach' | '/pipeline' | '/recruiters' | '/'
+  to:
+    | '/auth'
+    | '/find'
+    | '/outreach'
+    | '/pipeline'
+    | '/recruiters'
+    | '/'
+    | '/api/public/whatsapp/webhook'
   id:
     | '__root__'
     | '/_app'
@@ -92,11 +116,13 @@ export interface FileRouteTypes {
     | '/_app/pipeline'
     | '/_app/recruiters'
     | '/_app/'
+    | '/api/public/whatsapp/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -150,6 +176,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRecruitersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/whatsapp/webhook': {
+      id: '/api/public/whatsapp/webhook'
+      path: '/api/public/whatsapp/webhook'
+      fullPath: '/api/public/whatsapp/webhook'
+      preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -174,6 +207,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
