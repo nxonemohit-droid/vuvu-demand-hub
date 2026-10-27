@@ -1,5 +1,7 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [ ] Repair signed WhatsApp callback ingestion and automatic Outreach proof updates; verify received callbacks and report the 40-message batch's real status.
+
 - [x] Send bounded 40-employer WhatsApp batch: 5 new attempts plus 35 previously Accepted recipients resent at user's request; all 40 accepted with provider IDs saved, prior references preserved in lead notes; no delivery receipts received.
 
 - [x] Run requested 20-message WhatsApp batch: 20 pending recruiter mobile numbers accepted by Meta, 0 send failures; other future queue schedules unchanged.
