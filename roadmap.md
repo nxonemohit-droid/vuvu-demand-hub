@@ -1,5 +1,8 @@
 # Voynova Lead Engine — rebuild roadmap
 
+- [x] Run requested 20-message WhatsApp batch: 20 pending recruiter mobile numbers accepted by Meta, 0 send failures; other future queue schedules unchanged.
+- [ ] Reconcile user's four visible WhatsApp messages with recorded employer sends; distinguish historical/manual records from current-number acceptance and recipient delivery.
+
 - [x] Check WhatsApp evidence and show Meta acceptance separately from actual delivery on Outreach. Two tests passed; signed-in panel shows ten accepted messages with delivery unknown. No callback storage exists; actual Delivered/Read tracking is blocked by Classic connector support and requires approved migration.
 - [x] Show contact roles, contact-source labels and hiring/admissions evidence with source links in employer/college tables. Verified four Latvia prospects: Europlast has undated blue-collar vacancies, LU international degree admissions supported; Pillar/LVPIC excluded. LU already emailed, so no duplicate institution outreach. One new Europlast enquiry sent; signed-in preview reads sent at 26/10/2026 22:01. Remaining leads are source-reported, not individually verified.
 
