@@ -172,7 +172,7 @@ async function extract(markdown: string, kind: string): Promise<Record<string, s
           "profile_summary: 2 factual sentences about what this company does and where it operates.",
         ].join(" ");
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -183,9 +183,11 @@ async function extract(markdown: string, kind: string): Promise<Record<string, s
       model: "google/gemini-2.5-flash",
       stream: true,
       include: ["reasoning.encrypted_content"],
-      instructions: `${instruction} Return json. Use null for anything not clearly stated on the page. Never invent an email address.`,
-      input: [{ role: "user", content: [{ type: "input_text", text: markdown }] }],
-      text: { format: { type: "json_schema", name: "lead", strict: true, schema: SCHEMA } },
+      messages: [
+        { role: "system", content: `${instruction} Return json. Use null for anything not clearly stated on the page. Never invent an email address.` },
+        { role: "user", content: markdown },
+      ],
+      response_format: { type: "json_schema", json_schema: { name: "lead", strict: true, schema: SCHEMA } },
     }),
   });
 
@@ -194,7 +196,7 @@ async function extract(markdown: string, kind: string): Promise<Record<string, s
     return {};
   }
 
-  // Accumulate the SSE output_text deltas.
+  // Accumulate the SSE chat.completion chunk deltas.
   if (!res.body) return {};
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -212,7 +214,8 @@ async function extract(markdown: string, kind: string): Promise<Record<string, s
       if (!payload || payload === "[DONE]") continue;
       try {
         const ev = JSON.parse(payload);
-        if (ev.type === "response.output_text.delta" && ev.delta) text += ev.delta;
+        const delta = ev.choices?.[0]?.delta?.content;
+        if (typeof delta === "string") text += delta;
       } catch { /* partial frame */ }
     }
   }
