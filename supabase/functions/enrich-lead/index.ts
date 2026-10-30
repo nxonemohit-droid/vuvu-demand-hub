@@ -180,9 +180,8 @@ async function extract(markdown: string, kind: string): Promise<Record<string, s
       "X-Lovable-AIG-SDK": "fetch",
     },
     body: JSON.stringify({
-      model: "openai/gpt-6-astra",
+      model: "google/gemini-2.5-flash",
       stream: true,
-      reasoning: { effort: "low", summary: "auto" },
       include: ["reasoning.encrypted_content"],
       instructions: `${instruction} Return json. Use null for anything not clearly stated on the page. Never invent an email address.`,
       input: [{ role: "user", content: [{ type: "input_text", text: markdown }] }],
